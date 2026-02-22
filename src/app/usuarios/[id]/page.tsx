@@ -3,25 +3,26 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import CambiarRolForm from './CambiarRolForm'
 import Link from 'next/link'
 
-export default async function UsuarioDetallePage({ params }: { params: { id: string } }) {
+export default async function UsuarioDetallePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createServerSupabaseClient()
 
   const { data: usuario } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   const { data: proyectos } = await supabase
     .from('projects')
     .select('title, status, created_at')
-    .eq('owner_id', params.id)
+    .eq('owner_id', id)
     .order('created_at', { ascending: false })
 
   const { data: evidencias } = await supabase
     .from('evidences')
     .select('title, type, created_at')
-    .eq('created_by', params.id)
+    .eq('created_by', id)
     .order('created_at', { ascending: false })
 
   if (!usuario) return (
