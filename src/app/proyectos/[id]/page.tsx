@@ -16,25 +16,26 @@ const typeIcon: Record<string, string> = {
   'enlace': '🔗', 'presentación': '📊', 'código': '💻',
 }
 
-export default async function ProyectoDetallePage({ params }: { params: { id: string } }) {
+export default async function ProyectoDetallePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createServerSupabaseClient()
 
   const { data: proyecto } = await supabase
     .from('projects')
     .select('*, courses(name)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   const { data: evidencias } = await supabase
     .from('evidences')
     .select('*, profiles(full_name)')
-    .eq('project_id', params.id)
+    .eq('project_id', id)
     .order('created_at', { ascending: false })
 
   const { data: comentarios } = await supabase
     .from('comments')
     .select('*, profiles(full_name, role)')
-    .eq('project_id', params.id)
+    .eq('project_id', id)
     .order('created_at', { ascending: true })
 
   const { data: { user } } = await supabase.auth.getUser()
