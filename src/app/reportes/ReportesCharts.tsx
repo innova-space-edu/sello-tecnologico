@@ -72,7 +72,7 @@ export default function ReportesCharts({ usuarios, proyectos, evidencias }: {
           {usuariosPieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={usuariosPieData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({name, percent}) => `${name} ${(percent*100).toFixed(0)}%`}>
+                <Pie data={usuariosPieData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({name, percent}) => `${name} ${((percent ?? 0)*100).toFixed(0)}%`}>
                   {usuariosPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
@@ -93,7 +93,7 @@ export default function ReportesCharts({ usuarios, proyectos, evidencias }: {
           {proyectosPieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={proyectosPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" label={({name, percent}) => `${(percent*100).toFixed(0)}%`}>
+                <Pie data={proyectosPieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" label={({name, percent}) => `${((percent ?? 0)*100).toFixed(0)}%`}>
                   {proyectosPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
@@ -114,7 +114,7 @@ export default function ReportesCharts({ usuarios, proyectos, evidencias }: {
           {evidenciasPieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={evidenciasPieData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({name, percent}) => `${(percent*100).toFixed(0)}%`}>
+                <Pie data={evidenciasPieData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({name, percent}) => `${((percent ?? 0)*100).toFixed(0)}%`}>
                   {evidenciasPieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
