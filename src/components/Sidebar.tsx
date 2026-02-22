@@ -9,6 +9,7 @@ const menu = [
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
+  { href: '/usuarios', label: 'Usuarios', icon: '👥' },
   { href: '/reportes', label: 'Reportes', icon: '📈' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
@@ -25,44 +26,29 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 min-h-screen bg-blue-900 text-white flex flex-col fixed left-0 top-0">
-      {/* Logo y nombre */}
       <div className="p-6 border-b border-blue-700">
         <div className="text-xs text-blue-300 uppercase tracking-widest mb-1">Colegio Providencia</div>
         <div className="text-lg font-bold text-white leading-tight">Sello Tecnológico</div>
       </div>
-
-      {/* Menú */}
       <nav className="flex-1 p-4 space-y-1">
         {menu.map((item) => {
           const active = pathname.startsWith(item.href)
           return (
-            <Link
-              key={item.href}
-              href={item.href}
+            <Link key={item.href} href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-blue-600 text-white'
-                  : 'text-blue-200 hover:bg-blue-800 hover:text-white'
-              }`}
-            >
-              <span>{item.icon}</span>
-              {item.label}
+                active ? 'bg-blue-600 text-white' : 'text-blue-200 hover:bg-blue-800 hover:text-white'
+              }`}>
+              <span>{item.icon}</span>{item.label}
             </Link>
           )
         })}
       </nav>
-
-      {/* Logout y footer */}
       <div className="p-4 border-t border-blue-700">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-blue-200 hover:bg-blue-800 hover:text-white transition-colors"
-        >
+        <button onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
           <span>🚪</span> Cerrar sesión
         </button>
-        <div className="text-xs text-blue-400 mt-4 text-center">
-          Innova Space Education 2026
-        </div>
+        <div className="text-xs text-blue-400 mt-4 text-center">Innova Space Education 2026</div>
       </div>
     </aside>
   )
