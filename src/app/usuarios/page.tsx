@@ -1,5 +1,6 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import Link from 'next/link'
 
 const roleColor: Record<string, string> = {
   'admin': 'bg-purple-100 text-purple-700',
@@ -9,18 +10,13 @@ const roleColor: Record<string, string> = {
 }
 
 const roleIcon: Record<string, string> = {
-  'admin': '👑',
-  'coordinador': '🎯',
-  'docente': '👨‍🏫',
-  'estudiante': '🎓',
+  'admin': '👑', 'coordinador': '🎯', 'docente': '👨‍🏫', 'estudiante': '🎓',
 }
 
 export default async function UsuariosPage() {
   const supabase = await createServerSupabaseClient()
   const { data: usuarios } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false })
+    .from('profiles').select('*').order('created_at', { ascending: false })
 
   const docentes = usuarios?.filter(u => u.role === 'docente') ?? []
   const estudiantes = usuarios?.filter(u => u.role === 'estudiante') ?? []
@@ -35,7 +31,6 @@ export default async function UsuariosPage() {
           <p className="text-gray-500 mt-1">Docentes y estudiantes registrados en el sistema</p>
         </div>
 
-        {/* Resumen */}
         <div className="grid grid-cols-3 gap-5 mb-8">
           {[
             { label: 'Docentes', count: docentes.length, icon: '👨‍🏫', color: 'bg-green-100 text-green-700' },
@@ -52,7 +47,6 @@ export default async function UsuariosPage() {
           ))}
         </div>
 
-        {/* Tabla de usuarios */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-blue-900">Todos los usuarios ({usuarios?.length ?? 0})</h2>
@@ -73,7 +67,9 @@ export default async function UsuariosPage() {
                 {usuarios.map(u => (
                   <tr key={u.id} className="hover:bg-blue-50 transition-colors">
                     <td className="px-6 py-4 font-medium text-gray-800">
-                      {roleIcon[u.role]} {u.full_name ?? '—'}
+                      <Link href={`/usuarios/${u.id}`} className="text-blue-700 hover:underline">
+                        {roleIcon[u.role]} {u.full_name ?? '—'}
+                      </Link>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{u.rut ?? '—'}</td>
                     <td className="px-6 py-4 text-gray-500">{u.email}</td>
