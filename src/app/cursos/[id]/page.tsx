@@ -10,25 +10,26 @@ const statusColor: Record<string, string> = {
   'Cerrado': 'bg-red-100 text-red-600',
 }
 
-export default async function CursoDetallePage({ params }: { params: { id: string } }) {
+export default async function CursoDetallePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createServerSupabaseClient()
 
   const { data: curso } = await supabase
     .from('courses')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   const { data: proyectos } = await supabase
     .from('projects')
     .select('*')
-    .eq('course_id', params.id)
+    .eq('course_id', id)
     .order('created_at', { ascending: false })
 
   const { data: miembros } = await supabase
     .from('course_members')
     .select('*, profiles(full_name, email, role, rut)')
-    .eq('course_id', params.id)
+    .eq('course_id', id)
 
   if (!curso) return (
     <div className="flex min-h-screen bg-gray-50">
