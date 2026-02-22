@@ -3,34 +3,62 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+type Mode = 'login' | 'register'
+type Role = 'admin' | 'coordinador' | 'docente' | 'estudiante'
+
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+
+  const [mode, setMode] = useState<Mode>('login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
   const [form, setForm] = useState({
-    email: '', password: '', full_name: '', rut: '', curso: ''
+    email: '',
+    password: '',
+    full_name: '',
+    rut: '',
+    curso: '',
   })
 
-  const detectRole = (email: string) => {
-    return email.endsWith('@colprovidencia.cl') ? 'docente' : 'estudiante'
+  const detectRole = (email: string): Role => {
+    // Regla simple: dominio del colegio => docente, otro => estudiante
+    return email.trim().toLowerCase().endsWith('@colprovidencia.cl') ? 'docente' : 'estudiante'
   }
+
+  const normalizeRut = (rut: string) =>
+    rut
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, '')
+      // deja puntos y guion si el usuario los pone, pero elimina duplicados raros
+      .replace(/\.{2,}/g, '.')
+      .replace(/-{2,}/g, '-')
+
+  const normalizeCurso = (curso: string) => curso.trim()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
+
+    const email = form.email.trim().toLowerCase()
+
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email,
       password: form.password,
     })
-    if (error) {
+
+    if (loginError) {
       setError('Correo o contraseña incorrectos')
       setLoading(false)
-    } else {
-      router.push('/dashboard')
+      return
     }
+
+    // OK
+    router.push('/dashboard')
+    setLoading(false)
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -38,8 +66,13 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    if (!form.rut || !form.full_name || !form.email || !form.password) {
-      setError('Todos los campos son obligatorios')
+    const email = form.email.trim().toLowerCase()
+    const role = detectRole(email)
+    const rut = normalizeRut(form.rut)
+    const curso = normalizeCurso(form.curso)
+
+    if (!rut || !form.full_name.trim() || !email || !form.password) {
+      setError('Todos los campos obligatorios deben completarse')
       setLoading(false)
       return
     }
@@ -50,32 +83,50 @@ export default function LoginPage() {
       return
     }
 
-    const role = detectRole(form.email)
-
     const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
+      email,
       password: form.password,
     })
 
     if (signUpError) {
-      setError(signUpError.message === 'User already registered'
-        ? 'Este correo ya está registrado'
-        : 'Error al registrar. Intenta de nuevo.')
+      const msg = String(signUpError.message || '')
+      setError(
+        msg.includes('User already registered')
+          ? 'Este correo ya está registrado'
+          : 'Error al registrar. Intenta de nuevo.'
+      )
       setLoading(false)
       return
     }
 
-    if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        email: form.email,
-        full_name: form.full_name,
-        rut: form.rut,
-        curso: form.curso,
-        role,
-      })
-      router.push('/dashboard')
+    if (!data.user) {
+      setError('No se pudo crear el usuario. Intenta nuevamente.')
+      setLoading(false)
+      return
     }
+
+    // ✅ Lo que pedías: upsert del perfil con info extra
+    const { error: profileError } = await supabase.from('profiles').upsert({
+      id: data.user.id,
+      email,
+      full_name: form.full_name.trim(),
+      rut,
+      curso,
+      role,
+    })
+
+    if (profileError) {
+      // Esto suele pasar si falta policy de INSERT/UPSERT en RLS
+      setError(
+        'La cuenta se creó, pero no se pudo guardar el perfil (RLS/Permisos). ' +
+          'Avísame y lo corregimos en Supabase.'
+      )
+      setLoading(false)
+      return
+    }
+
+    router.push('/dashboard')
+    setLoading(false)
   }
 
   return (
@@ -91,7 +142,10 @@ export default function LoginPage() {
         {/* Tabs */}
         <div className="flex mx-8 mb-6 bg-gray-100 rounded-xl p-1">
           <button
-            onClick={() => { setMode('login'); setError('') }}
+            onClick={() => {
+              setMode('login')
+              setError('')
+            }}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
               mode === 'login' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'
             }`}
@@ -99,7 +153,10 @@ export default function LoginPage() {
             Ingresar
           </button>
           <button
-            onClick={() => { setMode('register'); setError('') }}
+            onClick={() => {
+              setMode('register')
+              setError('')
+            }}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
               mode === 'register' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'
             }`}
@@ -120,9 +177,10 @@ export default function LoginPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
                 <input
-                  type="email" required
+                  type="email"
+                  required
                   value={form.email}
-                  onChange={e => setForm({...form, email: e.target.value})}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="tu@correo.cl"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
@@ -130,15 +188,17 @@ export default function LoginPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
                 <input
-                  type="password" required
+                  type="password"
+                  required
                   value={form.password}
-                  onChange={e => setForm({...form, password: e.target.value})}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
               <button
-                type="submit" disabled={loading}
+                type="submit"
+                disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 mt-2"
               >
                 {loading ? 'Ingresando...' : 'Ingresar'}
@@ -151,7 +211,7 @@ export default function LoginPage() {
                 <input
                   required
                   value={form.full_name}
-                  onChange={e => setForm({...form, full_name: e.target.value})}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                   placeholder="Juan Pérez González"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
@@ -161,7 +221,7 @@ export default function LoginPage() {
                 <input
                   required
                   value={form.rut}
-                  onChange={e => setForm({...form, rut: e.target.value})}
+                  onChange={(e) => setForm({ ...form, rut: e.target.value })}
                   placeholder="12.345.678-9"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
@@ -170,7 +230,7 @@ export default function LoginPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Curso / Nivel</label>
                 <input
                   value={form.curso}
-                  onChange={e => setForm({...form, curso: e.target.value})}
+                  onChange={(e) => setForm({ ...form, curso: e.target.value })}
                   placeholder="Ej: 2° Medio B"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
@@ -178,17 +238,21 @@ export default function LoginPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico *</label>
                 <input
-                  type="email" required
+                  type="email"
+                  required
                   value={form.email}
-                  onChange={e => setForm({...form, email: e.target.value})}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="tu@correo.cl"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 {form.email && (
-                  <p className="text-xs mt-1 font-medium" style={{
-                    color: form.email.endsWith('@colprovidencia.cl') ? '#15803d' : '#2563eb'
-                  }}>
-                    {form.email.endsWith('@colprovidencia.cl')
+                  <p
+                    className="text-xs mt-1 font-medium"
+                    style={{
+                      color: form.email.trim().toLowerCase().endsWith('@colprovidencia.cl') ? '#15803d' : '#2563eb',
+                    }}
+                  >
+                    {form.email.trim().toLowerCase().endsWith('@colprovidencia.cl')
                       ? '✅ Serás registrado como Docente'
                       : '🎓 Serás registrado como Estudiante'}
                   </p>
@@ -197,15 +261,17 @@ export default function LoginPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
                 <input
-                  type="password" required
+                  type="password"
+                  required
                   value={form.password}
-                  onChange={e => setForm({...form, password: e.target.value})}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="Mínimo 6 caracteres"
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
               <button
-                type="submit" disabled={loading}
+                type="submit"
+                disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 mt-2"
               >
                 {loading ? 'Registrando...' : 'Crear cuenta'}
