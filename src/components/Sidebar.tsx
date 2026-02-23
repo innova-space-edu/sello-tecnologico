@@ -20,6 +20,7 @@ const menu = [
   { href: '/historial', label: 'Historial', icon: '🕐' },
   { href: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
+  { href: '/admin/moderacion', label: 'Moderación', icon: '🚨' },
 ]
 
 export default function Sidebar() {
