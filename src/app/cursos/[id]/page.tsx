@@ -1,6 +1,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
+import AgregarMiembroForm from './AgregarMiembroForm'
 
 const statusColor: Record<string, string> = {
   'Borrador': 'bg-gray-100 text-gray-600',
@@ -13,6 +14,17 @@ const statusColor: Record<string, string> = {
 export default async function CursoDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createServerSupabaseClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: perfilActual } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user?.id ?? '')
+    .single()
+
+  const puedeAgregarMiembros = perfilActual?.role === 'docente' ||
+    perfilActual?.role === 'admin' ||
+    perfilActual?.role === 'coordinador'
 
   const { data: curso } = await supabase
     .from('courses')
@@ -30,6 +42,18 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
     .from('course_members')
     .select('*, profiles(full_name, email, role, rut)')
     .eq('course_id', id)
+
+  // Obtener estudiantes que NO están ya en el curso (solo para docentes/admin)
+  let estudiantesDisponibles: any[] = []
+  if (puedeAgregarMiembros) {
+    const miembroIds = miembros?.map((m: any) => m.user_id) ?? []
+    const { data: todos } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, rut')
+      .eq('role', 'estudiante')
+      .order('full_name')
+    estudiantesDisponibles = (todos ?? []).filter(e => !miembroIds.includes(e.id))
+  }
 
   if (!curso) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -61,7 +85,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
         </div>
 
         {/* Stats del curso */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
           {[
             { label: 'Proyectos', value: proyectos?.length ?? 0, icon: '🗂️', color: 'bg-blue-100 text-blue-700' },
             { label: 'Miembros', value: miembros?.length ?? 0, icon: '👥', color: 'bg-indigo-100 text-indigo-700' },
@@ -77,12 +101,12 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Proyectos */}
-          <div className="col-span-2">
+          <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+              <div className="px-6 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-blue-900">Proyectos del curso</h2>
               </div>
               {proyectos && proyectos.length > 0 ? (
@@ -123,17 +147,51 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
           </div>
 
           {/* Miembros */}
-          <div>
+          <div className="flex flex-col gap-4">
+
+            {/* Formulario agregar — solo docentes/admin */}
+            {puedeAgregarMiembros && (
+              <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h2 className="font-semibold text-blue-900">Agregar estudiante</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Solo visible para docentes y coordinadores</p>
+                </div>
+                <div className="p-5">
+                  {estudiantesDisponibles.length > 0 ? (
+                    <AgregarMiembroForm
+                      cursoId={id}
+                      estudiantes={estudiantesDisponibles}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-2">
+                      Todos los estudiantes ya están en este curso
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Lista de miembros */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
+              <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="font-semibold text-blue-900">Miembros ({miembros?.length ?? 0})</h2>
               </div>
               {miembros && miembros.length > 0 ? (
                 <div className="divide-y divide-gray-100">
                   {miembros.map((m: any) => (
-                    <div key={m.user_id} className="px-5 py-3">
-                      <p className="font-medium text-gray-800 text-sm">{m.profiles?.full_name ?? m.profiles?.email}</p>
-                      <p className="text-xs text-gray-400">{m.profiles?.role} {m.profiles?.rut ? `· ${m.profiles.rut}` : ''}</p>
+                    <div key={m.user_id} className="px-5 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs shrink-0">
+                        {(m.profiles?.full_name ?? m.profiles?.email)?.[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-800 text-sm truncate">
+                          {m.profiles?.full_name ?? m.profiles?.email}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {m.profiles?.role}
+                          {m.profiles?.rut ? ` · ${m.profiles.rut}` : ''}
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>
