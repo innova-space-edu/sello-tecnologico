@@ -133,11 +133,17 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         {/* Header */}
-        <div className="text-center p-8 pb-4">
-          <div className="text-4xl mb-3">🏫</div>
-          <h1 className="text-2xl font-bold text-blue-900">Colegio Providencia</h1>
-          <p className="text-blue-600 font-semibold mt-1">Sello Tecnológico</p>
-        </div>
+        {/* Logo y nombre */}
+      <div className="text-center p-8 pb-4">
+        <img
+          src="https://drive.google.com/file/d/1kNPRll5Bzap3zAncT27j4YCAxqxvI2Ir/view?usp=drive_link"
+          alt="Colegio Providencia"
+          className="h-24 w-auto object-contain mx-auto mb-4"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+        <h1 className="text-2xl font-bold text-blue-900">Colegio Providencia</h1>
+        <p className="text-blue-600 font-semibold mt-1">Sello Tecnológico</p>
+      </div>
 
         {/* Tabs */}
         <div className="flex mx-8 mb-6 bg-gray-100 rounded-xl p-1">
