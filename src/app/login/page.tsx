@@ -136,7 +136,7 @@ export default function LoginPage() {
         {/* Logo y nombre */}
       <div className="text-center p-8 pb-4">
         <img
-          src="https://drive.google.com/uc?export=view&id=1kNPRll5Bzap3zAncT27j4YCAxqxvI2Ir"
+          src="https://drive.google.com/file/d/1kNPRll5Bzap3zAncT27j4YCAxqxvI2Ir/view?usp=sharing"
           alt="Colegio Providencia"
           className="h-28 w-auto object-contain mx-auto mb-4"
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
