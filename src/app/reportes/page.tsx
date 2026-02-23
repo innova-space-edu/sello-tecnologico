@@ -23,7 +23,7 @@ export default async function ReportesPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
 
         {/* Header con botón exportar */}
         <div className="mb-8 flex justify-between items-center">
@@ -42,7 +42,7 @@ export default async function ReportesPage() {
         </div>
 
         {/* Totales */}
-        <div className="grid grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5 mb-6 lg:mb-8">
           {[
             { label: 'Cursos', value: cursosCount ?? 0, icon: '📚', color: 'bg-blue-100 text-blue-700' },
             { label: 'Proyectos', value: proyectosCount ?? 0, icon: '🗂️', color: 'bg-indigo-100 text-indigo-700' },
