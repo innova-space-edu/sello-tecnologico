@@ -5,7 +5,6 @@ import type { NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
 
-  // Rutas públicas que no requieren verificación
   const publicPaths = ['/login', '/registro', '/bloqueado']
   if (publicPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
     return response
@@ -33,15 +32,33 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Verificar si está bloqueado
   const { data: perfil } = await supabase
     .from('profiles')
     .select('blocked, role')
     .eq('id', user.id)
     .single()
 
+  // Verificar si está bloqueado
   if (perfil?.blocked && perfil?.role !== 'admin') {
     return NextResponse.redirect(new URL('/bloqueado', request.url))
+  }
+
+  // Rutas restringidas para estudiantes
+  const rutasRestringidas = [
+    '/cursos/nuevo',
+    '/proyectos/nuevo',
+    '/evidencias/nueva',
+    '/usuarios/importar',
+    '/notificaciones',
+    '/admin',
+    '/historial',
+  ]
+
+  if (perfil?.role === 'estudiante') {
+    const restringida = rutasRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
+    if (restringida) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return response
