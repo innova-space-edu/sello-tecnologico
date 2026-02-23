@@ -47,7 +47,7 @@ export default async function UsuariosPage() {
           ))}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
           <div className="px-6 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-blue-900">Todos los usuarios ({usuarios?.length ?? 0})</h2>
           </div>
