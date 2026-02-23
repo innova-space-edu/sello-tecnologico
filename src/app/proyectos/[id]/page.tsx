@@ -43,7 +43,7 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
   if (!proyecto) return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <p className="text-gray-500">Proyecto no encontrado.</p>
       </main>
     </div>
@@ -78,7 +78,7 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           <div className="col-span-2 space-y-6">
 
             {/* Descripción y objetivos */}
