@@ -28,7 +28,7 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
   if (!usuario) return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <p className="text-gray-500">Usuario no encontrado.</p>
       </main>
     </div>
@@ -42,7 +42,7 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
           <Link href="/usuarios" className="text-blue-600 text-sm hover:underline">← Volver a Usuarios</Link>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           <div className="space-y-5">
             <div className="bg-white rounded-xl shadow-sm p-6">
               <div className="text-center mb-4">
