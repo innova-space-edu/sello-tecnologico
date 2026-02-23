@@ -23,7 +23,6 @@ export default function MensajesPage() {
       const { data: users } = await supabase.from('profiles').select('*').neq('id', user.id).order('full_name')
       setUsuarios(users ?? [])
 
-      // Contar no leídos por usuario
       const { data: unreadMsgs } = await supabase
         .from('messages')
         .select('sender_id')
@@ -42,7 +41,7 @@ export default function MensajesPage() {
     fetchMessages()
 
     const channel = supabase
-      .channel('messages')
+      .channel('messages-' + selectedUser.id)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         fetchMessages()
       })
@@ -60,13 +59,12 @@ export default function MensajesPage() {
 
     const { data } = await supabase
       .from('messages')
-      .select('*, sender:profiles!messages_sender_id_fkey(full_name, email)')
+      .select('*')
       .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${currentUser.id})`)
       .order('created_at', { ascending: true })
 
     setMessages(data ?? [])
 
-    // Marcar como leídos
     await supabase
       .from('messages')
       .update({ read: true })
@@ -86,6 +84,7 @@ export default function MensajesPage() {
       content: input.trim(),
     })
     setInput('')
+    fetchMessages()
   }
 
   const roleColor: Record<string, string> = {
@@ -135,9 +134,9 @@ export default function MensajesPage() {
 
         {/* Área de conversación */}
         {selectedUser ? (
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col overflow-hidden">
             {/* Header conversación */}
-            <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center gap-3">
+            <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center gap-3 shrink-0">
               <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
                 {(selectedUser.full_name ?? selectedUser.email)?.[0]?.toUpperCase()}
               </div>
@@ -182,7 +181,7 @@ export default function MensajesPage() {
             </div>
 
             {/* Input */}
-            <div className="bg-white px-6 py-4 border-t border-gray-200">
+            <div className="bg-white px-6 py-4 border-t border-gray-200 shrink-0">
               <form onSubmit={handleSend} className="flex gap-3">
                 <input value={input} onChange={e => setInput(e.target.value)}
                   placeholder={`Mensaje para ${selectedUser.full_name ?? selectedUser.email}...`}
