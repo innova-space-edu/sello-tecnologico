@@ -172,7 +172,22 @@ export default async function AdminPage() {
             Ver conversaciones →
           </Link>
         </div>
-
+        {/* Moderación */}
+        <div className="bg-white rounded-xl shadow-sm p-5 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-3xl">🚨</div>
+            <div>
+              <h2 className="font-semibold text-red-700">Moderación de Contenido</h2>
+              <p className="text-gray-500 text-sm mt-0.5">
+                Detección automática de palabras inapropiadas, bullying y contenido sexual
+              </p>
+            </div>
+          </div>
+          <Link href="/admin/moderacion"
+            className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
+            Ver alertas →
+          </Link>
+        </div>
         {/* Todos los proyectos */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
