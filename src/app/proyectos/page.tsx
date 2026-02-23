@@ -15,6 +15,7 @@ const statusColor: Record<string, string> = {
 export default function ProyectosPage() {
   const supabase = createClient()
   const [proyectos, setProyectos] = useState<any[]>([])
+  const [rol, setRol] = useState<string>('')
 
   const fetchProyectos = async () => {
     const { data } = await supabase
@@ -24,13 +25,24 @@ export default function ProyectosPage() {
     setProyectos(data ?? [])
   }
 
-  useEffect(() => { fetchProyectos() }, [])
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      setRol(perfil?.role ?? '')
+      fetchProyectos()
+    }
+    init()
+  }, [])
 
   const handleDelete = async (id: string, titulo: string) => {
     if (!confirm(`¿Eliminar el proyecto "${titulo}"? Esta acción no se puede deshacer.`)) return
     await supabase.from('projects').delete().eq('id', id)
     fetchProyectos()
   }
+
+  const esEstudiante = rol === 'estudiante'
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -41,10 +53,12 @@ export default function ProyectosPage() {
             <h1 className="text-2xl font-bold text-blue-900">Proyectos</h1>
             <p className="text-gray-500 mt-1">Todos los proyectos del Sello Tecnológico</p>
           </div>
-          <Link href="/proyectos/nuevo"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-            + Nuevo proyecto
-          </Link>
+          {!esEstudiante && (
+            <Link href="/proyectos/nuevo"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+              + Nuevo proyecto
+            </Link>
+          )}
         </div>
 
         {proyectos.length > 0 ? (
@@ -57,7 +71,9 @@ export default function ProyectosPage() {
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Tipo</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
-                  <th className="text-left px-6 py-3 text-gray-500 font-medium"></th>
+                  {!esEstudiante && (
+                    <th className="text-left px-6 py-3 text-gray-500 font-medium"></th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -76,13 +92,15 @@ export default function ProyectosPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{p.start_date ?? '—'}</td>
-                    <td className="px-6 py-4">
-                      <button onClick={() => handleDelete(p.id, p.title)}
-                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                        title="Eliminar proyecto">
-                        🗑️
-                      </button>
-                    </td>
+                    {!esEstudiante && (
+                      <td className="px-6 py-4">
+                        <button onClick={() => handleDelete(p.id, p.title)}
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                          title="Eliminar proyecto">
+                          🗑️
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -92,10 +110,12 @@ export default function ProyectosPage() {
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">🗂️</div>
             <h3 className="text-lg font-semibold text-gray-700">No hay proyectos aún</h3>
-            <Link href="/proyectos/nuevo"
-              className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-              + Crear proyecto
-            </Link>
+            {!esEstudiante && (
+              <Link href="/proyectos/nuevo"
+                className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                + Crear proyecto
+              </Link>
+            )}
           </div>
         )}
       </main>
