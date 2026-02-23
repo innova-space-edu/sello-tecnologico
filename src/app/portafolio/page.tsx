@@ -36,7 +36,7 @@ export default async function PortafolioPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
 
         {/* Header */}
         <div className="mb-8 flex justify-between items-start">
@@ -92,7 +92,7 @@ export default async function PortafolioPage() {
                   {/* Proyectos del curso */}
                   {proyectosCurso.length > 0 ? (
                     <div className="p-6">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {proyectosCurso.map(p => {
                           const evProyecto = evidencias?.filter(ev => ev.project_id === p.id) ?? []
                           return (
