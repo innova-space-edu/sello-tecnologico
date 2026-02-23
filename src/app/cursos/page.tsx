@@ -3,25 +3,35 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function CursosPage() {
   const supabase = createClient()
-  const router = useRouter()
   const [cursos, setCursos] = useState<any[]>([])
+  const [rol, setRol] = useState<string>('')
 
   const fetchCursos = async () => {
     const { data } = await supabase.from('courses').select('*').order('created_at', { ascending: false })
     setCursos(data ?? [])
   }
 
-  useEffect(() => { fetchCursos() }, [])
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      setRol(perfil?.role ?? '')
+      fetchCursos()
+    }
+    init()
+  }, [])
 
   const handleDelete = async (id: string, nombre: string) => {
     if (!confirm(`¿Eliminar el curso "${nombre}"? Esta acción no se puede deshacer.`)) return
     await supabase.from('courses').delete().eq('id', id)
     fetchCursos()
   }
+
+  const esEstudiante = rol === 'estudiante'
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -32,10 +42,12 @@ export default function CursosPage() {
             <h1 className="text-2xl font-bold text-blue-900">Cursos</h1>
             <p className="text-gray-500 mt-1">Gestiona los cursos del Sello Tecnológico</p>
           </div>
-          <Link href="/cursos/nuevo"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-            + Nuevo curso
-          </Link>
+          {!esEstudiante && (
+            <Link href="/cursos/nuevo"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+              + Nuevo curso
+            </Link>
+          )}
         </div>
 
         {cursos.length > 0 ? (
@@ -48,13 +60,15 @@ export default function CursosPage() {
                     <p className="text-gray-500 text-sm mt-1">{curso.level} — {curso.area}</p>
                     <p className="text-gray-400 text-xs mt-2">Año {curso.year}</p>
                   </Link>
-                  <div className="flex gap-2 ml-4">
+                  <div className="flex gap-2 ml-4 items-center">
                     <span className="text-2xl">📚</span>
-                    <button onClick={() => handleDelete(curso.id, curso.name)}
-                      className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                      title="Eliminar curso">
-                      🗑️
-                    </button>
+                    {!esEstudiante && (
+                      <button onClick={() => handleDelete(curso.id, curso.name)}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                        title="Eliminar curso">
+                        🗑️
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -64,11 +78,15 @@ export default function CursosPage() {
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">📚</div>
             <h3 className="text-lg font-semibold text-gray-700">No hay cursos aún</h3>
-            <p className="text-gray-400 mt-2">Crea el primer curso para comenzar</p>
-            <Link href="/cursos/nuevo"
-              className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-              + Crear curso
-            </Link>
+            <p className="text-gray-400 mt-2">
+              {esEstudiante ? 'Aún no hay cursos disponibles' : 'Crea el primer curso para comenzar'}
+            </p>
+            {!esEstudiante && (
+              <Link href="/cursos/nuevo"
+                className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                + Crear curso
+              </Link>
+            )}
           </div>
         )}
       </main>
