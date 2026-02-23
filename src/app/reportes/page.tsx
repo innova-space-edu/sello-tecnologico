@@ -1,6 +1,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import ReportesCharts from './ReportesCharts'
+import ExportPDF from '@/components/ExportPDF'
 
 export default async function ReportesPage() {
   const supabase = await createServerSupabaseClient()
@@ -12,13 +13,32 @@ export default async function ReportesPage() {
   const { data: proyectos } = await supabase.from('projects').select('status, created_at, type')
   const { data: evidencias } = await supabase.from('evidences').select('type, created_at')
 
+  // Calcular estados y roles para el PDF
+  const estados: Record<string, number> = {}
+  proyectos?.forEach(p => { estados[p.status] = (estados[p.status] ?? 0) + 1 })
+
+  const rolCount: Record<string, number> = {}
+  usuarios?.forEach(u => { rolCount[u.role] = (rolCount[u.role] ?? 0) + 1 })
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <main className="ml-64 flex-1 p-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-blue-900">Reportes</h1>
-          <p className="text-gray-500 mt-1">Estadísticas generales del Sello Tecnológico</p>
+
+        {/* Header con botón exportar */}
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-blue-900">Reportes</h1>
+            <p className="text-gray-500 mt-1">Estadísticas generales del Sello Tecnológico</p>
+          </div>
+          <ExportPDF data={{
+            cursos: cursosCount ?? 0,
+            proyectos: proyectosCount ?? 0,
+            evidencias: evidenciasCount ?? 0,
+            usuarios: usuarios?.length ?? 0,
+            porEstado: estados,
+            porRol: rolCount,
+          }} />
         </div>
 
         {/* Totales */}
