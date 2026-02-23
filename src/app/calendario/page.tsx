@@ -114,7 +114,7 @@ export default function CalendarioPage() {
               {formatDisplay(weekDates[0])} — {formatDisplay(weekDates[4])}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => setWeekOffset(w => w - 1)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-100 transition-colors">
               ← Anterior
@@ -193,7 +193,7 @@ export default function CalendarioPage() {
         )}
 
         {/* Grilla del calendario */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
