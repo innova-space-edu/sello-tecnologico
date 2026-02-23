@@ -12,9 +12,11 @@ const menu = [
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
   { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
+  { href: '/calendario', label: 'Calendario', icon: '📅' },
   { href: '/portafolio', label: 'Portafolio', icon: '📋' },
   { href: '/reportes', label: 'Reportes', icon: '📈' },
   { href: '/historial', label: 'Historial', icon: '🕐' },
+  { href: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
