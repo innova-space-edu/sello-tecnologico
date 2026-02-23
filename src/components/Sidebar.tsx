@@ -10,8 +10,10 @@ const menu = [
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
+  { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
   { href: '/portafolio', label: 'Portafolio', icon: '📋' },
   { href: '/reportes', label: 'Reportes', icon: '📈' },
+  { href: '/historial', label: 'Historial', icon: '🕐' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
