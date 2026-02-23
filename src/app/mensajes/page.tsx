@@ -98,10 +98,10 @@ export default function MensajesPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 flex" style={{ height: '100vh' }}>
+      <main className="lg:ml-64 flex-1 flex pt-14 lg:pt-0" style={{ height: '100vh' }}>
 
         {/* Lista de usuarios */}
-        <div className="w-72 bg-white border-r border-gray-200 flex flex-col">
+        <div className="w-full sm:w-72 bg-white border-r border-gray-200 flex flex-col">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-bold text-blue-900 text-lg">Mensajes</h2>
             <p className="text-gray-400 text-xs mt-0.5">Conversaciones directas</p>
