@@ -12,6 +12,7 @@ const typeIcon: Record<string, string> = {
 export default function EvidenciasPage() {
   const supabase = createClient()
   const [evidencias, setEvidencias] = useState<any[]>([])
+  const [rol, setRol] = useState<string>('')
 
   const fetchEvidencias = async () => {
     const { data } = await supabase
@@ -21,13 +22,24 @@ export default function EvidenciasPage() {
     setEvidencias(data ?? [])
   }
 
-  useEffect(() => { fetchEvidencias() }, [])
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      setRol(perfil?.role ?? '')
+      fetchEvidencias()
+    }
+    init()
+  }, [])
 
   const handleDelete = async (id: string, titulo: string) => {
     if (!confirm(`¿Eliminar la evidencia "${titulo}"?`)) return
     await supabase.from('evidences').delete().eq('id', id)
     fetchEvidencias()
   }
+
+  const esEstudiante = rol === 'estudiante'
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -38,10 +50,12 @@ export default function EvidenciasPage() {
             <h1 className="text-2xl font-bold text-blue-900">Evidencias</h1>
             <p className="text-gray-500 mt-1">Archivos y documentos del Sello Tecnológico</p>
           </div>
-          <Link href="/evidencias/nueva"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-            + Nueva evidencia
-          </Link>
+          {!esEstudiante && (
+            <Link href="/evidencias/nueva"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+              + Nueva evidencia
+            </Link>
+          )}
         </div>
 
         {evidencias.length > 0 ? (
@@ -68,11 +82,13 @@ export default function EvidenciasPage() {
                       </a>
                     )}
                   </div>
-                  <button onClick={() => handleDelete(ev.id, ev.title)}
-                    className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors shrink-0"
-                    title="Eliminar evidencia">
-                    🗑️
-                  </button>
+                  {!esEstudiante && (
+                    <button onClick={() => handleDelete(ev.id, ev.title)}
+                      className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors shrink-0"
+                      title="Eliminar evidencia">
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -81,10 +97,12 @@ export default function EvidenciasPage() {
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">📎</div>
             <h3 className="text-lg font-semibold text-gray-700">No hay evidencias aún</h3>
-            <Link href="/evidencias/nueva"
-              className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-              + Subir evidencia
-            </Link>
+            {!esEstudiante && (
+              <Link href="/evidencias/nueva"
+                className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                + Subir evidencia
+              </Link>
+            )}
           </div>
         )}
       </main>
