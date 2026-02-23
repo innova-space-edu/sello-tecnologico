@@ -34,7 +34,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
   if (!curso) return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <p className="text-gray-500">Curso no encontrado.</p>
       </main>
     </div>
@@ -61,7 +61,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
         </div>
 
         {/* Stats del curso */}
-        <div className="grid grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {[
             { label: 'Proyectos', value: proyectos?.length ?? 0, icon: '🗂️', color: 'bg-blue-100 text-blue-700' },
             { label: 'Miembros', value: miembros?.length ?? 0, icon: '👥', color: 'bg-indigo-100 text-indigo-700' },
