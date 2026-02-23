@@ -13,7 +13,7 @@ export default async function AdminPage() {
     return (
       <div className="flex min-h-screen bg-gray-50">
         <Sidebar />
-        <main className="ml-64 flex-1 p-8">
+        <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
           <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
             <div className="text-4xl mb-3">🚫</div>
             <h2 className="text-lg font-semibold text-red-700">Acceso restringido</h2>
@@ -51,7 +51,7 @@ export default async function AdminPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
 
         {/* Header */}
         <div className="mb-8">
@@ -60,7 +60,7 @@ export default async function AdminPage() {
         </div>
 
         {/* Stats globales */}
-        <div className="grid grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4 mb-6 lg:mb-8">
           {[
             { label: 'Usuarios', value: usuarios?.length ?? 0, icon: '👥', color: 'bg-purple-100 text-purple-700' },
             { label: 'Docentes', value: docentes.length, icon: '👨‍🏫', color: 'bg-green-100 text-green-700' },
@@ -78,7 +78,7 @@ export default async function AdminPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
 
           {/* Todos los usuarios */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
