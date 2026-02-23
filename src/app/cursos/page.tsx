@@ -26,7 +26,7 @@ export default function CursosPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-blue-900">Cursos</h1>
@@ -39,7 +39,7 @@ export default function CursosPage() {
         </div>
 
         {cursos.length > 0 ? (
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             {cursos.map((curso) => (
               <div key={curso.id} className="bg-white rounded-xl shadow-sm p-6 border border-transparent hover:border-blue-300 transition-all">
                 <div className="flex items-start justify-between">
