@@ -221,13 +221,31 @@ export default function CalendarioPage() {
                     const slotEvents = getEventsFor(d, slot)
                     const isToday = formatDate(d) === today
                     return (
-                      <td key={di} className={`px-2 py-1.5 border-l border-gray-200 align-top min-h-12 ${
+                      <td key={di} className={`px-2 py-1.5 border-l border-gray-200 align-top ${
                         isToday ? 'bg-blue-50 bg-opacity-30' : ''
                       }`} style={{ minHeight: '48px' }}>
                         {slotEvents.map(ev => (
                           <div key={ev.id}
                             className={`text-xs px-2 py-1.5 rounded-lg border mb-1 cursor-pointer group relative ${colorMap[ev.color] ?? colorMap.blue}`}>
                             <div className="font-semibold truncate pr-4">{ev.title}</div>
-                            {ev.courses?.name && <div className="text-xs opacity-70 truncate">{ev.courses.name}</div>}
+                            {ev.courses?.name && (
+                              <div className="text-xs opacity-70 truncate">{ev.courses.name}</div>
+                            )}
                             <button onClick={() => handleDelete(ev.id)}
-                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red
+                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 text-xs leading-none">
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  )
+}
