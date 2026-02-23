@@ -29,6 +29,7 @@ export default async function AdminPage() {
   const { data: proyectos } = await supabase.from('projects').select('*, courses(name)').order('created_at', { ascending: false })
   const { data: evidencias } = await supabase.from('evidences').select('*').order('created_at', { ascending: false })
   const { data: logs } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(20)
+  const { count: mensajesCount } = await supabase.from('messages').select('*', { count: 'exact', head: true })
 
   const docentes = usuarios?.filter(u => u.role === 'docente') ?? []
   const estudiantes = usuarios?.filter(u => u.role === 'estudiante') ?? []
@@ -60,13 +61,14 @@ export default async function AdminPage() {
         </div>
 
         {/* Stats globales */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4 mb-6 lg:mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-4 mb-6 lg:mb-8">
           {[
             { label: 'Usuarios', value: usuarios?.length ?? 0, icon: '👥', color: 'bg-purple-100 text-purple-700' },
             { label: 'Docentes', value: docentes.length, icon: '👨‍🏫', color: 'bg-green-100 text-green-700' },
             { label: 'Estudiantes', value: estudiantes.length, icon: '🎓', color: 'bg-sky-100 text-sky-700' },
             { label: 'Proyectos', value: proyectos?.length ?? 0, icon: '🗂️', color: 'bg-indigo-100 text-indigo-700' },
             { label: 'Evidencias', value: evidencias?.length ?? 0, icon: '📎', color: 'bg-blue-100 text-blue-700' },
+            { label: 'Mensajes', value: mensajesCount ?? 0, icon: '💬', color: 'bg-pink-100 text-pink-700' },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3">
               <div className={`text-xl p-2.5 rounded-lg ${s.color}`}>{s.icon}</div>
@@ -84,7 +86,10 @@ export default async function AdminPage() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
               <h2 className="font-semibold text-blue-900">Todos los usuarios ({usuarios?.length ?? 0})</h2>
-              <Link href="/usuarios/importar" className="text-xs text-blue-600 hover:underline">⬆️ Importar</Link>
+              <div className="flex gap-3">
+                <Link href="/usuarios/importar" className="text-xs text-blue-600 hover:underline">⬆️ Importar</Link>
+                <Link href="/admin/mensajes" className="text-xs text-blue-600 hover:underline">💬 Ver mensajes</Link>
+              </div>
             </div>
             <div className="overflow-auto max-h-80">
               <table className="w-full text-sm">
@@ -149,6 +154,23 @@ export default async function AdminPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Monitoreo de mensajes - banner */}
+        <div className="bg-white rounded-xl shadow-sm p-5 mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="text-3xl">💬</div>
+            <div>
+              <h2 className="font-semibold text-blue-900">Monitoreo de Mensajes</h2>
+              <p className="text-gray-500 text-sm mt-0.5">
+                {mensajesCount ?? 0} mensajes totales en la plataforma — solo lectura
+              </p>
+            </div>
+          </div>
+          <Link href="/admin/mensajes"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
+            Ver conversaciones →
+          </Link>
         </div>
 
         {/* Todos los proyectos */}
