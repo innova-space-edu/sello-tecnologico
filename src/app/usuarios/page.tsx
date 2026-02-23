@@ -25,13 +25,13 @@ export default async function UsuariosPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-blue-900">Usuarios</h1>
           <p className="text-gray-500 mt-1">Docentes y estudiantes registrados en el sistema</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-5 mb-6 lg:mb-8">
           {[
             { label: 'Docentes', count: docentes.length, icon: '👨‍🏫', color: 'bg-green-100 text-green-700' },
             { label: 'Estudiantes', count: estudiantes.length, icon: '🎓', color: 'bg-sky-100 text-sky-700' },
