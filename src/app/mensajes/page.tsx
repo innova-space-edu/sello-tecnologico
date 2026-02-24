@@ -34,6 +34,7 @@ export default function MensajesPage() {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
   const [warning, setWarning] = useState('')
   const [bloqueado, setBloqueado] = useState(false)
+  const [parBloqueado, setParBloqueado] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,7 +45,6 @@ export default function MensajesPage() {
       const { data: perfil } = await supabase
         .from('profiles').select('*').eq('id', user.id).single()
 
-      // Si ya está bloqueado al entrar
       if (perfil?.blocked && perfil?.role !== 'admin') {
         router.push('/bloqueado')
         return
@@ -63,7 +63,6 @@ export default function MensajesPage() {
       unreadMsgs?.forEach(m => { counts[m.sender_id] = (counts[m.sender_id] ?? 0) + 1 })
       setUnread(counts)
 
-      // Actualizar last_seen
       await supabase.from('profiles')
         .update({ last_seen: new Date().toISOString() }).eq('id', user.id)
 
@@ -95,7 +94,7 @@ export default function MensajesPage() {
           }
         })
 
-      // 🔴 Listener en tiempo real — detectar bloqueo mientras está en la página
+      // Listener bloqueo en tiempo real
       const blockChannel = supabase
         .channel('block-listener-' + user.id)
         .on('postgres_changes', {
@@ -106,10 +105,7 @@ export default function MensajesPage() {
         }, (payload) => {
           if (payload.new.blocked === true) {
             setBloqueado(true)
-            // Redirigir después de 3 segundos para mostrar el aviso
-            setTimeout(() => {
-              router.push('/bloqueado')
-            }, 3000)
+            setTimeout(() => { router.push('/bloqueado') }, 3000)
           }
         })
         .subscribe()
@@ -128,8 +124,24 @@ export default function MensajesPage() {
     init()
   }, [])
 
+  // Verificar si el par está bloqueado al seleccionar usuario
   useEffect(() => {
     if (!selectedUser || !currentUser) return
+    setParBloqueado(false)
+    setWarning('')
+
+    const checkPar = async () => {
+      const uidA = [currentUser.id, selectedUser.id].sort()[0]
+      const uidB = [currentUser.id, selectedUser.id].sort()[1]
+      const { data } = await supabase
+        .from('blocked_pairs')
+        .select('id')
+        .eq('user_a', uidA)
+        .eq('user_b', uidB)
+        .maybeSingle()
+      if (data) setParBloqueado(true)
+    }
+    checkPar()
     fetchMessages()
 
     const channel = supabase
@@ -164,7 +176,7 @@ export default function MensajesPage() {
     e.preventDefault()
     if (!input.trim() || !selectedUser || !currentUser) return
 
-    // Verificar si está bloqueado antes de enviar
+    // Verificar bloqueo personal
     const { data: perfil } = await supabase
       .from('profiles').select('blocked').eq('id', currentUser.id).single()
     if (perfil?.blocked) {
@@ -172,9 +184,26 @@ export default function MensajesPage() {
       return
     }
 
+    // Verificar bloqueo entre el par
+    const uidA = [currentUser.id, selectedUser.id].sort()[0]
+    const uidB = [currentUser.id, selectedUser.id].sort()[1]
+    const { data: par } = await supabase
+      .from('blocked_pairs')
+      .select('id')
+      .eq('user_a', uidA)
+      .eq('user_b', uidB)
+      .maybeSingle()
+
+    if (par) {
+      setParBloqueado(true)
+      setWarning('Esta conversación fue bloqueada por el administrador. No puedes enviar mensajes a este usuario.')
+      return
+    }
+
+    // Detectar palabras bloqueadas
     const palabrasEncontradas = detectarPalabrasBloqueadas(input)
     if (palabrasEncontradas.length > 0) {
-      setWarning(`Tu mensaje infringe el Reglamento Escolar. Contiene contenido inapropiado ("${palabrasEncontradas[0]}"). Será revisado por el administrador.`)
+      setWarning(`Tu mensaje infringe el Reglamento Escolar. Contiene contenido inapropiado ("${palabrasEncontradas[0]}"). Tu cuenta será bloqueada inmediatamente.`)
     }
 
     await supabase.from('messages').insert({
@@ -208,7 +237,7 @@ export default function MensajesPage() {
           </p>
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
             <p className="text-sm text-red-700 font-medium">
-              🚨 Se ha notificado al administrador para revisión inmediata.
+              🚨 El administrador revisará el caso y tomará las medidas correspondientes.
             </p>
           </div>
           <p className="text-xs text-gray-400">Redirigiendo en unos segundos...</p>
@@ -230,7 +259,7 @@ export default function MensajesPage() {
           </div>
           <div className="flex-1 overflow-y-auto">
             {usuarios.map(u => (
-              <button key={u.id} onClick={() => { setSelectedUser(u); setWarning('') }}
+              <button key={u.id} onClick={() => setSelectedUser(u)}
                 className={`w-full px-5 py-3.5 flex items-center gap-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 ${
                   selectedUser?.id === u.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                 }`}>
@@ -279,26 +308,41 @@ export default function MensajesPage() {
                   isOnline(selectedUser.id) ? 'bg-green-500' : 'bg-red-400'
                 }`} />
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-semibold text-gray-800">{selectedUser.full_name ?? selectedUser.email}</p>
                 <p className={`text-xs font-medium ${isOnline(selectedUser.id) ? 'text-green-500' : 'text-red-400'}`}>
                   {isOnline(selectedUser.id) ? '● En línea ahora' : '● Desconectado'}
                 </p>
               </div>
+              {parBloqueado && (
+                <span className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-medium">
+                  🚫 Conversación bloqueada
+                </span>
+              )}
             </div>
 
+            {/* Banner conversación bloqueada entre el par */}
+            {parBloqueado && (
+              <div className="mx-4 mt-4 bg-red-50 border border-red-300 rounded-xl p-4 flex items-center gap-3 shrink-0">
+                <span className="text-2xl shrink-0">🚫</span>
+                <div>
+                  <p className="text-sm font-bold text-red-700">Conversación bloqueada por el administrador</p>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    No puedes enviar ni recibir mensajes de este usuario. Contacta al administrador para más información.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Aviso de mensaje bloqueado */}
-            {warning && (
-              <div className="mx-4 mt-4 bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3 shrink-0 animate-pulse">
+            {warning && !parBloqueado && (
+              <div className="mx-4 mt-4 bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3 shrink-0">
                 <span className="text-2xl shrink-0">🚨</span>
                 <div className="flex-1">
                   <p className="text-sm font-bold text-red-700 mb-1">
                     Mensaje bloqueado — Reglamento Escolar infringido
                   </p>
                   <p className="text-xs text-red-600">{warning}</p>
-                  <p className="text-xs text-red-500 mt-1 font-semibold">
-                    Tu cuenta será bloqueada inmediatamente.
-                  </p>
                 </div>
                 <button onClick={() => setWarning('')} className="text-red-400 hover:text-red-600 shrink-0">✕</button>
               </div>
@@ -340,15 +384,22 @@ export default function MensajesPage() {
 
             {/* Input */}
             <div className="bg-white px-6 py-4 border-t border-gray-200 shrink-0">
-              <form onSubmit={handleSend} className="flex gap-3">
-                <input value={input} onChange={e => { setInput(e.target.value); setWarning('') }}
-                  placeholder={`Mensaje para ${selectedUser.full_name ?? selectedUser.email}...`}
-                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50" />
-                <button type="submit" disabled={!input.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50">
-                  Enviar
-                </button>
-              </form>
+              {parBloqueado ? (
+                <div className="flex items-center justify-center py-2 gap-2 text-red-400">
+                  <span>🚫</span>
+                  <span className="text-sm font-medium">No puedes enviar mensajes a este usuario</span>
+                </div>
+              ) : (
+                <form onSubmit={handleSend} className="flex gap-3">
+                  <input value={input} onChange={e => { setInput(e.target.value); setWarning('') }}
+                    placeholder={`Mensaje para ${selectedUser.full_name ?? selectedUser.email}...`}
+                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50" />
+                  <button type="submit" disabled={!input.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50">
+                    Enviar
+                  </button>
+                </form>
+              )}
               <p className="text-xs text-gray-400 mt-2 text-center">
                 Los mensajes son monitoreados para garantizar un entorno escolar seguro
               </p>
