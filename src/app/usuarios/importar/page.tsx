@@ -105,26 +105,34 @@ export default function ImportarUsuariosPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-blue-900">Importar alumnos desde Excel</h1>
-          <p className="text-gray-500 mt-1">Sube un archivo CSV con la lista de alumnos</p>
+      {/* ✅ lg:ml-64 + pt-16 para móvil con sidebar colapsado */}
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8 min-w-0">
+        <div className="mb-6 lg:mb-8">
+          {/* ✅ Texto ajustado a móvil */}
+          <h1 className="text-xl lg:text-2xl font-bold text-blue-900">Importar alumnos desde Excel</h1>
+          <p className="text-gray-500 mt-1 text-sm">Sube un archivo CSV con la lista de alumnos</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
+        {/* ✅ grid-cols-1 en móvil, 2 columnas en desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-5">
 
             {/* Instrucciones */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
-              <h3 className="font-semibold text-blue-900 mb-2">📋 Formato del archivo</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 lg:p-5">
+              <h3 className="font-semibold text-blue-900 mb-2 text-sm lg:text-base">📋 Formato del archivo</h3>
               <p className="text-sm text-blue-700 mb-3">El archivo CSV debe tener estas columnas en la primera fila:</p>
-              <code className="block bg-white rounded-lg p-3 text-xs text-gray-700 border border-blue-200">
-                nombre,rut,correo,curso
-              </code>
+              {/* ✅ overflow-x-auto para que el código no desborde */}
+              <div className="overflow-x-auto">
+                <code className="block bg-white rounded-lg p-3 text-xs text-gray-700 border border-blue-200 whitespace-nowrap">
+                  nombre,rut,correo,curso
+                </code>
+              </div>
               <p className="text-xs text-blue-600 mt-2">Ejemplo de fila:</p>
-              <code className="block bg-white rounded-lg p-3 text-xs text-gray-700 border border-blue-200">
-                Juan Pérez,12.345.678-9,jperez@gmail.com,2° Medio B
-              </code>
+              <div className="overflow-x-auto">
+                <code className="block bg-white rounded-lg p-3 text-xs text-gray-700 border border-blue-200 whitespace-nowrap">
+                  Juan Pérez,12.345.678-9,jperez@gmail.com,2° Medio B
+                </code>
+              </div>
               <p className="text-xs text-blue-500 mt-3">
                 💡 La contraseña inicial de cada usuario será su RUT sin puntos ni guión.
                 Los correos @colprovidencia.cl se asignan como docentes automáticamente.
@@ -132,11 +140,11 @@ export default function ImportarUsuariosPage() {
             </div>
 
             {/* Subir archivo */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="font-semibold text-blue-900 mb-4">Subir archivo CSV</h3>
+            <div className="bg-white rounded-xl shadow-sm p-4 lg:p-6">
+              <h3 className="font-semibold text-blue-900 mb-4 text-sm lg:text-base">Subir archivo CSV</h3>
               <input type="file" accept=".csv,.txt"
                 onChange={handleFile}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                className="w-full border border-gray-300 rounded-lg px-3 lg:px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               <p className="text-xs text-gray-400 mt-2">Formatos aceptados: .csv, .txt</p>
               {error && (
                 <div className="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
@@ -147,15 +155,15 @@ export default function ImportarUsuariosPage() {
 
             {/* Resultado */}
             {resultado && (
-              <div className={`rounded-xl p-5 border ${resultado.errores.length === 0 ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
-                <h3 className="font-semibold mb-2">Resultado de importación</h3>
+              <div className={`rounded-xl p-4 lg:p-5 border ${resultado.errores.length === 0 ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                <h3 className="font-semibold mb-2 text-sm lg:text-base">Resultado de importación</h3>
                 <p className="text-sm text-green-700">✅ {resultado.ok} usuarios importados correctamente</p>
                 {resultado.errores.length > 0 && (
                   <div className="mt-2">
                     <p className="text-sm text-red-700 font-medium">❌ {resultado.errores.length} errores:</p>
                     <ul className="mt-1 space-y-1">
                       {resultado.errores.map((e, i) => (
-                        <li key={i} className="text-xs text-red-600">{e}</li>
+                        <li key={i} className="text-xs text-red-600 break-all">{e}</li>
                       ))}
                     </ul>
                   </div>
@@ -169,18 +177,21 @@ export default function ImportarUsuariosPage() {
           </div>
 
           {/* Preview */}
-          <div>
+          <div className="min-w-0">
             {preview.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                  <h3 className="font-semibold text-blue-900">Vista previa ({preview.length} usuarios)</h3>
+                <div className="px-4 lg:px-6 py-4 border-b border-gray-100 flex flex-wrap gap-3 justify-between items-center">
+                  <h3 className="font-semibold text-blue-900 text-sm lg:text-base">
+                    Vista previa ({preview.length} usuarios)
+                  </h3>
                   <button onClick={handleImport} disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50">
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 lg:px-5 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 w-full sm:w-auto">
                     {loading ? 'Importando...' : '⬆️ Importar todos'}
                   </button>
                 </div>
-                <div className="overflow-auto max-h-96">
-                  <table className="w-full text-sm">
+                {/* ✅ overflow-x-auto para tabla en móvil */}
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-sm min-w-[500px]">
                     <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                       <tr>
                         <th className="text-left px-4 py-2 text-gray-500 font-medium">Nombre</th>
@@ -193,12 +204,12 @@ export default function ImportarUsuariosPage() {
                     <tbody className="divide-y divide-gray-100">
                       {preview.map((u, i) => (
                         <tr key={i} className="hover:bg-blue-50">
-                          <td className="px-4 py-2 text-gray-800">{u.full_name}</td>
-                          <td className="px-4 py-2 text-gray-500">{u.rut}</td>
-                          <td className="px-4 py-2 text-gray-500 text-xs">{u.email}</td>
-                          <td className="px-4 py-2 text-gray-500">{u.curso}</td>
+                          <td className="px-4 py-2 text-gray-800 text-xs whitespace-nowrap">{u.full_name}</td>
+                          <td className="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{u.rut}</td>
+                          <td className="px-4 py-2 text-gray-500 text-xs max-w-[140px] truncate">{u.email}</td>
+                          <td className="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{u.curso}</td>
                           <td className="px-4 py-2">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.email.endsWith('@colprovidencia.cl') ? 'bg-green-100 text-green-700' : 'bg-sky-100 text-sky-700'}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap ${u.email.endsWith('@colprovidencia.cl') ? 'bg-green-100 text-green-700' : 'bg-sky-100 text-sky-700'}`}>
                               {u.email.endsWith('@colprovidencia.cl') ? 'docente' : 'estudiante'}
                             </span>
                           </td>
