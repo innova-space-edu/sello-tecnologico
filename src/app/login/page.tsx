@@ -100,7 +100,7 @@ export default function LoginPage() {
         <div className="pt-8 pb-4 text-center">
           <div className="flex justify-center mb-4">
             <img
-              src="/logo.png"
+              src="/colegio logo.jpg"
               alt="Logo Colegio Providencia"
               className="h-24 w-auto object-contain"
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
