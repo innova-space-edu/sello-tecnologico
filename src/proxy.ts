@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
 
   const publicPaths = ['/login', '/registro', '/bloqueado']
@@ -38,12 +38,10 @@ export async function middleware(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  // Verificar si está bloqueado
   if (perfil?.blocked && perfil?.role !== 'admin') {
     return NextResponse.redirect(new URL('/bloqueado', request.url))
   }
 
-  // Rutas restringidas para estudiantes
   const rutasRestringidas = [
     '/cursos/nuevo',
     '/proyectos/nuevo',
