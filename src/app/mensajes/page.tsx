@@ -2,20 +2,18 @@
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
-// Palabras bloqueadas en el frontend (validación inmediata)
 const PALABRAS_BLOQUEADAS = [
   'te amo','te quiero','eres mi vida','mi amor','mi corazon','mi corazón',
   'estoy enamorado','estoy enamorada','me gustas','quiero estar contigo',
   'eres hermosa','eres hermoso','eres linda','eres lindo','mi cielo',
-  'mi vida','mi reina','mi rey','mi princesa','mi principe','bésame',
-  'besame','un beso','te extraño','te extrano','pienso en ti',
-  'sueño contigo','sueno contigo','sal conmigo','me enamoré','me enamore',
+  'mi reina','mi rey','mi princesa','mi principe','bésame','besame',
+  'un beso','te extraño','te extrano','pienso en ti','sueño contigo',
+  'sueno contigo','sal conmigo','me enamoré','me enamore',
   'declaracion','te declaro','eres especial para mi','me tienes loco','me tienes loca',
-  // Bullying
   'idiota','imbecil','estupido','estupida','retrasado','retrasada',
   'inutil','basura','te voy a pegar','te voy a matar','suicidio',
-  // Sexual
   'sexo','porno','desnudo','desnuda','puta','prostituta',
 ]
 
@@ -26,6 +24,7 @@ function detectarPalabrasBloqueadas(texto: string): string[] {
 
 export default function MensajesPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [usuarios, setUsuarios] = useState<any[]>([])
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
@@ -34,16 +33,27 @@ export default function MensajesPage() {
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
   const [warning, setWarning] = useState('')
+  const [bloqueado, setBloqueado] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: perfil } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+
+      const { data: perfil } = await supabase
+        .from('profiles').select('*').eq('id', user.id).single()
+
+      // Si ya está bloqueado al entrar
+      if (perfil?.blocked && perfil?.role !== 'admin') {
+        router.push('/bloqueado')
+        return
+      }
+
       setCurrentUser(perfil)
 
-      const { data: users } = await supabase.from('profiles').select('*').neq('id', user.id).order('full_name')
+      const { data: users } = await supabase
+        .from('profiles').select('*').neq('id', user.id).order('full_name')
       setUsuarios(users ?? [])
 
       const { data: unreadMsgs } = await supabase
@@ -53,10 +63,11 @@ export default function MensajesPage() {
       unreadMsgs?.forEach(m => { counts[m.sender_id] = (counts[m.sender_id] ?? 0) + 1 })
       setUnread(counts)
 
-      // Actualizar last_seen al entrar
-      await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id)
+      // Actualizar last_seen
+      await supabase.from('profiles')
+        .update({ last_seen: new Date().toISOString() }).eq('id', user.id)
 
-      // Presencia en tiempo real con Supabase Realtime
+      // Presencia en tiempo real
       const presenceChannel = supabase.channel('online-users')
       presenceChannel
         .on('presence', { event: 'sync' }, () => {
@@ -84,14 +95,34 @@ export default function MensajesPage() {
           }
         })
 
-      // Actualizar last_seen cada 30 segundos
+      // 🔴 Listener en tiempo real — detectar bloqueo mientras está en la página
+      const blockChannel = supabase
+        .channel('block-listener-' + user.id)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        }, (payload) => {
+          if (payload.new.blocked === true) {
+            setBloqueado(true)
+            // Redirigir después de 3 segundos para mostrar el aviso
+            setTimeout(() => {
+              router.push('/bloqueado')
+            }, 3000)
+          }
+        })
+        .subscribe()
+
       const interval = setInterval(async () => {
-        await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id)
+        await supabase.from('profiles')
+          .update({ last_seen: new Date().toISOString() }).eq('id', user.id)
       }, 30000)
 
       return () => {
         clearInterval(interval)
         supabase.removeChannel(presenceChannel)
+        supabase.removeChannel(blockChannel)
       }
     }
     init()
@@ -123,7 +154,9 @@ export default function MensajesPage() {
       .order('created_at', { ascending: true })
     setMessages(data ?? [])
     await supabase.from('messages').update({ read: true })
-      .eq('sender_id', selectedUser.id).eq('receiver_id', currentUser.id).eq('read', false)
+      .eq('sender_id', selectedUser.id)
+      .eq('receiver_id', currentUser.id)
+      .eq('read', false)
     setUnread(prev => ({ ...prev, [selectedUser.id]: 0 }))
   }
 
@@ -131,22 +164,19 @@ export default function MensajesPage() {
     e.preventDefault()
     if (!input.trim() || !selectedUser || !currentUser) return
 
-    // Validación en frontend antes de enviar
-    const palabrasEncontradas = detectarPalabrasBloqueadas(input)
-    if (palabrasEncontradas.length > 0) {
-      setWarning(`⚠️ Mensaje bloqueado: Tu mensaje infringe el Reglamento Escolar del Colegio Providencia. Contiene contenido inapropiado ("${palabrasEncontradas[0]}"). Este incidente será revisado por el administrador.`)
-      setInput('')
-      // Igual se envía para que el trigger lo registre y bloquee
-      await supabase.from('messages').insert({
-        sender_id: currentUser.id,
-        receiver_id: selectedUser.id,
-        content: input.trim(),
-      })
-      fetchMessages()
+    // Verificar si está bloqueado antes de enviar
+    const { data: perfil } = await supabase
+      .from('profiles').select('blocked').eq('id', currentUser.id).single()
+    if (perfil?.blocked) {
+      router.push('/bloqueado')
       return
     }
 
-    setWarning('')
+    const palabrasEncontradas = detectarPalabrasBloqueadas(input)
+    if (palabrasEncontradas.length > 0) {
+      setWarning(`Tu mensaje infringe el Reglamento Escolar. Contiene contenido inapropiado ("${palabrasEncontradas[0]}"). Será revisado por el administrador.`)
+    }
+
     await supabase.from('messages').insert({
       sender_id: currentUser.id,
       receiver_id: selectedUser.id,
@@ -164,6 +194,28 @@ export default function MensajesPage() {
   }
 
   const isOnline = (userId: string) => onlineUsers.has(userId)
+
+  // Pantalla de bloqueo en tiempo real
+  if (bloqueado) {
+    return (
+      <div className="fixed inset-0 bg-red-900 bg-opacity-95 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center mx-4">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-red-700 mb-3">Cuenta bloqueada</h1>
+          <p className="text-gray-600 mb-4">
+            Tu mensaje infringió el Reglamento Escolar del Colegio Providencia.
+            Tu cuenta ha sido bloqueada automáticamente y el administrador ha sido notificado.
+          </p>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+            <p className="text-sm text-red-700 font-medium">
+              🚨 Se ha notificado al administrador para revisión inmediata.
+            </p>
+          </div>
+          <p className="text-xs text-gray-400">Redirigiendo en unos segundos...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -186,10 +238,9 @@ export default function MensajesPage() {
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
                     {(u.full_name ?? u.email)?.[0]?.toUpperCase() ?? '?'}
                   </div>
-                  {/* Indicador online/offline */}
                   <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
                     isOnline(u.id) ? 'bg-green-500' : 'bg-red-400'
-                  }`} title={isOnline(u.id) ? 'En línea' : 'Desconectado'} />
+                  }`} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
@@ -238,13 +289,18 @@ export default function MensajesPage() {
 
             {/* Aviso de mensaje bloqueado */}
             {warning && (
-              <div className="mx-4 mt-4 bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3 shrink-0">
+              <div className="mx-4 mt-4 bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3 shrink-0 animate-pulse">
                 <span className="text-2xl shrink-0">🚨</span>
-                <div>
-                  <p className="text-sm font-semibold text-red-700 mb-1">Mensaje bloqueado por el Reglamento Escolar</p>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-red-700 mb-1">
+                    Mensaje bloqueado — Reglamento Escolar infringido
+                  </p>
                   <p className="text-xs text-red-600">{warning}</p>
+                  <p className="text-xs text-red-500 mt-1 font-semibold">
+                    Tu cuenta será bloqueada inmediatamente.
+                  </p>
                 </div>
-                <button onClick={() => setWarning('')} className="ml-auto text-red-400 hover:text-red-600 shrink-0">✕</button>
+                <button onClick={() => setWarning('')} className="text-red-400 hover:text-red-600 shrink-0">✕</button>
               </div>
             )}
 
