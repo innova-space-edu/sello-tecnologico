@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import MiraChat from '@/components/MiraChat'
 import NotificationBanner from '@/components/NotificationBanner'
+import ProviChat from '@/components/ProviChat'
 
 const inter = Inter({ subsets: ['latin'] })
 
