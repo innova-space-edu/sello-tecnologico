@@ -3,6 +3,27 @@ import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import { useEffect, useState, useRef } from 'react'
 
+// Palabras bloqueadas en el frontend (validación inmediata)
+const PALABRAS_BLOQUEADAS = [
+  'te amo','te quiero','eres mi vida','mi amor','mi corazon','mi corazón',
+  'estoy enamorado','estoy enamorada','me gustas','quiero estar contigo',
+  'eres hermosa','eres hermoso','eres linda','eres lindo','mi cielo',
+  'mi vida','mi reina','mi rey','mi princesa','mi principe','bésame',
+  'besame','un beso','te extraño','te extrano','pienso en ti',
+  'sueño contigo','sueno contigo','sal conmigo','me enamoré','me enamore',
+  'declaracion','te declaro','eres especial para mi','me tienes loco','me tienes loca',
+  // Bullying
+  'idiota','imbecil','estupido','estupida','retrasado','retrasada',
+  'inutil','basura','te voy a pegar','te voy a matar','suicidio',
+  // Sexual
+  'sexo','porno','desnudo','desnuda','puta','prostituta',
+]
+
+function detectarPalabrasBloqueadas(texto: string): string[] {
+  const lower = texto.toLowerCase()
+  return PALABRAS_BLOQUEADAS.filter(p => lower.includes(p))
+}
+
 export default function MensajesPage() {
   const supabase = createClient()
   const [usuarios, setUsuarios] = useState<any[]>([])
@@ -11,6 +32,8 @@ export default function MensajesPage() {
   const [input, setInput] = useState('')
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [unread, setUnread] = useState<Record<string, number>>({})
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
+  const [warning, setWarning] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -24,14 +47,52 @@ export default function MensajesPage() {
       setUsuarios(users ?? [])
 
       const { data: unreadMsgs } = await supabase
-        .from('messages')
-        .select('sender_id')
-        .eq('receiver_id', user.id)
-        .eq('read', false)
-
+        .from('messages').select('sender_id')
+        .eq('receiver_id', user.id).eq('read', false)
       const counts: Record<string, number> = {}
       unreadMsgs?.forEach(m => { counts[m.sender_id] = (counts[m.sender_id] ?? 0) + 1 })
       setUnread(counts)
+
+      // Actualizar last_seen al entrar
+      await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id)
+
+      // Presencia en tiempo real con Supabase Realtime
+      const presenceChannel = supabase.channel('online-users')
+      presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+          const state = presenceChannel.presenceState()
+          const ids = new Set(Object.values(state).flat().map((p: any) => p.user_id))
+          setOnlineUsers(ids)
+        })
+        .on('presence', { event: 'join' }, ({ newPresences }: any) => {
+          setOnlineUsers(prev => {
+            const next = new Set(prev)
+            newPresences.forEach((p: any) => next.add(p.user_id))
+            return next
+          })
+        })
+        .on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
+          setOnlineUsers(prev => {
+            const next = new Set(prev)
+            leftPresences.forEach((p: any) => next.delete(p.user_id))
+            return next
+          })
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await presenceChannel.track({ user_id: user.id })
+          }
+        })
+
+      // Actualizar last_seen cada 30 segundos
+      const interval = setInterval(async () => {
+        await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id)
+      }, 30000)
+
+      return () => {
+        clearInterval(interval)
+        supabase.removeChannel(presenceChannel)
+      }
     }
     init()
   }, [])
@@ -56,28 +117,36 @@ export default function MensajesPage() {
 
   const fetchMessages = async () => {
     if (!selectedUser || !currentUser) return
-
     const { data } = await supabase
-      .from('messages')
-      .select('*')
+      .from('messages').select('*')
       .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${currentUser.id})`)
       .order('created_at', { ascending: true })
-
     setMessages(data ?? [])
-
-    await supabase
-      .from('messages')
-      .update({ read: true })
-      .eq('sender_id', selectedUser.id)
-      .eq('receiver_id', currentUser.id)
-      .eq('read', false)
-
+    await supabase.from('messages').update({ read: true })
+      .eq('sender_id', selectedUser.id).eq('receiver_id', currentUser.id).eq('read', false)
     setUnread(prev => ({ ...prev, [selectedUser.id]: 0 }))
   }
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || !selectedUser || !currentUser) return
+
+    // Validación en frontend antes de enviar
+    const palabrasEncontradas = detectarPalabrasBloqueadas(input)
+    if (palabrasEncontradas.length > 0) {
+      setWarning(`⚠️ Mensaje bloqueado: Tu mensaje infringe el Reglamento Escolar del Colegio Providencia. Contiene contenido inapropiado ("${palabrasEncontradas[0]}"). Este incidente será revisado por el administrador.`)
+      setInput('')
+      // Igual se envía para que el trigger lo registre y bloquee
+      await supabase.from('messages').insert({
+        sender_id: currentUser.id,
+        receiver_id: selectedUser.id,
+        content: input.trim(),
+      })
+      fetchMessages()
+      return
+    }
+
+    setWarning('')
     await supabase.from('messages').insert({
       sender_id: currentUser.id,
       receiver_id: selectedUser.id,
@@ -94,6 +163,8 @@ export default function MensajesPage() {
     estudiante: 'bg-sky-100 text-sky-700',
   }
 
+  const isOnline = (userId: string) => onlineUsers.has(userId)
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
@@ -107,12 +178,18 @@ export default function MensajesPage() {
           </div>
           <div className="flex-1 overflow-y-auto">
             {usuarios.map(u => (
-              <button key={u.id} onClick={() => setSelectedUser(u)}
+              <button key={u.id} onClick={() => { setSelectedUser(u); setWarning('') }}
                 className={`w-full px-5 py-3.5 flex items-center gap-3 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 ${
                   selectedUser?.id === u.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''
                 }`}>
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
-                  {(u.full_name ?? u.email)?.[0]?.toUpperCase() ?? '?'}
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
+                    {(u.full_name ?? u.email)?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  {/* Indicador online/offline */}
+                  <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                    isOnline(u.id) ? 'bg-green-500' : 'bg-red-400'
+                  }`} title={isOnline(u.id) ? 'En línea' : 'Desconectado'} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-center">
@@ -123,9 +200,14 @@ export default function MensajesPage() {
                       </span>
                     )}
                   </div>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleColor[u.role] ?? 'bg-gray-100 text-gray-500'}`}>
-                    {u.role}
-                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${roleColor[u.role] ?? 'bg-gray-100 text-gray-500'}`}>
+                      {u.role}
+                    </span>
+                    <span className={`text-xs ${isOnline(u.id) ? 'text-green-500' : 'text-gray-400'}`}>
+                      {isOnline(u.id) ? '● En línea' : '● Desconectado'}
+                    </span>
+                  </div>
                 </div>
               </button>
             ))}
@@ -135,16 +217,36 @@ export default function MensajesPage() {
         {/* Área de conversación */}
         {selectedUser ? (
           <div className="flex-1 flex flex-col overflow-hidden">
+
             {/* Header conversación */}
             <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center gap-3 shrink-0">
-              <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
-                {(selectedUser.full_name ?? selectedUser.email)?.[0]?.toUpperCase()}
+              <div className="relative">
+                <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
+                  {(selectedUser.full_name ?? selectedUser.email)?.[0]?.toUpperCase()}
+                </div>
+                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                  isOnline(selectedUser.id) ? 'bg-green-500' : 'bg-red-400'
+                }`} />
               </div>
               <div>
                 <p className="font-semibold text-gray-800">{selectedUser.full_name ?? selectedUser.email}</p>
-                <p className="text-xs text-gray-400">{selectedUser.email} · {selectedUser.role}</p>
+                <p className={`text-xs font-medium ${isOnline(selectedUser.id) ? 'text-green-500' : 'text-red-400'}`}>
+                  {isOnline(selectedUser.id) ? '● En línea ahora' : '● Desconectado'}
+                </p>
               </div>
             </div>
+
+            {/* Aviso de mensaje bloqueado */}
+            {warning && (
+              <div className="mx-4 mt-4 bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3 shrink-0">
+                <span className="text-2xl shrink-0">🚨</span>
+                <div>
+                  <p className="text-sm font-semibold text-red-700 mb-1">Mensaje bloqueado por el Reglamento Escolar</p>
+                  <p className="text-xs text-red-600">{warning}</p>
+                </div>
+                <button onClick={() => setWarning('')} className="ml-auto text-red-400 hover:text-red-600 shrink-0">✕</button>
+              </div>
+            )}
 
             {/* Mensajes */}
             <div className="flex-1 overflow-y-auto p-6 space-y-3 bg-gray-50">
@@ -183,7 +285,7 @@ export default function MensajesPage() {
             {/* Input */}
             <div className="bg-white px-6 py-4 border-t border-gray-200 shrink-0">
               <form onSubmit={handleSend} className="flex gap-3">
-                <input value={input} onChange={e => setInput(e.target.value)}
+                <input value={input} onChange={e => { setInput(e.target.value); setWarning('') }}
                   placeholder={`Mensaje para ${selectedUser.full_name ?? selectedUser.email}...`}
                   className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50" />
                 <button type="submit" disabled={!input.trim()}
@@ -191,6 +293,9 @@ export default function MensajesPage() {
                   Enviar
                 </button>
               </form>
+              <p className="text-xs text-gray-400 mt-2 text-center">
+                Los mensajes son monitoreados para garantizar un entorno escolar seguro
+              </p>
             </div>
           </div>
         ) : (
