@@ -1,6 +1,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
+import PortfolioSections from '@/components/PortfolioSections'
 
 const etapaColor: Record<string, string> = {
   inicial: 'bg-yellow-100 text-yellow-700',
@@ -44,6 +45,12 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
     .eq('created_by', portafolio.user_id)
     .order('created_at', { ascending: true })
 
+  const { data: secciones } = await supabase
+    .from('portfolio_sections')
+    .select('*')
+    .eq('portfolio_id', portafolio.id)
+    .order('order_index', { ascending: true })
+
   const estudiante = portafolio.profiles
   const evInicial = evidencias?.filter(e => e.evidencia_tipo === 'inicial') ?? []
   const evIntermedia = evidencias?.filter(e => e.evidencia_tipo === 'intermedia') ?? []
@@ -58,19 +65,23 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
         <div className="mb-6">
           <Link href="/portafolio" className="text-blue-600 text-sm hover:underline">← Volver</Link>
           <div className="mt-3 bg-gradient-to-r from-blue-800 to-blue-600 rounded-2xl p-6 text-white">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-3xl font-bold">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-3xl font-bold shrink-0">
                 {estudiante?.full_name?.[0]?.toUpperCase() ?? '?'}
               </div>
-              <div>
+              <div className="flex-1">
                 <h1 className="text-2xl font-bold">📂 {estudiante?.full_name ?? estudiante?.email}</h1>
                 <p className="text-blue-200 mt-0.5">Portafolio Tecnológico · {portafolio.year}</p>
                 {estudiante?.curso && <p className="text-blue-200 text-sm">{estudiante.curso}</p>}
               </div>
-              <div className="ml-auto flex gap-3 text-center">
+              <div className="flex gap-3 text-center">
                 <div className="bg-white bg-opacity-10 rounded-xl px-4 py-2">
                   <div className="text-xl font-bold">{evidencias?.length ?? 0}</div>
                   <div className="text-blue-200 text-xs">Evidencias</div>
+                </div>
+                <div className="bg-white bg-opacity-10 rounded-xl px-4 py-2">
+                  <div className="text-xl font-bold">{secciones?.length ?? 0}</div>
+                  <div className="text-blue-200 text-xs">Secciones</div>
                 </div>
                 <div className="bg-white bg-opacity-10 rounded-xl px-4 py-2">
                   <div className="text-xl font-bold">{evFinal.length}</div>
@@ -169,6 +180,18 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
                 <Campo label="Cómo la tecnología me ayudó a aprender mejor" value={portafolio.tecnologia_ayudo} />
               </div>
             )}
+
+            {/* Secciones personalizadas — solo lectura para el docente */}
+            {secciones && secciones.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">➕ Secciones personalizadas</h2>
+                <PortfolioSections
+                  portfolioId={portafolio.id}
+                  initialSections={secciones}
+                  editable={false}
+                />
+              </div>
+            )}
           </div>
 
           {/* Panel lateral */}
@@ -206,6 +229,21 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
                 )}
               </div>
             </div>
+
+            {/* Resumen secciones */}
+            {secciones && secciones.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm p-5">
+                <h3 className="font-semibold text-blue-900 mb-3">Secciones personalizadas</h3>
+                <div className="space-y-1.5">
+                  {secciones.map((s: any) => (
+                    <div key={s.id} className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>{s.type === 'texto' ? '📝' : s.type === 'alternativas' ? '☑️' : '🖼️'}</span>
+                      <span className="truncate">{s.title}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </main>
