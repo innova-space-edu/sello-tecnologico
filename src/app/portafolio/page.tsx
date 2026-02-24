@@ -3,6 +3,7 @@ import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import PortfolioSections from '@/components/PortfolioSections'
 
 const etapaColor: Record<string, string> = {
   inicial: 'bg-yellow-100 text-yellow-700',
@@ -20,6 +21,7 @@ export default function PortafolioPage() {
   const [portafolio, setPortafolio] = useState<any>(null)
   const [evidencias, setEvidencias] = useState<any[]>([])
   const [proyectos, setProyectos] = useState<any[]>([])
+  const [portfolioSections, setPortfolioSections] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -46,7 +48,6 @@ export default function PortafolioPage() {
       const { data: p } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setPerfil(p)
 
-      // Cargar o crear portafolio del año actual
       const year = new Date().getFullYear()
       let { data: port } = await supabase.from('portfolios')
         .select('*').eq('user_id', user.id).eq('year', year).single()
@@ -59,6 +60,7 @@ export default function PortafolioPage() {
       }
 
       setPortafolio(port)
+
       if (port) {
         setForm({
           quien_soy: port.quien_soy ?? '',
@@ -72,9 +74,16 @@ export default function PortafolioPage() {
           quiero_aprender: port.quiero_aprender ?? '',
           tecnologia_ayudo: port.tecnologia_ayudo ?? '',
         })
+
+        // Cargar secciones personalizadas
+        const { data: secs } = await supabase
+          .from('portfolio_sections')
+          .select('*')
+          .eq('portfolio_id', port.id)
+          .order('order_index', { ascending: true })
+        setPortfolioSections(secs ?? [])
       }
 
-      // Evidencias del estudiante
       const { data: evs } = await supabase
         .from('evidences')
         .select('*, projects(title)')
@@ -82,8 +91,7 @@ export default function PortafolioPage() {
         .order('created_at', { ascending: true })
       setEvidencias(evs ?? [])
 
-      // Proyectos relacionados
-      const proyIds = [...new Set((evs ?? []).map(e => e.project_id).filter(Boolean))]
+      const proyIds = [...new Set((evs ?? []).map((e: any) => e.project_id).filter(Boolean))]
       if (proyIds.length > 0) {
         const { data: proys } = await supabase
           .from('projects').select('id, title, status, tipo_proyecto')
@@ -125,7 +133,7 @@ export default function PortafolioPage() {
   const evIntermedia = evidencias.filter(e => e.evidencia_tipo === 'intermedia')
   const evFinal = evidencias.filter(e => e.evidencia_tipo === 'final')
 
-  const TABS = ['A. Información', 'B. Presentación', 'C. Evidencias', 'D. Reflexiones', 'E. Progreso', 'F. Reflexión final']
+  const TABS = ['A. Información', 'B. Presentación', 'C. Evidencias', 'D. Reflexiones', 'E. Progreso', 'F. Reflexión final', '➕ Mis secciones']
 
   if (loading) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -165,7 +173,9 @@ export default function PortafolioPage() {
         <div className="flex gap-1 flex-wrap mb-6">
           {TABS.map((t, i) => (
             <button key={i} onClick={() => setTab(i)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === i ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-blue-50 border border-gray-200'}`}>
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                tab === i ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-blue-50 border border-gray-200'
+              }`}>
               {t}
             </button>
           ))}
@@ -241,16 +251,13 @@ export default function PortafolioPage() {
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">C. Evidencias seleccionadas</h2>
                 <p className="text-xs text-gray-400 mb-4">Solo lo más significativo de tu aprendizaje este año</p>
-
                 {evidencias.length > 0 ? (
                   <div className="space-y-3">
                     {evidencias.map(ev => (
                       <Link key={ev.id} href={`/evidencias/${ev.id}`}
                         className="flex items-start gap-4 p-4 border border-gray-100 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all">
-                        {/* Preview miniatura */}
                         {ev.file_url && ev.file_type?.startsWith('image/') ? (
-                          <img src={ev.file_url} alt={ev.title}
-                            className="w-14 h-14 object-cover rounded-lg shrink-0" />
+                          <img src={ev.file_url} alt={ev.title} className="w-14 h-14 object-cover rounded-lg shrink-0" />
                         ) : (
                           <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-2xl shrink-0">
                             {ev.file_type?.startsWith('video/') ? '🎥' :
@@ -285,8 +292,7 @@ export default function PortafolioPage() {
                   <div className="text-center py-8 text-gray-400">
                     <div className="text-4xl mb-3">📎</div>
                     <p className="text-sm">Aún no tienes evidencias</p>
-                    <Link href="/evidencias/nueva"
-                      className="inline-block mt-3 text-blue-600 text-sm hover:underline">
+                    <Link href="/evidencias/nueva" className="inline-block mt-3 text-blue-600 text-sm hover:underline">
                       + Subir primera evidencia
                     </Link>
                   </div>
@@ -345,8 +351,7 @@ export default function PortafolioPage() {
                           )}
                         </div>
                         {!ev.reflexion_aprendizaje && !ev.dificultad && !ev.como_resolvi && (
-                          <Link href={`/evidencias/${ev.id}`}
-                            className="text-xs text-blue-600 hover:underline">
+                          <Link href={`/evidencias/${ev.id}`} className="text-xs text-blue-600 hover:underline">
                             + Agregar reflexión a esta evidencia
                           </Link>
                         )}
@@ -367,8 +372,6 @@ export default function PortafolioPage() {
             <div className="space-y-4">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="font-bold text-blue-900 border-b pb-2 mb-6">E. Progreso en el tiempo</h2>
-
-                {/* Línea de tiempo visual */}
                 <div className="relative">
                   <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gray-200" />
 
@@ -466,7 +469,6 @@ export default function PortafolioPage() {
                   </div>
                 </div>
 
-                {/* Resumen progreso */}
                 {evidencias.length > 1 && (
                   <div className="mt-8 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-5 border border-blue-100">
                     <p className="font-semibold text-gray-800 mb-3">📈 Comparación de mejoras</p>
@@ -522,9 +524,26 @@ export default function PortafolioPage() {
               <div>
                 <label className={labelClass}>Cómo la tecnología me ayudó a aprender mejor</label>
                 <textarea value={form.tecnologia_ayudo} onChange={e => setForm({...form, tecnologia_ayudo: e.target.value})}
-                  rows={3} placeholder="¿Qué herramientas digitales te fueron más útiles? ¿Cómo te apoyó la tecnología?"
+                  rows={3} placeholder="¿Qué herramientas digitales te fueron más útiles?"
                   className={textareaClass} />
               </div>
+            </div>
+          )}
+
+          {/* G — Mis secciones personalizadas */}
+          {tab === 6 && portafolio && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
+                <p className="text-sm text-blue-700 font-medium">➕ Secciones personalizadas</p>
+                <p className="text-xs text-blue-500 mt-0.5">
+                  Agrega las secciones que quieras: texto libre, preguntas de selección o imágenes. Se guardan automáticamente.
+                </p>
+              </div>
+              <PortfolioSections
+                portfolioId={portafolio.id}
+                initialSections={portfolioSections}
+                editable={true}
+              />
             </div>
           )}
 
