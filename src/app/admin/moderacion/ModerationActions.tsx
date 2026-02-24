@@ -13,91 +13,109 @@ export default function ModerationActions({
   const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [resultado, setResultado] = useState('')
 
-  // Desbloquear AMBOS usuarios — el par sigue sin poder hablarse
+  const desbloquearUsuario = async (uid: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ blocked: false, blocked_reason: null, blocked_at: null })
+      .eq('id', uid)
+    return error
+  }
+
   const desbloquearAmbos = async () => {
-    if (!confirm('¿Desbloquear ambos usuarios? Podrán usar la plataforma normalmente pero NO podrán enviarse mensajes entre sí.')) return
+    if (!confirm('¿Desbloquear ambos usuarios? Podrán usar la plataforma pero NO podrán hablarse entre sí.')) return
     setLoading(true)
+    setResultado('')
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Desbloquear ambos al mismo tiempo
-    await supabase.from('profiles')
-      .update({ blocked: false, blocked_reason: null, blocked_at: null })
-      .in('id', [senderId, receiverId])
+    // Dos queries separadas — garantizado
+    const err1 = await desbloquearUsuario(senderId)
+    const err2 = await desbloquearUsuario(receiverId)
 
-    // Enviar advertencia a ambos
-    await supabase.from('messages').insert([
-      {
-        sender_id: user?.id,
-        receiver_id: senderId,
-        content: '⚠️ AVISO: Tu cuenta ha sido desbloqueada por el administrador. Tu acceso a la plataforma ha sido restituido. Sin embargo, tienes prohibido comunicarte con el otro participante de la conversación infractora. Cualquier reincidencia tendrá consecuencias disciplinarias graves.',
-      },
-      {
-        sender_id: user?.id,
-        receiver_id: receiverId,
-        content: '⚠️ AVISO: Tu cuenta ha sido desbloqueada por el administrador. Tu acceso a la plataforma ha sido restituido. Sin embargo, tienes prohibido comunicarte con el otro participante de la conversación infractora. Cualquier reincidencia tendrá consecuencias disciplinarias graves.',
-      }
-    ])
+    if (err1 || err2) {
+      setResultado(`⚠️ Error: ${err1?.message ?? err2?.message}`)
+      setLoading(false)
+      return
+    }
 
-    // Marcar como revisado
+    // Advertencia a cada uno por separado
+    await supabase.from('messages').insert({
+      sender_id: user?.id,
+      receiver_id: senderId,
+      content: '⚠️ AVISO: Tu cuenta ha sido desbloqueada. Tu acceso a la plataforma ha sido restituido. Sin embargo, tienes prohibido comunicarte con el otro participante de la conversación infractora. Cualquier reincidencia tendrá consecuencias disciplinarias graves.',
+    })
+
+    await supabase.from('messages').insert({
+      sender_id: user?.id,
+      receiver_id: receiverId,
+      content: '⚠️ AVISO: Tu cuenta ha sido desbloqueada. Tu acceso a la plataforma ha sido restituido. Sin embargo, tienes prohibido comunicarte con el otro participante de la conversación infractora. Cualquier reincidencia tendrá consecuencias disciplinarias graves.',
+    })
+
     await supabase.from('flagged_messages')
       .update({ reviewed: true, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
       .eq('id', flagId)
 
+    setResultado('✅ Ambos desbloqueados correctamente')
     setLoading(false)
-    router.refresh()
+    setTimeout(() => router.refresh(), 1000)
   }
 
-  // Eliminar chat + desbloquear ambos — el par sigue sin poder hablarse
   const eliminarChatYDesbloquear = async () => {
-    if (!confirm('¿Eliminar TODOS los mensajes entre estos usuarios y desbloquearlos? El bloqueo entre ellos permanecerá.')) return
+    if (!confirm('¿Eliminar TODOS los mensajes y desbloquear? El bloqueo entre ellos permanecerá.')) return
     setLoading(true)
+    setResultado('')
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Eliminar todos los mensajes entre ellos
     await supabase.from('messages')
       .delete()
       .or(`and(sender_id.eq.${senderId},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${senderId})`)
 
-    // Desbloquear ambos
-    await supabase.from('profiles')
-      .update({ blocked: false, blocked_reason: null, blocked_at: null })
-      .in('id', [senderId, receiverId])
+    const err1 = await desbloquearUsuario(senderId)
+    const err2 = await desbloquearUsuario(receiverId)
 
-    // Enviar aviso
-    await supabase.from('messages').insert([
-      {
-        sender_id: user?.id,
-        receiver_id: senderId,
-        content: '🗑️ AVISO: El historial de tu conversación inapropiada ha sido eliminado por el administrador. Tu cuenta ha sido desbloqueada, pero no podrás comunicarte con el otro participante.',
-      },
-      {
-        sender_id: user?.id,
-        receiver_id: receiverId,
-        content: '🗑️ AVISO: El historial de tu conversación inapropiada ha sido eliminado por el administrador. Tu cuenta ha sido desbloqueada, pero no podrás comunicarte con el otro participante.',
-      }
-    ])
+    if (err1 || err2) {
+      setResultado(`⚠️ Error al desbloquear: ${err1?.message ?? err2?.message}`)
+      setLoading(false)
+      return
+    }
 
-    // Marcar como revisado
+    await supabase.from('messages').insert({
+      sender_id: user?.id,
+      receiver_id: senderId,
+      content: '🗑️ AVISO: El historial de tu conversación ha sido eliminado. Tu cuenta ha sido desbloqueada, pero no podrás comunicarte con el otro participante.',
+    })
+
+    await supabase.from('messages').insert({
+      sender_id: user?.id,
+      receiver_id: receiverId,
+      content: '🗑️ AVISO: El historial de tu conversación ha sido eliminado. Tu cuenta ha sido desbloqueada, pero no podrás comunicarte con el otro participante.',
+    })
+
     await supabase.from('flagged_messages')
       .update({ reviewed: true, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
       .eq('id', flagId)
 
+    setResultado('✅ Chat eliminado y ambos desbloqueados')
     setLoading(false)
-    router.refresh()
+    setTimeout(() => router.refresh(), 1000)
   }
 
-  // Falsa alarma — desbloquea TODO incluyendo el par (pueden volver a hablarse)
   const falsaAlarma = async () => {
-    if (!confirm('¿Confirmas que es una falsa alarma? Se desbloquearán ambos usuarios y podrán volver a hablarse entre sí.')) return
+    if (!confirm('¿Confirmas falsa alarma? Se desbloquea todo y podrán volver a hablarse.')) return
     setLoading(true)
+    setResultado('')
 
-    // Desbloquear ambos
-    await supabase.from('profiles')
-      .update({ blocked: false, blocked_reason: null, blocked_at: null })
-      .in('id', [senderId, receiverId])
+    const err1 = await desbloquearUsuario(senderId)
+    const err2 = await desbloquearUsuario(receiverId)
 
-    // Eliminar bloqueo del par para que puedan volver a hablar
+    if (err1 || err2) {
+      setResultado(`⚠️ Error: ${err1?.message ?? err2?.message}`)
+      setLoading(false)
+      return
+    }
+
+    // Eliminar bloqueo del par
     const uidA = [senderId, receiverId].sort()[0]
     const uidB = [senderId, receiverId].sort()[1]
     await supabase.from('blocked_pairs')
@@ -105,19 +123,18 @@ export default function ModerationActions({
       .eq('user_a', uidA)
       .eq('user_b', uidB)
 
-    // Marcar como revisado
     await supabase.from('flagged_messages')
       .update({ reviewed: true })
       .eq('id', flagId)
 
+    setResultado('✅ Falsa alarma — ambos desbloqueados completamente')
     setLoading(false)
-    router.refresh()
+    setTimeout(() => router.refresh(), 1000)
   }
 
   return (
     <div className="flex flex-col gap-2 shrink-0 min-w-48">
 
-      {/* Opción principal */}
       <button onClick={desbloquearAmbos} disabled={loading}
         className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 text-left">
         🔓 Desbloquear ambos
@@ -137,7 +154,15 @@ export default function ModerationActions({
       </button>
 
       {loading && (
-        <p className="text-xs text-gray-400 text-center">Procesando...</p>
+        <p className="text-xs text-gray-400 text-center animate-pulse">Procesando...</p>
+      )}
+
+      {resultado && (
+        <p className={`text-xs text-center font-medium px-2 py-1.5 rounded-lg ${
+          resultado.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+        }`}>
+          {resultado}
+        </p>
       )}
     </div>
   )
