@@ -134,7 +134,7 @@ export default async function ModeracionPage() {
                     </div>
 
                     {/* Acciones */}
-                    <ModerationActions flagId={f.id} senderId={f.sender_id} />
+                    <ModerationActions flagId={f.id} senderId={f.sender_id} receiverId={f.receiver_id} />
                   </div>
                 </div>
               ))}
