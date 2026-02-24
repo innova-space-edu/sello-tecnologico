@@ -134,13 +134,14 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         {/* Header */}
         {/* Logo y nombre */}
-      <div className="text-center p-8 pb-4">
-        <img
-          src="/logo-colegio.png"
-          alt="Colegio Providencia"
-          className="h-28 w-auto object-contain mx-auto mb-4"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+       <div className="flex justify-center mb-4">
+      <img
+        src="/logo.png"
+        alt="Logo Colegio Providencia"
+        className="h-24 w-auto object-contain"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
         />
+      </div>
         <h1 className="text-2xl font-bold text-blue-900">Colegio Providencia</h1>
         <p className="text-blue-600 font-semibold mt-1">Sello Tecnológico</p>
       </div>
