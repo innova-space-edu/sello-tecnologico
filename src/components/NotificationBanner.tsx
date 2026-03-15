@@ -18,14 +18,31 @@ export default function NotificationBanner() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [dismissed, setDismissed] = useState<string[]>([])
 
-  useEffect(() => {
+  const fetchNotifications = async () => {
     const today = new Date().toISOString().split('T')[0]
-    supabase.from('notifications')
+    const { data } = await supabase
+      .from('notifications')
       .select('*')
       .eq('active', true)
       .or(`expires_at.is.null,expires_at.gte.${today}`)
       .order('created_at', { ascending: false })
-      .then(({ data }) => setNotifications(data ?? []))
+    setNotifications(data ?? [])
+  }
+
+  useEffect(() => {
+    fetchNotifications()
+
+    // Escuchar cambios en tiempo real — cuando el admin desactiva una notif, desaparece automáticamente
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        () => fetchNotifications()
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   const visible = notifications.filter(n => !dismissed.includes(n.id))
