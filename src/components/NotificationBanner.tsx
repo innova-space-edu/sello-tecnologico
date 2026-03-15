@@ -17,6 +17,7 @@ export default function NotificationBanner() {
   const supabase = createClient()
   const [notifications, setNotifications] = useState<any[]>([])
   const [dismissed, setDismissed] = useState<string[]>([])
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   const fetchNotifications = async () => {
     const today = new Date().toISOString().split('T')[0]
@@ -30,23 +31,35 @@ export default function NotificationBanner() {
   }
 
   useEffect(() => {
-    fetchNotifications()
+    // Solo mostrar si hay sesión activa
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return
+      setIsLoggedIn(true)
+      fetchNotifications()
+    })
 
-    // Escuchar cambios en tiempo real — cuando el admin desactiva una notif, desaparece automáticamente
+    // Realtime: refresca cuando cambia cualquier notificación
     const channel = supabase
       .channel('notifications-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications' },
-        () => fetchNotifications()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+        fetchNotifications()
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Ocultar banner si el usuario cierra sesión
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session)
+      if (!session) setNotifications([])
+    })
+
+    return () => {
+      supabase.removeChannel(channel)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const visible = notifications.filter(n => !dismissed.includes(n.id))
-  if (visible.length === 0) return null
+  if (!isLoggedIn || visible.length === 0) return null
 
   return (
     <div className="fixed top-0 left-64 right-0 z-40 space-y-0">
