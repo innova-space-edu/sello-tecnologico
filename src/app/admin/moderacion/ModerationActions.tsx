@@ -23,6 +23,15 @@ export default function ModerationActions({
     return error
   }
 
+  // Desactiva notificaciones de bloqueo automático en el banner
+  const limpiarNotificacionesBloqueo = async () => {
+    await supabase
+      .from('notifications')
+      .update({ active: false })
+      .eq('type', 'error')
+      .ilike('title', '%Bloqueo%')
+  }
+
   const desbloquearAmbos = async () => {
     if (!confirm('¿Desbloquear ambos usuarios? Podrán usar la plataforma pero NO podrán hablarse entre sí.')) return
     setLoading(true)
@@ -55,6 +64,8 @@ export default function ModerationActions({
     await supabase.from('flagged_messages')
       .update({ reviewed: true, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
       .eq('id', flagId)
+
+    await limpiarNotificacionesBloqueo()
 
     setResultado('✅ Ambos desbloqueados correctamente')
     setLoading(false)
@@ -96,6 +107,8 @@ export default function ModerationActions({
       .update({ reviewed: true, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
       .eq('id', flagId)
 
+    await limpiarNotificacionesBloqueo()
+
     setResultado('✅ Chat eliminado y ambos desbloqueados')
     setLoading(false)
     setTimeout(() => router.refresh(), 1000)
@@ -126,6 +139,8 @@ export default function ModerationActions({
     await supabase.from('flagged_messages')
       .update({ reviewed: true })
       .eq('id', flagId)
+
+    await limpiarNotificacionesBloqueo()
 
     setResultado('✅ Falsa alarma — ambos desbloqueados completamente')
     setLoading(false)
