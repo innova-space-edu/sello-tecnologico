@@ -11,6 +11,7 @@ export default function ProviChat() {
   const [esDocente, setEsDocente] = useState(false)
   const [unread, setUnread] = useState(0)
   const [lastSeen, setLastSeen] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -21,13 +22,16 @@ export default function ProviChat() {
       const { data: perfil } = await supabase
         .from('profiles').select('*').eq('id', user.id).single()
 
-      // Solo docentes y admin con dominio @colprovidencia.cl
-      const esProvi = user.email?.endsWith('@colprovidencia.cl') ?? false
+      // Mostrar a docentes, admin y coordinadores aunque el correo no use el dominio institucional
       const rolValido = perfil?.role === 'docente' || perfil?.role === 'admin' || perfil?.role === 'coordinador'
 
-      if (!esProvi || !rolValido) return
+      if (!rolValido) {
+        setReady(true)
+        return
+      }
 
       setEsDocente(true)
+      setReady(true)
       setCurrentUser(perfil)
 
       const saved = localStorage.getItem('provi-last-seen')
@@ -48,7 +52,7 @@ export default function ProviChat() {
 
       return () => { supabase.removeChannel(channel) }
     }
-    init()
+    init().finally(() => setReady(true))
   }, [])
 
   useEffect(() => {
@@ -86,12 +90,12 @@ export default function ProviChat() {
     setInput('')
   }
 
-  if (!esDocente) return null
+  if (!ready || !esDocente) return null
 
   return (
     <>
       {/* Burbuja flotante verde */}
-      <div className="fixed bottom-24 right-6 z-50">
+      <div className="fixed bottom-6 right-24 sm:right-28 z-[60]">
         <button
           onClick={() => setOpen(!open)}
           className="relative bg-green-500 hover:bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg transition-all hover:scale-110"
@@ -120,7 +124,7 @@ export default function ProviChat() {
 
       {/* Ventana del chat */}
       {open && (
-        <div className="fixed bottom-44 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-green-200 flex flex-col overflow-hidden"
+        <div className="fixed bottom-24 right-6 sm:right-24 z-[60] w-[min(24rem,calc(100vw-1.5rem))] bg-white rounded-2xl shadow-2xl border border-green-200 flex flex-col overflow-hidden"
           style={{ height: '480px' }}>
 
           {/* Header */}
