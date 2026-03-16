@@ -1,6 +1,7 @@
 'use client'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { useState } from 'react'
 
 type Mode = 'login' | 'register'
@@ -99,12 +100,16 @@ export default function LoginPage() {
         {/* Header con logo */}
         <div className="pt-8 pb-4 text-center">
           <div className="flex justify-center mb-4">
-            <img
-              src="/colegio-logo.jpg"
-              alt="Logo Colegio Providencia"
-              className="h-24 w-auto object-contain"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
+            <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100">
+              <Image
+                src="/colegio-logo.jpg"
+                alt="Logo Colegio Providencia"
+                fill
+                sizes="96px"
+                className="object-contain p-2"
+                priority
+              />
+            </div>
           </div>
           <h1 className="text-2xl font-bold text-blue-900">Colegio Providencia</h1>
           <p className="text-blue-600 font-semibold mt-1">Sello Tecnológico</p>
