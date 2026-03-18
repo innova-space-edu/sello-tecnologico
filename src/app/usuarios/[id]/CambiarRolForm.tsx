@@ -1,6 +1,6 @@
 'use client'
 import { createClient } from '@/lib/supabase'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 const roles = [
@@ -10,12 +10,34 @@ const roles = [
   { value: 'admin', label: '👑 Administrador' },
 ]
 
-export default function CambiarRolForm({ userId, currentRole }: { userId: string, currentRole: string }) {
+const rolesPermitidos = ['admin', 'docente', 'coordinador', 'utp']
+
+export default function CambiarRolForm({ userId, currentRole }: { userId: string; currentRole: string }) {
   const supabase = createClient()
   const router = useRouter()
   const [role, setRole] = useState(currentRole)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [puedeEditar, setPuedeEditar] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase.from('profiles').select('role').eq('id', user.id).single()
+        .then(({ data }) => {
+          setPuedeEditar(rolesPermitidos.includes(data?.role ?? ''))
+        })
+    })
+  }, [])
+
+  if (!puedeEditar) {
+    return (
+      <div className="text-center py-3">
+        <p className="text-xs text-gray-400">🔒 Solo administradores y docentes pueden cambiar el rol</p>
+        <p className="text-sm font-medium text-gray-600 mt-1 capitalize">{currentRole}</p>
+      </div>
+    )
+  }
 
   const handleSave = async () => {
     setLoading(true)
