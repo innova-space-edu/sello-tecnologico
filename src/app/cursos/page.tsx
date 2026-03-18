@@ -64,10 +64,7 @@ export default function CursosPage() {
                   </Link>
                   <div className="flex gap-2 ml-4 items-center">
                     {puedeInvitar && (
-                      <InvitarProyectoCurso
-                        cursoId={curso.id}
-                        cursoNombre={curso.name}
-                      />
+                      <InvitarProyectoCurso cursoId={curso.id} cursoNombre={curso.name} />
                     )}
                     {!esEstudiante && (
                       <button onClick={() => handleDelete(curso.id, curso.name)}
