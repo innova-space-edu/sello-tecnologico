@@ -124,12 +124,25 @@ export default function Sidebar() {
 
         <nav className="flex-1 p-4 space-y-0.5 overflow-y-auto">
           {menu.map((item) => {
-            // Ocultar moderación a no-admins
-            if (item.href === '/admin/moderacion' && rol !== 'admin') return null
-            if (item.href === '/admin' && rol !== 'admin') return null
-            if (item.href === '/usuarios/importar' && rol === 'estudiante') return null
-            if (item.href === '/notificaciones' && rol === 'estudiante') return null
-            if (item.href === '/historial' && rol === 'estudiante') return null
+            // ── ADMIN: ve todo ─────────────────────────────────────────
+            // ── DOCENTE: cursos, proyectos, portafolio, evidencias,
+            //             usuarios, reportes, calendario, configuración
+            //             NO: mensajes, admin, moderación, historial, notificaciones, importar
+            // ── ESTUDIANTE: sin admin, sin moderación, sin historial,
+            //                sin notificaciones, sin importar
+            const esAdmin = rol === 'admin'
+            const esDocente = rol === 'docente' || rol === 'coordinador' || rol === 'utp'
+            const esEstudianteRol = rol === 'estudiante'
+
+            if (item.href === '/admin' && !esAdmin) return null
+            if (item.href === '/admin/moderacion' && !esAdmin) return null
+            if (item.href === '/historial' && !esAdmin) return null
+            if (item.href === '/notificaciones' && !esAdmin) return null
+            if (item.href === '/usuarios/importar' && esEstudianteRol) return null
+            // Docente NO ve mensajes ni historial
+            if (item.href === '/mensajes' && esDocente) return null
+            if (item.href === '/usuarios' && esEstudianteRol) return null
+            if (item.href === '/reportes' && esEstudianteRol) return null
 
             const active = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href))
