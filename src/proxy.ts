@@ -44,8 +44,6 @@ export async function proxy(request: NextRequest) {
 
   const rutasRestringidas = [
     '/cursos/nuevo',
-    '/proyectos/nuevo',
-    '/evidencias/nueva',
     '/usuarios/importar',
     '/notificaciones',
     '/admin',
