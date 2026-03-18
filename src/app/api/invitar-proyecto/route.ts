@@ -14,76 +14,73 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
-    const { invitacionId } = await req.json()
-    if (!invitacionId) return NextResponse.json({ error: 'invitacionId requerido' }, { status: 400 })
+    const { data: perfil } = await supabase
+      .from('profiles').select('role, full_name').eq('id', user.id).single()
 
-    // Obtener la invitación
-    const { data: inv } = await supabaseAdmin
+    if (!['admin', 'docente', 'coordinador'].includes(perfil?.role ?? ''))
+      return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+
+    const { cursoId, proyectoId } = await req.json()
+    if (!cursoId || !proyectoId)
+      return NextResponse.json({ error: 'cursoId y proyectoId son requeridos' }, { status: 400 })
+
+    const { data: proyecto } = await supabaseAdmin
+      .from('projects').select('id, title').eq('id', proyectoId).single()
+    if (!proyecto) return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 })
+
+    const { data: curso } = await supabaseAdmin
+      .from('courses').select('id, name').eq('id', cursoId).single()
+    if (!curso) return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 })
+
+    const { data: miembros } = await supabaseAdmin
+      .from('course_members').select('user_id').eq('course_id', cursoId)
+    if (!miembros?.length)
+      return NextResponse.json({ error: 'El curso no tiene estudiantes' }, { status: 400 })
+
+    // Ver quiénes ya tienen invitación vigente
+    const { data: yaInvitados } = await supabaseAdmin
       .from('project_invitations')
-      .select('*, projects(*), courses(name)')
-      .eq('id', invitacionId)
-      .single()
+      .select('estudiante_id')
+      .eq('proyecto_id', proyectoId)
+      .eq('curso_id', cursoId)
+      .in('estado', ['pendiente', 'aceptada'])
 
-    if (!inv) return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
-    if (inv.estudiante_id !== user.id)
-      return NextResponse.json({ error: 'Esta invitación no es tuya' }, { status: 403 })
-    if (inv.estado !== 'pendiente')
-      return NextResponse.json({ error: 'Esta invitación ya fue respondida' }, { status: 400 })
+    const idsYaInvitados = new Set((yaInvitados ?? []).map((i: any) => i.estudiante_id))
+    const nuevos = miembros.filter((m: any) => !idsYaInvitados.has(m.user_id))
 
-    const plantilla = inv.projects
+    if (nuevos.length === 0)
+      return NextResponse.json({
+        ok: true, enviados: 0,
+        mensaje: 'Todos los estudiantes ya tienen una invitación activa para este proyecto.'
+      })
 
-    // Crear la copia del proyecto para este estudiante
-    const { data: nuevoCopia, error: errCopia } = await supabaseAdmin
-      .from('projects').insert({
-        title: plantilla.title,
-        description: plantilla.description,
-        status: 'Borrador',
-        type: plantilla.type,
-        course_id: plantilla.course_id ?? inv.curso_id,
-        start_date: plantilla.start_date,
-        end_date: plantilla.end_date,
-        semestre: plantilla.semestre,
-        asignaturas: plantilla.asignaturas,
-        docentes_responsables: plantilla.docentes_responsables,
-        tipo_proyecto: plantilla.tipo_proyecto,
-        objetivos_aprendizaje: plantilla.objetivos_aprendizaje,
-        habilidades: plantilla.habilidades,
-        vinculacion_pei: plantilla.vinculacion_pei,
-        pregunta_guia: plantilla.pregunta_guia,
-        contexto_problema: plantilla.contexto_problema,
-        justificacion: plantilla.justificacion,
-        metodologia: plantilla.metodologia,
-        organizacion_trabajo: plantilla.organizacion_trabajo,
-        herramientas_tecnologicas: plantilla.herramientas_tecnologicas,
-        herramientas_materiales: plantilla.herramientas_materiales,
-        etapas_metodologia: plantilla.etapas_metodologia,
-        uso_ia: plantilla.uso_ia,
-        estrategia_verificacion: plantilla.estrategia_verificacion,
-        tipo_producto: plantilla.tipo_producto,
-        instrumento_evaluacion: plantilla.instrumento_evaluacion,
-        criterios_evaluados: plantilla.criterios_evaluados,
-        autoevaluacion: plantilla.autoevaluacion,
-        aprendizajes_logrados: plantilla.aprendizajes_logrados,
-        dificultades: plantilla.dificultades,
-        mejoras: plantilla.mejoras,
-        impacto_comunidad: plantilla.impacto_comunidad,
-        owner_id: user.id,
-        plantilla_id: plantilla.id,
-        distribuido_por: inv.enviado_por,
-        distribuido_at: new Date().toISOString(),
-        es_copia_distribuida: true,
-      }).select('id').single()
+    // Crear invitaciones
+    const invitaciones = nuevos.map((m: any) => ({
+      proyecto_id: proyectoId,
+      curso_id: cursoId,
+      estudiante_id: m.user_id,
+      enviado_por: user.id,
+      estado: 'pendiente',
+    }))
 
-    if (errCopia) return NextResponse.json({ error: errCopia.message }, { status: 500 })
+    const { data: invCreadas, error: errInv } = await supabaseAdmin
+      .from('project_invitations').insert(invitaciones).select('id, estudiante_id')
+    if (errInv) return NextResponse.json({ error: errInv.message }, { status: 500 })
 
-    // Actualizar la invitación como aceptada
-    await supabaseAdmin.from('project_invitations').update({
-      estado: 'aceptada',
-      copia_proyecto_id: nuevoCopia.id,
-      respondida_at: new Date().toISOString(),
-    }).eq('id', invitacionId)
+    const mapaInv = new Map((invCreadas ?? []).map((i: any) => [i.estudiante_id, i.id]))
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sello-tecnologico.vercel.app'
 
-    return NextResponse.json({ ok: true, proyectoId: nuevoCopia.id })
+    // Enviar mensaje con link personalizado
+    const mensajes = nuevos.map((m: any) => ({
+      sender_id: user.id,
+      receiver_id: m.user_id,
+      content: `📋 Invitación de proyecto — ${perfil?.full_name ?? 'Tu docente'} te invita a participar en el proyecto "${proyecto.title}" del curso ${curso.name}. Acepta aquí: ${appUrl}/proyectos/aceptar?inv=${mapaInv.get(m.user_id)}`,
+      read: false,
+    }))
+
+    await supabaseAdmin.from('messages').insert(mensajes)
+
+    return NextResponse.json({ ok: true, enviados: nuevos.length, ya_invitados: idsYaInvitados.size })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
