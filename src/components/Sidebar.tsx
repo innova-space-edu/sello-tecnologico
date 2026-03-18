@@ -29,6 +29,7 @@ export default function Sidebar() {
   const supabase = createClient()
   const [open, setOpen] = useState(false)
   const [rol, setRol] = useState('')
+  const [nombre, setNombre] = useState('')
   const [alertasMod, setAlertasMod] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
 
@@ -38,8 +39,9 @@ export default function Sidebar() {
       if (!user) return
 
       const { data: perfil } = await supabase
-        .from('profiles').select('role').eq('id', user.id).single()
+        .from('profiles').select('role, full_name').eq('id', user.id).single()
       setRol(perfil?.role ?? '')
+      setNombre(perfil?.full_name ?? user.email ?? '')
 
       if (perfil?.role === 'admin') {
         // Contar alertas de moderación pendientes
@@ -139,8 +141,6 @@ export default function Sidebar() {
             if (item.href === '/historial' && !esAdmin) return null
             if (item.href === '/notificaciones' && !esAdmin) return null
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null
-            // Docente NO ve mensajes ni historial
-            if (item.href === '/mensajes' && esDocente) return null
             if (item.href === '/usuarios' && esEstudianteRol) return null
             if (item.href === '/reportes' && esEstudianteRol) return null
 
@@ -179,11 +179,22 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-blue-700">
+          {nombre && (
+            <div className="flex items-center gap-3 px-3 py-2.5 mb-2 bg-blue-800 rounded-lg">
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0">
+                {nombre[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{nombre}</p>
+                <p className="text-xs text-blue-300 capitalize">{rol}</p>
+              </div>
+            </div>
+          )}
           <button onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-blue-200 hover:bg-blue-800 hover:text-white transition-colors">
             <span>🚪</span> Cerrar sesión
           </button>
-          <div className="text-xs text-blue-400 mt-3 text-center">Innova Space Education 2026</div>
+          <div className="text-xs text-blue-400 mt-2 text-center">Innova Space Education 2026</div>
         </div>
       </aside>
 
