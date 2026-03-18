@@ -466,6 +466,7 @@ export default function EditarProyectoPage() {
           </div>
         )}
         {!loadingDatos && !noAutorizado && (
+        <>
         <div className="mb-6">
           <button onClick={() => router.push(`/proyectos/${proyectoId}`)} className="text-blue-600 text-sm hover:underline">← Volver al proyecto</button>
           <h1 className="text-2xl font-bold text-blue-900 mt-2">Editar: {proyectoTitulo}</h1>
@@ -1126,6 +1127,7 @@ export default function EditarProyectoPage() {
             )}
           </div>
         </form>
+        </>
         )}
       </main>
     </div>
