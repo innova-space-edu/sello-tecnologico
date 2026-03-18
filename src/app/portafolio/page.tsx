@@ -91,13 +91,13 @@ export default function PortafolioPage() {
         .order('created_at', { ascending: true })
       setEvidencias(evs ?? [])
 
-      const proyIds = [...new Set((evs ?? []).map((e: any) => e.project_id).filter(Boolean))]
-      if (proyIds.length > 0) {
-        const { data: proys } = await supabase
-          .from('projects').select('id, title, status, tipo_proyecto')
-          .in('id', proyIds)
-        setProyectos(proys ?? [])
-      }
+      // Cargar TODOS los proyectos del usuario (no solo los que tienen evidencia)
+      const { data: proys } = await supabase
+        .from('projects')
+        .select('id, title, status, tipo_proyecto, metodologia, start_date, end_date, description, pregunta_guia, objetivos_aprendizaje, habilidades, organizacion_trabajo, herramientas_tecnologicas, etapas_metodologia, uso_ia, aprendizajes_logrados, dificultades, mejoras, impacto_comunidad, updated_at')
+        .eq('owner_id', user.id)
+        .order('updated_at', { ascending: false })
+      setProyectos(proys ?? [])
 
       setLoading(false)
     }
@@ -133,7 +133,7 @@ export default function PortafolioPage() {
   const evIntermedia = evidencias.filter(e => e.evidencia_tipo === 'intermedia')
   const evFinal = evidencias.filter(e => e.evidencia_tipo === 'final')
 
-  const TABS = ['A. Información', 'B. Presentación', 'C. Evidencias', 'D. Reflexiones', 'E. Progreso', 'F. Reflexión final', '➕ Mis secciones']
+  const TABS = ['A. Información', 'B. Presentación', 'C. Proyectos', 'D. Evidencias', 'E. Reflexiones', 'F. Progreso', 'G. Reflexión final', '➕ Mis secciones']
 
   if (loading) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -246,7 +246,51 @@ export default function PortafolioPage() {
           )}
 
           {/* C — Evidencias seleccionadas */}
+
           {tab === 2 && (
+            <div className="space-y-4">
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">C. Mis Proyectos</h2>
+                {proyectos.length === 0 ? (
+                  <div className="text-center py-10">
+                    <div className="text-4xl mb-3">🗂️</div>
+                    <p className="text-gray-400 text-sm">No tienes proyectos aún</p>
+                    <Link href="/proyectos" className="inline-block mt-3 text-blue-600 text-sm hover:underline">Ver proyectos →</Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {proyectos.map((p: any) => (
+                      <div key={p.id} className="border border-gray-100 rounded-xl p-5 hover:border-blue-200 transition-colors">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1 min-w-0">
+                            <Link href={`/proyectos/${p.id}`} className="font-semibold text-blue-800 hover:underline truncate block">{p.title}</Link>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.status === 'Aprobado' ? 'bg-green-100 text-green-700' : p.status === 'En progreso' ? 'bg-blue-100 text-blue-700' : p.status === 'En revisión' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>{p.status}</span>
+                              {p.metodologia && <span className="text-xs text-gray-400">{p.metodologia}</span>}
+                            </div>
+                          </div>
+                          <Link href={`/proyectos/${p.id}/editar`} className="ml-3 text-xs text-blue-600 hover:underline shrink-0">✏️ Editar</Link>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                          {p.description && <div className="col-span-2 bg-gray-50 rounded-lg p-3"><p className="text-xs font-semibold text-gray-400 mb-1">DESCRIPCIÓN</p><p className="text-xs text-gray-700">{p.description}</p></div>}
+                          {p.pregunta_guia && <div className="bg-blue-50 rounded-lg p-3"><p className="text-xs font-semibold text-blue-400 mb-1">PREGUNTA GUÍA</p><p className="text-xs text-gray-700">{p.pregunta_guia}</p></div>}
+                          {p.objetivos_aprendizaje && <div className="bg-indigo-50 rounded-lg p-3"><p className="text-xs font-semibold text-indigo-400 mb-1">OBJETIVOS DE APRENDIZAJE</p><p className="text-xs text-gray-700 line-clamp-3">{p.objetivos_aprendizaje}</p></div>}
+                          {p.aprendizajes_logrados && <div className="bg-green-50 rounded-lg p-3"><p className="text-xs font-semibold text-green-500 mb-1">APRENDIZAJES LOGRADOS</p><p className="text-xs text-gray-700">{p.aprendizajes_logrados}</p></div>}
+                          {p.dificultades && <div className="bg-orange-50 rounded-lg p-3"><p className="text-xs font-semibold text-orange-400 mb-1">DIFICULTADES</p><p className="text-xs text-gray-700">{p.dificultades}</p></div>}
+                          {p.mejoras && <div className="bg-purple-50 rounded-lg p-3"><p className="text-xs font-semibold text-purple-400 mb-1">MEJORAS FUTURAS</p><p className="text-xs text-gray-700">{p.mejoras}</p></div>}
+                          {p.impacto_comunidad && <div className="col-span-2 bg-teal-50 rounded-lg p-3"><p className="text-xs font-semibold text-teal-500 mb-1">IMPACTO EN LA COMUNIDAD</p><p className="text-xs text-gray-700">{p.impacto_comunidad}</p></div>}
+                          {p.habilidades?.length > 0 && <div className="col-span-2"><p className="text-xs font-semibold text-gray-400 mb-1">HABILIDADES</p><div className="flex flex-wrap gap-1.5">{p.habilidades.map((h: string) => <span key={h} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{h}</span>)}</div></div>}
+                          {p.herramientas_tecnologicas?.length > 0 && <div className="col-span-2"><p className="text-xs font-semibold text-gray-400 mb-1">HERRAMIENTAS</p><div className="flex flex-wrap gap-1.5">{p.herramientas_tecnologicas.map((h: string) => <span key={h} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{h}</span>)}</div></div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 3 && (
             <div className="space-y-4">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">C. Evidencias seleccionadas</h2>
@@ -302,7 +346,7 @@ export default function PortafolioPage() {
           )}
 
           {/* D — Reflexión por evidencia */}
-          {tab === 3 && (
+          {tab === 4 && (
             <div className="space-y-4">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">D. Reflexión por evidencia</h2>
@@ -368,7 +412,7 @@ export default function PortafolioPage() {
           )}
 
           {/* E — Progreso en el tiempo */}
-          {tab === 4 && (
+          {tab === 5 && (
             <div className="space-y-4">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="font-bold text-blue-900 border-b pb-2 mb-6">E. Progreso en el tiempo</h2>
@@ -500,7 +544,7 @@ export default function PortafolioPage() {
           )}
 
           {/* F — Reflexión final anual */}
-          {tab === 5 && (
+          {tab === 6 && (
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
               <h2 className="font-bold text-blue-900 border-b pb-2">F. Reflexión final anual</h2>
               <div>
@@ -531,7 +575,7 @@ export default function PortafolioPage() {
           )}
 
           {/* G — Mis secciones personalizadas */}
-          {tab === 6 && portafolio && (
+          {tab === 7 && portafolio && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
                 <p className="text-sm text-blue-700 font-medium">➕ Secciones personalizadas</p>
