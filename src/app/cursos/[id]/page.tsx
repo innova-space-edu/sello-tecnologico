@@ -2,6 +2,7 @@ import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import AgregarMiembroForm from './AgregarMiembroForm'
+import EditarCursoForm from './EditarCursoForm'
 
 const statusColor: Record<string, string> = {
   'Borrador': 'bg-gray-100 text-gray-600',
@@ -25,6 +26,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
   const puedeAgregarMiembros = perfilActual?.role === 'docente' ||
     perfilActual?.role === 'admin' ||
     perfilActual?.role === 'coordinador'
+  const puedeEditarCurso = perfilActual?.role === 'admin' || perfilActual?.role === 'coordinador'
 
   const { data: curso } = await supabase
     .from('courses')
@@ -77,10 +79,21 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
               <h1 className="text-2xl font-bold text-blue-900">{curso.name}</h1>
               <p className="text-gray-500 mt-1">{curso.level} — {curso.area} — Año {curso.year}</p>
             </div>
-            <Link href={`/proyectos/nuevo?curso=${curso.id}`}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">
-              + Nuevo proyecto
-            </Link>
+            <div className="flex items-center gap-2">
+              {puedeEditarCurso && (
+                <EditarCursoForm
+                  cursoId={curso.id}
+                  name={curso.name}
+                  level={curso.level ?? ''}
+                  area={curso.area ?? ''}
+                  year={curso.year ?? new Date().getFullYear()}
+                />
+              )}
+              <Link href={`/proyectos/nuevo?curso=${curso.id}`}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">
+                + Nuevo proyecto
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -133,6 +146,14 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
                           </span>
                         </td>
                         <td className="px-6 py-4 text-gray-400 text-xs">{p.start_date ?? '—'}</td>
+                        {puedeEditarCurso && (
+                          <td className="px-4 py-4">
+                            <Link href={`/proyectos/${p.id}/editar`}
+                              className="text-blue-400 hover:text-blue-600 text-xs hover:underline">
+                              ✏️ Editar
+                            </Link>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
