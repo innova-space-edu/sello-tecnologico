@@ -1,0 +1,50 @@
+import { createClient } from '@supabase/supabase-js'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { NextRequest, NextResponse } from 'next/server'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const supabase = await createServerSupabaseClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+
+    const { data: profile } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single()
+
+    if (profile?.role !== 'admin')
+      return NextResponse.json({ error: 'Solo administradores pueden eliminar usuarios' }, { status: 403 })
+
+    const { userId } = await req.json()
+    if (!userId) return NextResponse.json({ error: 'userId requerido' }, { status: 400 })
+
+    if (userId === user.id)
+      return NextResponse.json({ error: 'No puedes eliminar tu propia cuenta' }, { status: 400 })
+
+    const { data: target } = await supabase
+      .from('profiles').select('role').eq('id', userId).single()
+
+    if (target?.role === 'admin')
+      return NextResponse.json({ error: 'No se puede eliminar a otro administrador' }, { status: 403 })
+
+    await supabaseAdmin.from('messages').delete().eq('sender_id', userId)
+    await supabaseAdmin.from('messages').delete().eq('receiver_id', userId)
+    await supabaseAdmin.from('flagged_messages').delete().eq('sender_id', userId)
+    await supabaseAdmin.from('flagged_messages').delete().eq('receiver_id', userId)
+    await supabaseAdmin.from('evidences').delete().eq('created_by', userId)
+    await supabaseAdmin.from('projects').delete().eq('owner_id', userId)
+    await supabaseAdmin.from('profiles').delete().eq('id', userId)
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
