@@ -43,6 +43,7 @@ export default function ProyectosPage() {
   }
 
   const esEstudiante = rol === 'estudiante'
+  const puedeEliminar = rol === 'admin' || rol === 'docente' || rol === 'coordinador'
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -53,12 +54,10 @@ export default function ProyectosPage() {
             <h1 className="text-2xl font-bold text-blue-900">Proyectos</h1>
             <p className="text-gray-500 mt-1">Todos los proyectos del Sello Tecnológico</p>
           </div>
-          {!esEstudiante && (
-            <Link href="/proyectos/nuevo"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-              + Nuevo proyecto
-            </Link>
-          )}
+          <Link href="/proyectos/nuevo"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+            + Nuevo proyecto
+          </Link>
         </div>
 
         {proyectos.length > 0 ? (
@@ -71,7 +70,7 @@ export default function ProyectosPage() {
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Tipo</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
-                  {!esEstudiante && (
+                  {puedeEliminar && (
                     <th className="text-left px-6 py-3 text-gray-500 font-medium"></th>
                   )}
                 </tr>
@@ -92,7 +91,7 @@ export default function ProyectosPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{p.start_date ?? '—'}</td>
-                    {!esEstudiante && (
+                    {puedeEliminar && (
                       <td className="px-6 py-4">
                         <button onClick={() => handleDelete(p.id, p.title)}
                           className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
@@ -110,12 +109,10 @@ export default function ProyectosPage() {
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">🗂️</div>
             <h3 className="text-lg font-semibold text-gray-700">No hay proyectos aún</h3>
-            {!esEstudiante && (
-              <Link href="/proyectos/nuevo"
-                className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-                + Crear proyecto
-              </Link>
-            )}
+            <Link href="/proyectos/nuevo"
+              className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+              + Crear proyecto
+            </Link>
           </div>
         )}
       </main>
