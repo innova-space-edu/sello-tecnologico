@@ -261,7 +261,7 @@ git push origin main
 ## 👨‍💻 Desarrollado por
 
 **Innova Space Education**  
-📧 Contacto: [innova-space-edu](https://github.com/innova-space-edu)  
+📧 Contacto: [innova-space-edu](www.innova-space-edu.cl/)  
 🌐 Plataforma: [sello-tecnologico.vercel.app](https://sello-tecnologico.vercel.app)
 
 ---
