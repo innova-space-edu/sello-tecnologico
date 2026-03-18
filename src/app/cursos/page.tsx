@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import InvitarProyectoCurso from './InvitarProyectoCurso'
 
 export default function CursosPage() {
   const supabase = createClient()
@@ -32,6 +33,7 @@ export default function CursosPage() {
   }
 
   const esEstudiante = rol === 'estudiante'
+  const puedeInvitar = rol === 'admin' || rol === 'docente' || rol === 'coordinador'
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -61,7 +63,12 @@ export default function CursosPage() {
                     <p className="text-gray-400 text-xs mt-2">Año {curso.year}</p>
                   </Link>
                   <div className="flex gap-2 ml-4 items-center">
-                    <span className="text-2xl">📚</span>
+                    {puedeInvitar && (
+                      <InvitarProyectoCurso
+                        cursoId={curso.id}
+                        cursoNombre={curso.name}
+                      />
+                    )}
                     {!esEstudiante && (
                       <button onClick={() => handleDelete(curso.id, curso.name)}
                         className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
