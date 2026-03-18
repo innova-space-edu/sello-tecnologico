@@ -50,8 +50,25 @@ export async function proxy(request: NextRequest) {
     '/historial',
   ]
 
+  // Rutas bloqueadas para estudiantes
   if (perfil?.role === 'estudiante') {
     const restringida = rutasRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
+    if (restringida) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+  }
+
+  // Rutas bloqueadas para docentes/coordinador/utp
+  const rolesDocente = ['docente', 'coordinador', 'utp']
+  const rutasDocenteRestringidas = [
+    '/admin',
+    '/mensajes',
+    '/historial',
+    '/notificaciones',
+    '/usuarios/importar',
+  ]
+  if (rolesDocente.includes(perfil?.role ?? '')) {
+    const restringida = rutasDocenteRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
     if (restringida) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
