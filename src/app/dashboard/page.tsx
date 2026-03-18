@@ -14,6 +14,14 @@ export default async function DashboardPage() {
   const { count: evidenciasCount } = await supabase.from('evidences').select('*', { count: 'exact', head: true })
   const { count: usuariosCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
 
+  // Invitaciones pendientes del usuario actual
+  const { data: invitacionesPendientes } = await supabase
+    .from('project_invitations')
+    .select('id, projects(title), courses(name), profiles!project_invitations_enviado_por_fkey(full_name), created_at')
+    .eq('estudiante_id', user?.id ?? '')
+    .eq('estado', 'pendiente')
+    .order('created_at', { ascending: false })
+
   const hoy = new Date().toISOString().split('T')[0]
   const { data: atrasados } = await supabase
     .from('projects')
@@ -62,6 +70,30 @@ export default async function DashboardPage() {
             )}
           </p>
         </div>
+
+        {/* Invitaciones pendientes */}
+        {invitacionesPendientes && invitacionesPendientes.length > 0 && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg">📨</span>
+              <h2 className="font-semibold text-blue-700 text-sm">Invitaciones de proyecto ({invitacionesPendientes.length})</h2>
+            </div>
+            <div className="space-y-2">
+              {invitacionesPendientes.map((inv: any) => (
+                <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white rounded-lg px-3 py-2.5 border border-blue-100 gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-blue-800 text-sm truncate">{inv.projects?.title}</p>
+                    <p className="text-xs text-gray-400">{inv.profiles?.full_name ?? 'Tu docente'} · {inv.courses?.name}</p>
+                  </div>
+                  <Link href={`/proyectos/aceptar?inv=${inv.id}`}
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors">
+                    Ver invitación →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Alertas de atrasos */}
         {atrasados && atrasados.length > 0 && (
