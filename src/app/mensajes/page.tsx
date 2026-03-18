@@ -52,9 +52,42 @@ export default function MensajesPage() {
 
       setCurrentUser(perfil)
 
-      const { data: users } = await supabase
-        .from('profiles').select('*').neq('id', user.id).order('full_name')
-      setUsuarios(users ?? [])
+      // Filtrar usuarios visibles según rol:
+      // - Estudiantes: solo ven compañeros del mismo curso + docentes con @colprovidencia.cl
+      // - Docentes/admin: ven a todos
+      let visibles: any[] = []
+
+      const esEstudiante = perfil?.role === 'estudiante'
+
+      if (esEstudiante && perfil?.curso) {
+        // Compañeros del mismo curso
+        const { data: companeros } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('curso', perfil.curso)
+          .neq('id', user.id)
+          .order('full_name')
+
+        // Docentes del colegio (email @colprovidencia.cl o role docente/coordinador/admin)
+        const { data: docentes } = await supabase
+          .from('profiles')
+          .select('*')
+          .neq('id', user.id)
+          .in('role', ['docente', 'coordinador', 'admin', 'utp'])
+          .order('full_name')
+
+        // Combinar sin duplicados
+        const ids = new Set<string>()
+        const todos = [...(companeros ?? []), ...(docentes ?? [])]
+        visibles = todos.filter(u => { if (ids.has(u.id)) return false; ids.add(u.id); return true })
+      } else {
+        // Admins/docentes ven a todos
+        const { data: users } = await supabase
+          .from('profiles').select('*').neq('id', user.id).order('full_name')
+        visibles = users ?? []
+      }
+
+      setUsuarios(visibles)
 
       const { data: unreadMsgs } = await supabase
         .from('messages').select('sender_id')
