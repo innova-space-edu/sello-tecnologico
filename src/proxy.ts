@@ -62,7 +62,6 @@ export async function proxy(request: NextRequest) {
   const rolesDocente = ['docente', 'coordinador', 'utp']
   const rutasDocenteRestringidas = [
     '/admin',
-    '/mensajes',
     '/historial',
     '/notificaciones',
     '/usuarios/importar',
