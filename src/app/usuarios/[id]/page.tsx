@@ -1,6 +1,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import CambiarRolForm from './CambiarRolForm'
+import CambiarPasswordAdmin from './CambiarPasswordAdmin'
 import Link from 'next/link'
 
 export default async function UsuarioDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -79,6 +80,12 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h3 className="font-semibold text-blue-900 mb-4">Cambiar rol</h3>
               <CambiarRolForm userId={usuario.id} currentRole={usuario.role} />
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h3 className="font-semibold text-blue-900 mb-1">Cambiar contraseña</h3>
+              <p className="text-xs text-gray-400 mb-4">El cambio se aplica directamente en Supabase Auth.</p>
+              <CambiarPasswordAdmin userId={usuario.id} />
             </div>
           </div>
 
