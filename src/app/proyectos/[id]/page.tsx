@@ -2,6 +2,7 @@ import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import ComentariosSection from './ComentariosSection'
+import DistribuirProyecto from './DistribuirProyecto'
 
 const statusColor: Record<string, string> = {
   'Borrador': 'bg-gray-100 text-gray-600',
@@ -62,6 +63,26 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
     .eq('project_id', id).order('created_at', { ascending: true })
 
   const { data: { user } } = await supabase.auth.getUser()
+  const { data: perfilActual } = await supabase
+    .from('profiles').select('role').eq('id', user?.id ?? '').single()
+
+  const puedeDistribuir = ['admin', 'docente', 'coordinador'].includes(perfilActual?.role ?? '')
+
+  // Copias distribuidas de este proyecto
+  const { data: copiasDistribuidas } = await supabase
+    .from('projects')
+    .select('id, status, owner_id, profiles!projects_owner_id_fkey(full_name)')
+    .eq('plantilla_id', proyecto?.id ?? '')
+
+  // Total miembros del curso
+  const { data: miembrosCurso } = proyecto?.course_id
+    ? await supabase.from('course_members').select('user_id').eq('course_id', proyecto.course_id)
+    : { data: [] }
+
+  const copias = (copiasDistribuidas ?? []).map((c: any) => ({
+    owner_name: c.profiles?.full_name ?? '—',
+    status: c.status,
+  }))
 
   if (!proyecto) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -334,6 +355,18 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Distribuir al curso — solo para docentes/admin y si NO es copia */}
+            {puedeDistribuir && !proyecto.es_copia_distribuida && (
+              <DistribuirProyecto
+                proyectoId={proyecto.id}
+                courseId={proyecto.course_id}
+                courseName={proyecto.courses?.name ?? null}
+                totalMiembros={miembrosCurso?.length ?? 0}
+                yaDistribuido={!!proyecto.es_plantilla}
+                copias={copias}
+              />
             )}
           </div>
         </div>
