@@ -17,11 +17,16 @@ export default function ProyectosPage() {
   const [proyectos, setProyectos] = useState<any[]>([])
   const [rol, setRol] = useState<string>('')
 
-  const fetchProyectos = async () => {
-    const { data } = await supabase
-      .from('projects')
-      .select('*, courses(name)')
-      .order('created_at', { ascending: false })
+  const fetchProyectos = async (userRole: string, userId: string) => {
+    let query = supabase.from('projects').select('*, courses(name), profiles!projects_owner_id_fkey(full_name)')
+
+    // Estudiantes solo ven sus propios proyectos
+    // Admin/docente/coordinador ven TODOS
+    if (userRole === 'estudiante') {
+      query = query.eq('owner_id', userId)
+    }
+
+    const { data } = await query.order('created_at', { ascending: false })
     setProyectos(data ?? [])
   }
 
@@ -30,8 +35,9 @@ export default function ProyectosPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setRol(perfil?.role ?? '')
-      fetchProyectos()
+      const role = perfil?.role ?? ''
+      setRol(role)
+      fetchProyectos(role, user.id)
     }
     init()
   }, [])
@@ -39,7 +45,8 @@ export default function ProyectosPage() {
   const handleDelete = async (id: string, titulo: string) => {
     if (!confirm(`¿Eliminar el proyecto "${titulo}"? Esta acción no se puede deshacer.`)) return
     await supabase.from('projects').delete().eq('id', id)
-    fetchProyectos()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) fetchProyectos(rol, user.id)
   }
 
   const esEstudiante = rol === 'estudiante'
@@ -67,7 +74,7 @@ export default function ProyectosPage() {
                 <tr>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Proyecto</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Curso</th>
-                  <th className="text-left px-6 py-3 text-gray-500 font-medium">Tipo</th>
+                  {!esEstudiante && <th className="text-left px-6 py-3 text-gray-500 font-medium">Alumno</th>}
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
                   {puedeEliminar && (
@@ -84,7 +91,9 @@ export default function ProyectosPage() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{p.courses?.name ?? '—'}</td>
-                    <td className="px-6 py-4 text-gray-500">{p.type}</td>
+                    {!esEstudiante && (
+                      <td className="px-6 py-4 text-gray-500 text-xs">{(p as any).profiles?.full_name ?? '—'}</td>
+                    )}
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[p.status]}`}>
                         {p.status}
