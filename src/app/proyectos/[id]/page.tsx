@@ -197,6 +197,12 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
               + Nueva evidencia
             </Link>
           </div>
+          {(proyecto.owner_id === user?.id || puedeDistribuir) && (
+            <Link href={`/proyectos/${proyecto.id}/editar`}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+              ✏️ Editar
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
