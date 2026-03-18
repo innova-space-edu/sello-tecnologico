@@ -300,7 +300,14 @@ export default function NuevoProyectoPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+
+    // Verificar sesión activa antes de intentar insertar
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      alert('Tu sesión expiró. Por favor recarga la página e inicia sesión nuevamente.')
+      setLoading(false)
+      return
+    }
 
     const { error } = await supabase.from('projects').insert({
       title: form.title,
@@ -310,7 +317,7 @@ export default function NuevoProyectoPage() {
       course_id: form.course_id || null,
       start_date: form.start_date || null,
       end_date: form.end_date || null,
-      owner_id: user?.id,
+      owner_id: user.id,
       semestre: form.semestre,
       asignaturas: form.asignaturas ? form.asignaturas.split(',').map(s => s.trim()) : [],
       docentes_responsables: form.docentes_responsables ? form.docentes_responsables.split(',').map(s => s.trim()) : [],
@@ -338,8 +345,13 @@ export default function NuevoProyectoPage() {
       impacto_comunidad: form.impacto_comunidad,
     })
 
-    if (!error) router.push('/proyectos')
-    else { alert('Error: ' + error.message); setLoading(false) }
+    if (!error) {
+      router.push('/proyectos')
+    } else {
+      console.error('Error al crear proyecto:', error)
+      alert(`No se pudo crear el proyecto.\n\nDetalle: ${error.message}\n\nCódigo: ${error.code}`)
+      setLoading(false)
+    }
   }
 
   // ─── config de etapas ────────────────────────────────────────────────────────
