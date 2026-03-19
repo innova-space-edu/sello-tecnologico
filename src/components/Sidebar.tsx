@@ -121,7 +121,7 @@ export default function Sidebar() {
       `}>
         <div className="p-6 border-b border-blue-700">
           <div className="text-xs text-blue-300 uppercase tracking-widest mb-1">Colegio Providencia</div>
-          <div className="text-lg font-bold text-white leading-tight">Sello Tecnológico</div>
+          <div className="text-lg font-bold text-white leading-tight">Proyectos</div>
         </div>
 
         <nav className="flex-1 p-4 space-y-0.5 overflow-y-auto">
