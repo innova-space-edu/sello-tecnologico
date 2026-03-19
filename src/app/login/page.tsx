@@ -7,6 +7,25 @@ import { useState } from 'react'
 type Mode = 'login' | 'register'
 type Role = 'admin' | 'coordinador' | 'docente' | 'estudiante'
 
+
+// Lista oficial de cursos del colegio
+const CURSOS_DISPONIBLES = [
+  // 1° a 8° Básico
+  '1° Básico A', '1° Básico B',
+  '2° Básico A', '2° Básico B',
+  '3° Básico A', '3° Básico B',
+  '4° Básico A', '4° Básico B',
+  '5° Básico A', '5° Básico B',
+  '6° Básico A', '6° Básico B',
+  '7° Básico A', '7° Básico B',
+  '8° Básico A', '8° Básico B',
+  // 1° a 4° Medio
+  '1° Medio A', '1° Medio B',
+  '2° Medio A', '2° Medio B',
+  '3° Medio A', '3° Medio B',
+  '4° Medio A', '4° Medio B',
+]
+
 // Normaliza el texto del curso a un nombre canónico: "1° Medio A", "4° Medio B", etc.
 function parseCurso(raw: string): string {
   const s = raw.trim().toLowerCase().replace(/\s+/g, '')
@@ -62,7 +81,7 @@ export default function LoginPage() {
     const role = detectRole(email)
     const rut = normalizeRut(form.rut)
     const cursoRaw = form.curso.trim()
-    const cursoNormalizado = role === 'estudiante' && cursoRaw ? parseCurso(cursoRaw) : ''
+    const cursoNormalizado = role === 'estudiante' && cursoRaw ? cursoRaw.trim() : ''
 
     if (!rut || !form.full_name.trim() || !email || !form.password) {
       setError('Todos los campos obligatorios deben completarse'); setLoading(false); return
