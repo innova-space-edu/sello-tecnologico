@@ -13,12 +13,18 @@ export default function EvidenciasPage() {
   const supabase = createClient()
   const [evidencias, setEvidencias] = useState<any[]>([])
   const [rol, setRol] = useState<string>('')
+  const [userId, setUserId] = useState<string>('')
 
-  const fetchEvidencias = async () => {
-    const { data } = await supabase
+  const fetchEvidencias = async (userRole: string, uid: string) => {
+    let query = supabase
       .from('evidences')
-      .select('*, projects(title)')
-      .order('created_at', { ascending: false })
+      .select('*, projects(title), profiles!evidences_created_by_fkey(full_name)')
+
+    if (userRole === 'estudiante') {
+      query = query.eq('created_by', uid)
+    }
+
+    const { data } = await query.order('created_at', { ascending: false })
     setEvidencias(data ?? [])
   }
 
@@ -27,8 +33,10 @@ export default function EvidenciasPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      setRol(perfil?.role ?? '')
-      fetchEvidencias()
+      const role = perfil?.role ?? ''
+      setRol(role)
+      setUserId(user.id)
+      fetchEvidencias(role, user.id)
     }
     init()
   }, [])
@@ -36,7 +44,7 @@ export default function EvidenciasPage() {
   const handleDelete = async (id: string, titulo: string) => {
     if (!confirm(`¿Eliminar la evidencia "${titulo}"?`)) return
     await supabase.from('evidences').delete().eq('id', id)
-    fetchEvidencias()
+    fetchEvidencias(rol, userId)
   }
 
   const esEstudiante = rol === 'estudiante'
@@ -50,12 +58,10 @@ export default function EvidenciasPage() {
             <h1 className="text-2xl font-bold text-blue-900">Evidencias</h1>
             <p className="text-gray-500 mt-1">Archivos y documentos del Sello Tecnológico</p>
           </div>
-          {!esEstudiante && (
-            <Link href="/evidencias/nueva"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-              + Nueva evidencia
-            </Link>
-          )}
+          <Link href="/evidencias/nueva"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors flex items-center gap-2">
+            📎 + Nueva evidencia
+          </Link>
         </div>
 
         {evidencias.length > 0 ? (
@@ -82,13 +88,18 @@ export default function EvidenciasPage() {
                       </a>
                     )}
                   </div>
-                  {!esEstudiante && (
-                    <button onClick={() => handleDelete(ev.id, ev.title)}
-                      className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors shrink-0"
-                      title="Eliminar evidencia">
-                      🗑️
-                    </button>
-                  )}
+                  <div className="flex flex-col gap-1 shrink-0">
+                    {(ev.created_by === userId || !esEstudiante) && (
+                      <Link href={`/evidencias/${ev.id}/editar`}
+                        className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-xs"
+                        title="Editar evidencia">✏️</Link>
+                    )}
+                    {(ev.created_by === userId || !esEstudiante) && (
+                      <button onClick={() => handleDelete(ev.id, ev.title)}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                        title="Eliminar evidencia">🗑️</button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -97,12 +108,10 @@ export default function EvidenciasPage() {
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">📎</div>
             <h3 className="text-lg font-semibold text-gray-700">No hay evidencias aún</h3>
-            {!esEstudiante && (
-              <Link href="/evidencias/nueva"
-                className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
-                + Subir evidencia
-              </Link>
-            )}
+            <Link href="/evidencias/nueva"
+              className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
+              📎 + Subir evidencia
+            </Link>
           </div>
         )}
       </main>
