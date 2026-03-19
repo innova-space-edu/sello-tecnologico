@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import PortfolioSections from '@/components/PortfolioSections'
+import ExportPortafolioPDF from '@/components/ExportPortafolioPDF'
 
 const etapaColor: Record<string, string> = {
   inicial: 'bg-yellow-100 text-yellow-700',
@@ -198,10 +199,19 @@ export default function PortafolioPage() {
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors text-sm">
               🎪 Modo Feria
             </Link>
-            <button onClick={handleSave} disabled={saving}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
-              {saving ? 'Guardando...' : saved ? '✅ Guardado' : '💾 Guardar'}
-            </button>
+            <div className="flex items-center gap-2">
+              <ExportPortafolioPDF
+                portafolio={portafolio}
+                estudiante={perfil}
+                evidencias={evidencias}
+                proyectos={proyectos}
+                secciones={portfolioSections}
+              />
+              <button onClick={handleSave} disabled={saving}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
+                {saving ? 'Guardando...' : saved ? '✅ Guardado' : '💾 Guardar'}
+              </button>
+            </div>
           </div>
         </div>
 
