@@ -16,6 +16,7 @@ export default function ProyectosPage() {
   const supabase = createClient()
   const [proyectos, setProyectos] = useState<any[]>([])
   const [rol, setRol] = useState<string>('')
+  const [userId, setUserId] = useState<string>('')
 
   const fetchProyectos = async (userRole: string, userId: string) => {
     let query = supabase.from('projects').select('*, courses(name), profiles!projects_owner_id_fkey(full_name)')
@@ -37,6 +38,7 @@ export default function ProyectosPage() {
       const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       const role = perfil?.role ?? ''
       setRol(role)
+      setUserId(user.id)
       fetchProyectos(role, user.id)
     }
     init()
@@ -77,9 +79,7 @@ export default function ProyectosPage() {
                   {!esEstudiante && <th className="text-left px-6 py-3 text-gray-500 font-medium">Alumno</th>}
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
                   <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
-                  {puedeEliminar && (
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium"></th>
-                  )}
+                  <th className="text-left px-6 py-3 text-gray-500 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -100,15 +100,24 @@ export default function ProyectosPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{p.start_date ?? '—'}</td>
-                    {puedeEliminar && (
-                      <td className="px-6 py-4">
-                        <button onClick={() => handleDelete(p.id, p.title)}
-                          className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                          title="Eliminar proyecto">
-                          🗑️
-                        </button>
-                      </td>
-                    )}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1">
+                        {(p.owner_id === userId || puedeEliminar) && (
+                          <Link href={`/proyectos/${p.id}/editar`}
+                            className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-sm"
+                            title="Editar proyecto">
+                            ✏️
+                          </Link>
+                        )}
+                        {(p.owner_id === userId || puedeEliminar) && (
+                          <button onClick={() => handleDelete(p.id, p.title)}
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                            title="Eliminar proyecto">
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
