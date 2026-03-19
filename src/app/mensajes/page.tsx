@@ -78,7 +78,7 @@ const PALABRAS_BLOQUEADAS = [
 
   // ── Contenido sexual explícito ──────────────────────────────────────
   'sexo','porno','pornografia','pornografía','desnudo','desnuda',
-  'puta','prostituta','prostituto','escort','prepago',
+  'puta','prostituta','prostituto','escort','prepago', 'noporn',
   'culear','culo','culito','tetas','tetona','pene','polla',
   'vagina','masturbacion','masturbación','orgasmo','eyaculacion',
   'eyaculación','trio','threesome','lesbiana que','gay que',
@@ -95,7 +95,7 @@ const PALABRAS_BLOQUEADAS = [
   'lastimarse','autolesion','autolesión',
 
   // ── Drogas / sustancias ─────────────────────────────────────────────
-  'porro','porros','marihuana','pasta base','cocaína','cocaina',
+  'porro','porros','marihuana','pasta base','cocaína','cocaina', 'sal',
   'farlopa','merca','droga','drogarse','fumarse un','metanfetamina',
   'heroína','heroina','éxtasis','extasis','pastillas truchas',
 ]
@@ -142,16 +142,8 @@ export default function MensajesPage() {
 
       const esEstudiante = perfil?.role === 'estudiante'
 
-      if (esEstudiante && perfil?.curso) {
-        // Compañeros del mismo curso
-        const { data: companeros } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('curso', perfil.curso)
-          .neq('id', user.id)
-          .order('full_name')
-
-        // Docentes del colegio (email @colprovidencia.cl o role docente/coordinador/admin)
+      if (esEstudiante) {
+        // Docentes/staff visibles para todos los estudiantes
         const { data: docentes } = await supabase
           .from('profiles')
           .select('*')
@@ -159,10 +151,24 @@ export default function MensajesPage() {
           .in('role', ['docente', 'coordinador', 'admin', 'utp'])
           .order('full_name')
 
-        // Combinar sin duplicados
-        const ids = new Set<string>()
-        const todos = [...(companeros ?? []), ...(docentes ?? [])]
-        visibles = todos.filter(u => { if (ids.has(u.id)) return false; ids.add(u.id); return true })
+        if (perfil?.curso) {
+          // Solo compañeros del MISMO curso — sin excepción
+          const { data: companeros } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('curso', perfil.curso)
+            .eq('role', 'estudiante')
+            .neq('id', user.id)
+            .order('full_name')
+
+          // Combinar sin duplicados
+          const ids = new Set<string>()
+          const todos = [...(companeros ?? []), ...(docentes ?? [])]
+          visibles = todos.filter(u => { if (ids.has(u.id)) return false; ids.add(u.id); return true })
+        } else {
+          // Estudiante sin curso asignado: solo puede ver docentes/admin
+          visibles = docentes ?? []
+        }
       } else {
         // Admins/docentes ven a todos
         const { data: users } = await supabase
@@ -292,12 +298,31 @@ export default function MensajesPage() {
     e.preventDefault()
     if (!input.trim() || !selectedUser || !currentUser) return
 
+    // ── Regla de mismo curso para estudiantes ──────────────────────────
+    // Doble verificación: lista + envío, para que no se pueda bypasear
+    if (currentUser.role === 'estudiante' && selectedUser.role === 'estudiante') {
+      if (!currentUser.curso || currentUser.curso !== selectedUser.curso) {
+        setWarning('Solo puedes enviar mensajes a estudiantes de tu mismo curso.')
+        return
+      }
+    }
+
     // Verificar bloqueo personal
     const { data: perfil } = await supabase
-      .from('profiles').select('blocked').eq('id', currentUser.id).single()
+      .from('profiles').select('blocked, curso, role').eq('id', currentUser.id).single()
     if (perfil?.blocked) {
       router.push('/bloqueado')
       return
+    }
+
+    // Segunda verificación de curso directamente desde la DB (anti-bypass)
+    if (perfil?.role === 'estudiante' && selectedUser.role === 'estudiante') {
+      const { data: destinatario } = await supabase
+        .from('profiles').select('curso, role').eq('id', selectedUser.id).single()
+      if (!perfil.curso || perfil.curso !== destinatario?.curso) {
+        setWarning('No puedes enviar mensajes a estudiantes de otros cursos.')
+        return
+      }
     }
 
     // Verificar bloqueo entre el par
