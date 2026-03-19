@@ -2,6 +2,7 @@ import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import AdminActions from './AdminActions'
+import AdminAlertas from './AdminAlertas'
 
 export default async function AdminPage() {
   const supabase = await createServerSupabaseClient()
@@ -58,6 +59,11 @@ export default async function AdminPage() {
         <div className="mb-6 lg:mb-8">
           <h1 className="text-xl lg:text-2xl font-bold text-blue-900">Panel de Administrador</h1>
           <p className="text-gray-500 mt-1 text-sm">Vista omnisciente del sistema — solo administradores</p>
+        </div>
+
+        {/* 🚨 Alertas de bloqueo — solo visibles aquí para el admin */}
+        <div className="mb-6">
+          <AdminAlertas />
         </div>
 
         {/* ✅ Stats: 2 cols móvil → 3 tablet → 6 desktop, con wrap garantizado */}
