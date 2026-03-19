@@ -2,6 +2,7 @@ import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import PortfolioSections from '@/components/PortfolioSections'
+import ExportPortafolioPDF from '@/components/ExportPortafolioPDF'
 
 const etapaColor: Record<string, string> = {
   inicial: 'bg-yellow-100 text-yellow-700',
@@ -70,7 +71,16 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
                 {estudiante?.full_name?.[0]?.toUpperCase() ?? '?'}
               </div>
               <div className="flex-1">
-                <h1 className="text-2xl font-bold">📂 {estudiante?.full_name ?? estudiante?.email}</h1>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-2xl font-bold">📂 {estudiante?.full_name ?? estudiante?.email}</h1>
+                  <ExportPortafolioPDF
+                    portafolio={portafolio}
+                    estudiante={estudiante}
+                    evidencias={evidencias ?? []}
+                    proyectos={[]}
+                    secciones={secciones ?? []}
+                  />
+                </div>
                 <p className="text-blue-200 mt-0.5">Portafolio Tecnológico · {portafolio.year}</p>
                 {estudiante?.curso && <p className="text-blue-200 text-sm">{estudiante.curso}</p>}
               </div>
