@@ -78,7 +78,7 @@ const PALABRAS_BLOQUEADAS = [
 
   // ── Contenido sexual explícito ──────────────────────────────────────
   'sexo','porno','pornografia','pornografía','desnudo','desnuda',
-  'puta','prostituta','prostituto','escort','prepago', 'noporn',
+  'puta','prostituta','prostituto','escort','prepago',
   'culear','culo','culito','tetas','tetona','pene','polla',
   'vagina','masturbacion','masturbación','orgasmo','eyaculacion',
   'eyaculación','trio','threesome','lesbiana que','gay que',
@@ -95,9 +95,9 @@ const PALABRAS_BLOQUEADAS = [
   'lastimarse','autolesion','autolesión',
 
   // ── Drogas / sustancias ─────────────────────────────────────────────
-  'porro','porros','marihuana','pasta base','cocaína','cocaina', 'sal',
+  'porro','porros','marihuana','pasta base','cocaína','cocaina', 'coca',
   'farlopa','merca','droga','drogarse','fumarse un','metanfetamina',
-  'heroína','heroina','éxtasis','extasis','pastillas truchas',
+  'heroína','heroina','éxtasis','extasis','pastillas truchas', 'sal',
 ]
 
 function detectarPalabrasBloqueadas(texto: string): string[] {
@@ -152,21 +152,25 @@ export default function MensajesPage() {
           .order('full_name')
 
         if (perfil?.curso) {
-          // Solo compañeros del MISMO curso — sin excepción
+          // Compañeros del MISMO curso — buscar por curso sin filtrar por rol
+          // para no excluir a nadie por diferencias en el campo role
           const { data: companeros } = await supabase
             .from('profiles')
             .select('*')
-            .eq('curso', perfil.curso)
-            .eq('role', 'estudiante')
+            .ilike('curso', perfil.curso.trim())
             .neq('id', user.id)
             .order('full_name')
 
-          // Combinar sin duplicados
+          // Combinar con docentes/admin sin duplicados
           const ids = new Set<string>()
           const todos = [...(companeros ?? []), ...(docentes ?? [])]
-          visibles = todos.filter(u => { if (ids.has(u.id)) return false; ids.add(u.id); return true })
+          visibles = todos.filter(u => {
+            if (ids.has(u.id)) return false
+            ids.add(u.id)
+            return true
+          })
         } else {
-          // Estudiante sin curso asignado: solo puede ver docentes/admin
+          // Sin curso asignado: solo docentes/admin
           visibles = docentes ?? []
         }
       } else {
@@ -318,8 +322,10 @@ export default function MensajesPage() {
     // Segunda verificación de curso directamente desde la DB (anti-bypass)
     if (perfil?.role === 'estudiante' && selectedUser.role === 'estudiante') {
       const { data: destinatario } = await supabase
-        .from('profiles').select('curso, role').eq('id', selectedUser.id).single()
-      if (!perfil.curso || perfil.curso !== destinatario?.curso) {
+        .from('profiles').select('curso').eq('id', selectedUser.id).single()
+      const mismoC = perfil.curso && destinatario?.curso &&
+        perfil.curso.trim().toLowerCase() === destinatario.curso.trim().toLowerCase()
+      if (!mismoC) {
         setWarning('No puedes enviar mensajes a estudiantes de otros cursos.')
         return
       }
