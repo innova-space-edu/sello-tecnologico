@@ -4,13 +4,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useState } from 'react'
 
-type Mode = 'login' | 'register'
-type Role = 'admin' | 'coordinador' | 'docente' | 'estudiante'
-
-
-// Lista oficial de cursos del colegio
-const CURSOS_DISPONIBLES = [
-  // 1° a 8° Básico
+const CURSOS = [
   '1° Básico A', '1° Básico B',
   '2° Básico A', '2° Básico B',
   '3° Básico A', '3° Básico B',
@@ -19,12 +13,14 @@ const CURSOS_DISPONIBLES = [
   '6° Básico A', '6° Básico B',
   '7° Básico A', '7° Básico B',
   '8° Básico A', '8° Básico B',
-  // 1° a 4° Medio
   '1° Medio A', '1° Medio B',
   '2° Medio A', '2° Medio B',
   '3° Medio A', '3° Medio B',
   '4° Medio A', '4° Medio B',
 ]
+
+type Mode = 'login' | 'register'
+type Role = 'admin' | 'coordinador' | 'docente' | 'estudiante'
 
 // Normaliza el texto del curso a un nombre canónico: "1° Medio A", "4° Medio B", etc.
 function parseCurso(raw: string): string {
@@ -81,7 +77,7 @@ export default function LoginPage() {
     const role = detectRole(email)
     const rut = normalizeRut(form.rut)
     const cursoRaw = form.curso.trim()
-    const cursoNormalizado = role === 'estudiante' && cursoRaw ? cursoRaw.trim() : ''
+    const cursoNormalizado = role === 'estudiante' && cursoRaw ? cursoRaw : ''
 
     if (!rut || !form.full_name.trim() || !email || !form.password) {
       setError('Todos los campos obligatorios deben completarse'); setLoading(false); return
@@ -213,11 +209,26 @@ export default function LoginPage() {
               {!isDocente && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Curso *</label>
-                  <input value={form.curso} onChange={e => setForm({ ...form, curso: e.target.value })}
-                    placeholder="Ej: 1mA, 2°MB, 4 medio B" className={inputClass} />
+                  <select
+                    value={form.curso}
+                    onChange={e => setForm({ ...form, curso: e.target.value })}
+                    className={inputClass}
+                  >
+                    <option value="">Selecciona tu curso...</option>
+                    <optgroup label="Enseñanza Básica">
+                      {CURSOS.filter(c => c.includes('Básico')).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Enseñanza Media">
+                      {CURSOS.filter(c => c.includes('Medio')).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </optgroup>
+                  </select>
                   {form.curso && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      📚 Se asignará a: <strong>{parseCurso(form.curso)}</strong>
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ Asignado a: <strong>{form.curso}</strong>
                     </p>
                   )}
                 </div>
