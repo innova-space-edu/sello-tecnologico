@@ -2,6 +2,7 @@ import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import ComentariosSection from './ComentariosSection'
+import ExportProyectoPDF from '@/components/ExportProyectoPDF'
 import DistribuirProyecto from './DistribuirProyecto'
 
 const statusColor: Record<string, string> = {
@@ -192,10 +193,17 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
                 )}
               </div>
             </div>
-            <Link href={`/evidencias/nueva?proyecto=${proyecto.id}`}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm shrink-0">
-              + Nueva evidencia
-            </Link>
+            <div className="flex items-center gap-2 flex-wrap">
+              <ExportProyectoPDF
+                proyecto={proyecto}
+                evidencias={evidencias ?? []}
+                curso={proyecto.courses?.name}
+              />
+              <Link href={`/evidencias/nueva?proyecto=${proyecto.id}`}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm shrink-0">
+                + Nueva evidencia
+              </Link>
+            </div>
           </div>
           {(proyecto.owner_id === user?.id || puedeDistribuir) && (
             <Link href={`/proyectos/${proyecto.id}/editar`}
