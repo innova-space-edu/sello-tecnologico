@@ -5,16 +5,99 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 const PALABRAS_BLOQUEADAS = [
+  // ── Romántico / coqueteo ────────────────────────────────────────────
   'te amo','te quiero','eres mi vida','mi amor','mi corazon','mi corazón',
   'estoy enamorado','estoy enamorada','me gustas','quiero estar contigo',
   'eres hermosa','eres hermoso','eres linda','eres lindo','mi cielo',
-  'mi reina','mi rey','mi princesa','mi principe','bésame','besame',
-  'un beso','te extraño','te extrano','pienso en ti','sueño contigo',
-  'sueno contigo','sal conmigo','me enamoré','me enamore',
-  'declaracion','te declaro','eres especial para mi','me tienes loco','me tienes loca',
-  'idiota','imbecil','estupido','estupida','retrasado','retrasada',
-  'inutil','basura','te voy a pegar','te voy a matar','suicidio',
-  'sexo','porno','desnudo','desnuda','puta','prostituta',
+  'mi reina','mi rey','mi princesa','mi principe','mi sol','mi luna',
+  'bésame','besame','un beso','dame un beso','te mando un beso',
+  'te extraño','te extrano','pienso en ti','sueño contigo','sueno contigo',
+  'sal conmigo','me enamoré','me enamore','me enamoré de ti',
+  'te declaro','declaracion','eres especial para mi','eres especial para mí',
+  'me tienes loco','me tienes loca','me volviste loco','me volviste loca',
+  'quiero besarte','quiero abrazarte','eres perfecta','eres perfecto',
+  'me haces feliz','sin ti no puedo','no puedo sin ti',
+  'te necesito','eres todo para mi','eres todo para mí',
+  'me gustas mucho','me encantas','estoy loco por ti','estoy loca por ti',
+  'quiero salir contigo','seamos novios','quieres ser mi novia','quieres ser mi novio',
+  'polola','pololo','pololear','estar de novios',
+
+  // ── Insultos generales ──────────────────────────────────────────────
+  'idiota','imbecil','imbécil','estupido','estupida','estúpido','estúpida',
+  'retrasado','retrasada','inutil','inútil','basura','animal','bestia',
+  'tonto','tonta','torpe','tarado','tarada','mentecato','bruto','bruta',
+  'maleducado','maleducada','bobo','boba','pendejo','pendeja',
+  'baboso','babosa','estorbo','fracasado','fracasada','perdedor','perdedora',
+  'miserable','patético','patetoca','ridículo','ridiculo','loco','loca',
+  'payaso','payasa','mediocre','ignorante','inepto','inepta',
+
+  // ── Insultos chilenos ───────────────────────────────────────────────
+  'hueon','huevon','huevona','weon','weon','weona','culiao','culiá',
+  'ctm','cstm','csm','la ctm','la cstm','concha','conchetumadre',
+  'marico','marica','maraco','maraca','cagado','cagada','cagarse',
+  'rajado','rajarse','pichula','pichulita','poto','potito',
+  'chuchetumadre','chuchetumare','chucha','la chucha','ql','qlia',
+  'aweonado','aweonada','gil','gila','fleto','flete','chanta',
+  'cagón','cagon','cagona','rajón','rajon','rajona',
+  'metete tu','metete tus','ándate a la','andate a la','andate a la chucha',
+  'vai a cagar','anda a cagar','anda a la chucha',
+
+  // ── Insultos latinoamericanos ───────────────────────────────────────
+  'cabron','cabrón','cabrona','hijo de puta','hijoputa','hdp','hp',
+  'malparido','malparida','gonorrea','sapo','sapa','mamerto','mamerta',
+  'boludo','boluda','pelotudo','pelotuda','forro','forra','mogólico',
+  'mogolico','cretino','cretina','gil','gila','otario','otaria',
+  'chota','choto','chambon','chambona','paila','pailón',
+  'pichicata','pichicatero','penca','pencazo','mamahuevo','mamagüevo',
+  'güevón','guevon','güevona','guevona','maldito','maldita',
+  'desgraciado','desgraciada','mierda','que mierda','qué mierda',
+
+  // ── Insultos españoles ──────────────────────────────────────────────
+  'gilipollas','capullo','capulla','mamón','mamona','zorra','zorrita',
+  'capullo','follar','joder','me cago','me cago en','hostia','hostias',
+  'coño','coñazo','subnormal','imbecil','gorda','gordo que',
+  'eres un mierda','vete a la mierda','vete al carajo',
+
+  // ── Violencia y amenazas ────────────────────────────────────────────
+  'te voy a pegar','te voy a matar','te voy a golpear','te voy a romper',
+  'te voy a dar una paliza','te voy a patear','te voy a cagar a palos',
+  'te mato','te pego','te destruyo','te reviento','te quiebro',
+  'voy a hacerte daño','te voy a hacer daño','te arrepentirás',
+  'te arrepentiras','cuídate','cuidate mucho','vas a ver','ya vas a ver',
+  'te voy a encontrar','sé donde vives','se donde vives',
+  'te voy a buscar','te voy a picar','te voy a rayar',
+
+  // ── Acoso / bullying ────────────────────────────────────────────────
+  'nadie te quiere','eres un fracaso','todo te sale mal',
+  'eres feo','eres fea','eres horrible','eres una basura',
+  'vete de aqui','vete de aquí','lárgate','largarte','desaparece',
+  'eres una carga','eres un problema','nadie te aguanta',
+  'todos te odian','te odio','te detesto','te asco',
+  'me das asco','qué asco','eres asqueroso','eres asquerosa',
+  'gordo feo','gorda fea','feto','fotuto',
+
+  // ── Contenido sexual explícito ──────────────────────────────────────
+  'sexo','porno','pornografia','pornografía','desnudo','desnuda',
+  'puta','prostituta','prostituto','escort','prepago',
+  'culear','culo','culito','tetas','tetona','pene','polla',
+  'vagina','masturbacion','masturbación','orgasmo','eyaculacion',
+  'eyaculación','trio','threesome','lesbiana que','gay que',
+  'manosear','abusar de','acoso sexual','te acoso',
+  'mándame foto','mandame foto','foto tuya','foto desnuda','foto desnudo',
+  'enséñame','enseñame','muéstrame','muestrame','video tuyo',
+
+  // ── Autolesión / salud mental ───────────────────────────────────────
+  'suicidio','suicidarme','quiero morir','me quiero morir',
+  'quiero matarme','me voy a matar','voy a matarme',
+  'no quiero vivir','para qué vivir','para que vivir',
+  'me corto','cortarme','hacerme daño','pastillas para morir',
+  'nadie me va a extrañar','es mejor que muera',
+  'lastimarse','autolesion','autolesión',
+
+  // ── Drogas / sustancias ─────────────────────────────────────────────
+  'porro','porros','marihuana','pasta base','cocaína','cocaina',
+  'farlopa','merca','droga','drogarse','fumarse un','metanfetamina',
+  'heroína','heroina','éxtasis','extasis','pastillas truchas',
 ]
 
 function detectarPalabrasBloqueadas(texto: string): string[] {
