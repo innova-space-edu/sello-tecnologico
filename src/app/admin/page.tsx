@@ -3,6 +3,10 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import AdminActions from './AdminActions'
 import AdminAlertas from './AdminAlertas'
+import { redirect } from 'next/navigation'
+
+// ─── Componente cliente para auto-refresh cada 5s (Server Components no pueden usar timers) ───
+import AdminAutoRefresh from './AdminAutoRefresh'
 
 export default async function AdminPage() {
   const supabase = await createServerSupabaseClient()
@@ -27,7 +31,7 @@ export default async function AdminPage() {
 
   const { data: usuarios } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
   const { data: cursos } = await supabase.from('courses').select('*').order('name')
-  const { data: proyectos } = await supabase.from('projects').select('*, courses(name)').order('created_at', { ascending: false })
+  const { data: proyectos } = await supabase.from('projects').select('*, courses(name), profiles!projects_owner_id_fkey(full_name)').order('created_at', { ascending: false })
   const { data: evidencias } = await supabase.from('evidences').select('*').order('created_at', { ascending: false })
   const { data: logs } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(20)
   const { count: mensajesCount } = await supabase.from('messages').select('*', { count: 'exact', head: true })
@@ -52,6 +56,9 @@ export default async function AdminPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
+      {/* Auto-refresh cada 5 segundos usando router.refresh() del lado cliente */}
+      <AdminAutoRefresh intervalo={5000} />
+
       {/* ✅ lg:ml-64 + pt-16 para móvil */}
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8 min-w-0">
 
@@ -167,7 +174,6 @@ export default async function AdminPage() {
         </div>
 
         {/* Monitoreo de mensajes */}
-        {/* ✅ flex-col en móvil, flex-row en sm+ */}
         <div className="bg-white rounded-xl shadow-sm p-4 lg:p-5 mb-4 lg:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="text-3xl">💬</div>
@@ -207,17 +213,23 @@ export default async function AdminPage() {
             <h2 className="font-semibold text-blue-900 text-sm lg:text-base">
               Todos los proyectos ({proyectos?.length ?? 0})
             </h2>
-            <Link href="/proyectos/nuevo" className="text-xs text-blue-600 hover:underline">+ Nuevo</Link>
+            <div className="flex items-center gap-3">
+              <Link href="/admin/proyectos" className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium transition-colors">
+                🗂️ Gestionar todos
+              </Link>
+              <Link href="/proyectos/nuevo" className="text-xs text-blue-600 hover:underline">+ Nuevo</Link>
+            </div>
           </div>
           {/* ✅ overflow-x-auto para tabla */}
           <div className="overflow-x-auto max-h-64">
-            <table className="w-full text-sm min-w-[400px]">
+            <table className="w-full text-sm min-w-[500px]">
               <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
                 <tr>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium text-xs">Proyecto</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium text-xs">Alumno</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium text-xs">Curso</th>
                   <th className="text-left px-4 py-2 text-gray-500 font-medium text-xs">Estado</th>
-                  <th className="text-left px-4 py-2 text-gray-500 font-medium text-xs">Fecha</th>
+                  <th className="text-left px-4 py-2 text-gray-500 font-medium text-xs">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -228,11 +240,17 @@ export default async function AdminPage() {
                         {p.title}
                       </Link>
                     </td>
+                    <td className="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{(p as any).profiles?.full_name ?? '—'}</td>
                     <td className="px-4 py-2 text-gray-500 text-xs whitespace-nowrap">{p.courses?.name ?? '—'}</td>
                     <td className="px-4 py-2">
                       <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{p.status}</span>
                     </td>
-                    <td className="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">{p.start_date ?? '—'}</td>
+                    <td className="px-4 py-2">
+                      <Link href={`/proyectos/${p.id}/editar`}
+                        className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg font-medium transition-colors whitespace-nowrap">
+                        ✏️ Editar
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
