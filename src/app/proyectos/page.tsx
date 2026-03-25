@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 
 const statusColor: Record<string, string> = {
   'Borrador': 'bg-gray-100 text-gray-600',
@@ -17,18 +17,24 @@ export default function ProyectosPage() {
   const [proyectos, setProyectos] = useState<any[]>([])
   const [rol, setRol] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<Date>(new Date())
 
-  const fetchProyectos = async (userRole: string, userId: string) => {
-    let query = supabase.from('projects').select('*, courses(name), profiles!projects_owner_id_fkey(full_name)')
+  // Refs para poder usarlos dentro del interval sin stale closure
+  const rolRef = useRef('')
+  const userIdRef = useRef('')
 
-    // Estudiantes solo ven sus propios proyectos
-    // Admin/docente/coordinador ven TODOS
+  const fetchProyectos = async (userRole: string, uid: string) => {
+    let query = supabase
+      .from('projects')
+      .select('*, courses(name), profiles!projects_owner_id_fkey(full_name)')
+
     if (userRole === 'estudiante') {
-      query = query.eq('owner_id', userId)
+      query = query.eq('owner_id', uid)
     }
 
     const { data } = await query.order('created_at', { ascending: false })
     setProyectos(data ?? [])
+    setUltimaActualizacion(new Date())
   }
 
   useEffect(() => {
@@ -39,16 +45,26 @@ export default function ProyectosPage() {
       const role = perfil?.role ?? ''
       setRol(role)
       setUserId(user.id)
+      rolRef.current = role
+      userIdRef.current = user.id
       fetchProyectos(role, user.id)
     }
     init()
+
+    // Auto-refresh cada 5 segundos
+    const interval = setInterval(() => {
+      if (rolRef.current && userIdRef.current) {
+        fetchProyectos(rolRef.current, userIdRef.current)
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const handleDelete = async (id: string, titulo: string) => {
     if (!confirm(`¿Eliminar el proyecto "${titulo}"? Esta acción no se puede deshacer.`)) return
     await supabase.from('projects').delete().eq('id', id)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) fetchProyectos(rol, user.id)
+    fetchProyectos(rol, userId)
   }
 
   const esEstudiante = rol === 'estudiante'
@@ -61,7 +77,12 @@ export default function ProyectosPage() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-2xl font-bold text-blue-900">Proyectos</h1>
-            <p className="text-gray-500 mt-1">Todos los proyectos del Sello Tecnológico</p>
+            <p className="text-gray-500 mt-1">
+              Todos los proyectos del Sello Tecnológico
+              <span className="ml-3 text-xs text-gray-400">
+                🔄 Actualizado {ultimaActualizacion.toLocaleTimeString('es-CL')}
+              </span>
+            </p>
           </div>
           <Link href="/proyectos/nuevo"
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">
@@ -101,17 +122,22 @@ export default function ProyectosPage() {
                     </td>
                     <td className="px-6 py-4 text-gray-500">{p.start_date ?? '—'}</td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/proyectos/${p.id}`}
+                          className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
+                          title="Ver proyecto">
+                          👁️ Ver
+                        </Link>
                         {(p.owner_id === userId || puedeEliminar) && (
                           <Link href={`/proyectos/${p.id}/editar`}
-                            className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-sm"
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200"
                             title="Editar proyecto">
-                            ✏️
+                            ✏️ Editar
                           </Link>
                         )}
                         {(p.owner_id === userId || puedeEliminar) && (
                           <button onClick={() => handleDelete(p.id, p.title)}
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200"
                             title="Eliminar proyecto">
                             🗑️
                           </button>
