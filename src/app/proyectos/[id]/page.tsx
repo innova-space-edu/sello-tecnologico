@@ -53,7 +53,7 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
   const supabase = await createServerSupabaseClient()
 
   const { data: proyecto } = await supabase
-    .from('projects').select('*, courses(name)').eq('id', id).single()
+    .from('projects').select('*, courses(name), project_groups(id, group_name)').eq('id', id).single()
 
   const { data: evidencias } = await supabase
     .from('evidences').select('*, profiles(full_name)')
@@ -212,6 +212,25 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
             </Link>
           )}
         </div>
+
+        {/* Banner de proyecto en común */}
+        {proyecto?.group_id && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-2 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-blue-900 font-semibold">🔗 Proyecto en común</p>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Este proyecto está conectado con otros proyectos del mismo grupo
+                {proyecto.project_groups?.group_name ? ` — ${proyecto.project_groups.group_name}` : ''}.
+              </p>
+            </div>
+            <Link
+              href={`/proyectos/grupo/${proyecto.group_id}`}
+              className="shrink-0 text-sm text-blue-700 font-semibold hover:underline whitespace-nowrap"
+            >
+              Ver proyecto en común →
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-5">
