@@ -21,7 +21,7 @@ export default async function FeriaPage() {
   const { data: cursos } = await supabase.from('courses').select('*').order('name')
   const { data: proyectos } = await supabase
     .from('projects')
-    .select('*')
+    .select('*, project_groups(id, group_name)')
     .in('status', ['En progreso', 'En revisión', 'Aprobado'])
     .order('created_at', { ascending: false })
   const { data: evidencias } = await supabase.from('evidences').select('*')
@@ -45,10 +45,40 @@ export default async function FeriaPage() {
       </div>
 
       {/* Proyectos por curso */}
-      <div className="max-w-7xl mx-auto px-8 pb-16 space-y-12">
+      <div className="max-w-7xl mx-auto px-8 pb-16 space-y-16">
         {cursos?.map(curso => {
           const proyectosCurso = proyectos?.filter(p => p.course_id === curso.id) ?? []
           if (proyectosCurso.length === 0) return null
+
+          // Agrupar visualmente: primero los que tienen group_id (agrupa sus copias), luego los individuales
+          const groupMap = new Map<string, typeof proyectosCurso>()
+          const individuales: typeof proyectosCurso = []
+
+          for (const p of proyectosCurso) {
+            if (p.group_id) {
+              const list = groupMap.get(p.group_id) ?? []
+              list.push(p)
+              groupMap.set(p.group_id, list)
+            } else {
+              individuales.push(p)
+            }
+          }
+
+          // Para grupos mostrar solo el primero como representante (con badge de "N integrantes")
+          const representantes = [
+            ...Array.from(groupMap.entries()).map(([gid, lista]) => ({
+              proyecto: lista[0],
+              grupoCopias: lista,
+              groupId: gid,
+              esGrupo: true,
+            })),
+            ...individuales.map(p => ({
+              proyecto: p,
+              grupoCopias: [p],
+              groupId: null,
+              esGrupo: false,
+            })),
+          ]
 
           return (
             <div key={curso.id}>
@@ -58,27 +88,44 @@ export default async function FeriaPage() {
                 <div className="h-px flex-1 bg-blue-700" />
               </div>
 
-              <div className="grid grid-cols-3 gap-6">
-                {proyectosCurso.map(p => {
-                  const evProyecto = evidencias?.filter(ev => ev.project_id === p.id) ?? []
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {representantes.map(({ proyecto: p, grupoCopias, groupId, esGrupo }) => {
+                  // Evidencias: si es grupo sumar todas las copias, si no solo las del proyecto
+                  const evProyecto = esGrupo
+                    ? (evidencias?.filter(ev => grupoCopias.some(c => c.id === ev.project_id)) ?? [])
+                    : (evidencias?.filter(ev => ev.project_id === p.id) ?? [])
+
                   return (
-                    <div key={p.id} className="bg-white bg-opacity-10 backdrop-blur rounded-2xl p-6 border border-blue-700 border-opacity-50">
-                      <div className="flex justify-between items-start mb-3">
-                        <h3 className="font-bold text-white text-lg leading-tight flex-1 pr-2">{p.title}</h3>
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 ${statusColor[p.status]}`}>
+                    <div key={p.id} className="bg-white bg-opacity-10 backdrop-blur rounded-2xl p-6 border border-blue-700 border-opacity-50 relative">
+
+                      {/* Badge de grupo */}
+                      {esGrupo && (
+                        <div className="absolute top-3 right-3">
+                          <Link
+                            href={`/proyectos/grupo/${groupId}`}
+                            className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-full font-semibold hover:bg-blue-500 transition-colors"
+                          >
+                            🔗 {grupoCopias.length} proyectos
+                          </Link>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-start mb-3 pr-20">
+                        <h3 className="font-bold text-white text-lg leading-tight">{p.title}</h3>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 ml-2 ${statusColor[p.status]}`}>
                           {p.status}
                         </span>
                       </div>
 
-                      {p.description && (
-                        <p className="text-blue-200 text-sm mb-4 leading-relaxed line-clamp-3">{p.description}</p>
+                      {/* Nombre del grupo si existe */}
+                      {esGrupo && p.project_groups?.group_name && (
+                        <p className="text-blue-300 text-xs mb-2 font-semibold">
+                          Grupo: {p.project_groups.group_name}
+                        </p>
                       )}
 
-                      {p.objectives && (
-                        <div className="mb-4">
-                          <p className="text-blue-300 text-xs font-semibold uppercase tracking-wide mb-1">Objetivos</p>
-                          <p className="text-blue-100 text-sm line-clamp-2">{p.objectives}</p>
-                        </div>
+                      {p.description && (
+                        <p className="text-blue-200 text-sm mb-4 leading-relaxed line-clamp-3">{p.description}</p>
                       )}
 
                       {evProyecto.length > 0 && (
@@ -87,12 +134,17 @@ export default async function FeriaPage() {
                             Evidencias ({evProyecto.length})
                           </p>
                           <div className="flex flex-wrap gap-1.5">
-                            {evProyecto.map(ev => (
+                            {evProyecto.slice(0, 6).map(ev => (
                               <span key={ev.id}
                                 className="flex items-center gap-1 bg-blue-800 bg-opacity-60 text-blue-100 text-xs px-2.5 py-1 rounded-full">
-                                {typeIcon[ev.type] ?? '📎'} {ev.title.length > 12 ? ev.title.slice(0, 12) + '...' : ev.title}
+                                {typeIcon[ev.type] ?? '📎'} {ev.title.length > 12 ? ev.title.slice(0, 12) + '…' : ev.title}
                               </span>
                             ))}
+                            {evProyecto.length > 6 && (
+                              <span className="bg-blue-800 bg-opacity-40 text-blue-300 text-xs px-2.5 py-1 rounded-full">
+                                +{evProyecto.length - 6} más
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}
