@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     const plantilla = inv.projects
 
     // Crear la copia del proyecto para este estudiante
+    // Se propaga group_id si la plantilla ya tiene uno asignado
     const { data: nuevoCopia, error: errCopia } = await supabaseAdmin
       .from('projects').insert({
         title: plantilla.title,
@@ -72,6 +73,8 @@ export async function POST(req: NextRequest) {
         distribuido_por: inv.enviado_por,
         distribuido_at: new Date().toISOString(),
         es_copia_distribuida: true,
+        // Propagar grupo si la plantilla ya pertenece a uno
+        group_id: plantilla.group_id ?? null,
       }).select('id').single()
 
     if (errCopia) return NextResponse.json({ error: errCopia.message }, { status: 500 })
