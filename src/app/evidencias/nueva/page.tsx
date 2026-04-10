@@ -2,11 +2,11 @@
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 
 const TIPOS = ['documento', 'foto', 'video', 'enlace', 'presentación', 'código']
 
-export default function NuevaEvidenciaPage() {
+function NuevaEvidenciaForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const proyectoDesdeURL = searchParams.get('proyecto')
@@ -355,5 +355,17 @@ export default function NuevaEvidenciaPage() {
         </form>
       </main>
     </div>
+  )
+}
+
+export default function NuevaEvidenciaPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen bg-gray-50 items-center justify-center">
+        <p className="text-gray-400 animate-pulse text-sm">Cargando...</p>
+      </div>
+    }>
+      <NuevaEvidenciaForm />
+    </Suspense>
   )
 }
