@@ -2,7 +2,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const TABS = [
   'A. Identificación',
@@ -123,8 +123,13 @@ export default function NuevoProyectoPage() {
   const [tab, setTab] = useState(0)
   const [cursos, setCursos] = useState<any[]>([])
   const [etapas, setEtapas] = useState<EtapasMetodologia>(etapasIniciales())
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [draftTime, setDraftTime] = useState<string | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
+  const userIdRef = useRef<string | null>(null)
+  const setForm = useCallback((val: any) => { setFormRaw(val); setHasChanges(true) }, [])
 
-  const [form, setForm] = useState({
+  const [form, setFormRaw] = useState({
     // A — Identificación
     title: '', year: new Date().getFullYear().toString(),
     semestre: '1', asignaturas: '', docentes_responsables: '',
@@ -167,18 +172,86 @@ export default function NuevoProyectoPage() {
 
   useEffect(() => {
     supabase.from('courses').select('id, name').order('name').then(({ data }) => setCursos(data ?? []))
+    // Restaurar borrador al cargar
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      userIdRef.current = user.id
+      const draftKey = `project-draft-new-${user.id}`
+      try {
+        const saved = localStorage.getItem(draftKey)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (parsed.form) setFormRaw(parsed.form)
+          if (parsed.etapas) setEtapas(parsed.etapas)
+          if (parsed.tab !== undefined) setTab(parsed.tab)
+          if (parsed.updated_at) setDraftTime(parsed.updated_at)
+        }
+      } catch { /* ignorar errores de localStorage */ }
+    })
   }, [])
+
+  // Autosave en localStorage con debounce
+  useEffect(() => {
+    if (!hasChanges) return
+    const timer = setTimeout(() => {
+      if (!userIdRef.current) return
+      try {
+        const draftKey = `project-draft-new-${userIdRef.current}`
+        const now = new Date().toISOString()
+        localStorage.setItem(draftKey, JSON.stringify({ form, etapas, tab, updated_at: now }))
+        setDraftTime(now)
+        setDraftStatus('saved')
+      } catch { setDraftStatus('error') }
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [form, etapas, tab, hasChanges])
+
+  // Aviso al salir si hay cambios sin guardar
+  useEffect(() => {
+    if (!hasChanges) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasChanges])
+
+  const saveDraft = () => {
+    if (!userIdRef.current) return
+    try {
+      const draftKey = `project-draft-new-${userIdRef.current}`
+      const now = new Date().toISOString()
+      localStorage.setItem(draftKey, JSON.stringify({ form, etapas, tab, updated_at: now }))
+      setDraftTime(now)
+      setDraftStatus('saved')
+      alert('📝 Borrador guardado localmente')
+    } catch { alert('Error al guardar borrador') }
+  }
+
+  const clearDraft = () => {
+    if (userIdRef.current) {
+      try { localStorage.removeItem(`project-draft-new-${userIdRef.current}`) } catch { /* ignore */ }
+    }
+  }
+
+  const formatDraftTime = (iso: string) => {
+    try {
+      const d = new Date(iso)
+      return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    } catch { return '' }
+  }
 
   const toggleArray = (field: string, value: string) => {
     const arr = (form as any)[field] as string[]
     setForm({ ...form, [field]: arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value] })
+    setHasChanges(true)
   }
   const toggleEtapaArray = (etapa: keyof EtapasMetodologia, field: string, value: string) => {
     const arr = ((etapas[etapa] as any)[field] as string[]) ?? []
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], [field]: arr.includes(value) ? arr.filter((v: string) => v !== value) : [...arr, value] } })
+    setHasChanges(true)
   }
   const updateEtapa = (etapa: keyof EtapasMetodologia, field: string, value: any) => {
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], [field]: value } })
+    setHasChanges(true)
   }
   const toggleEtapaAbierta = (etapa: keyof EtapasMetodologia) => {
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], activa: !etapas[etapa].activa } })
@@ -326,6 +399,8 @@ export default function NuevoProyectoPage() {
       fuentes_consultadas: form.fuentes_consultadas.filter(Boolean),
     })
     if (!error) {
+      clearDraft()
+      setHasChanges(false)
       router.push('/proyectos')
     } else {
       console.error('Error al crear proyecto:', error)
@@ -340,14 +415,29 @@ export default function NuevoProyectoPage() {
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mb-6">
           <button onClick={() => router.push('/proyectos')} className="text-blue-600 text-sm hover:underline">← Volver</button>
-          <h1 className="text-2xl font-bold text-blue-900 mt-2">Nueva Ficha de Proyecto Tecnológico</h1>
-          <p className="text-gray-500 mt-1 text-sm">Completa la ficha por secciones — puedes navegar entre ellas</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
+            <div>
+              <h1 className="text-2xl font-bold text-blue-900">Nueva Ficha de Proyecto Tecnológico</h1>
+              <p className="text-gray-500 mt-1 text-sm">Completa la ficha por secciones — puedes navegar entre ellas</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {draftTime && (
+                <span className="text-xs text-gray-400">
+                  {draftStatus === 'saving' ? '🔄 Guardando...' : `✅ Borrador: ${formatDraftTime(draftTime)}`}
+                </span>
+              )}
+              <button type="button" onClick={saveDraft}
+                className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+                📝 Guardar borrador
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Tabs navegación */}
         <div className="flex flex-wrap gap-2 mb-6">
           {TABS.map((t, i) => (
-            <button key={i} onClick={() => setTab(i)}
+            <button key={i} onClick={() => { setTab(i); setHasChanges(true) }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === i ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-blue-50 border border-gray-200'}`}>
               {t}
             </button>
@@ -1070,6 +1160,10 @@ export default function NuevoProyectoPage() {
                 {loading ? 'Guardando...' : '💾 Crear proyecto'}
               </button>
             )}
+            <button type="button" onClick={saveDraft}
+              className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+              📝 Borrador
+            </button>
           </div>
         </form>
       </main>
