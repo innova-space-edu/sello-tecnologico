@@ -1,21 +1,15 @@
 'use client'
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 
 const TIPOS = ['documento', 'foto', 'video', 'enlace', 'presentación', 'código']
-const ACCEPT = {
-  documento: '.pdf,.doc,.docx,.txt',
-  foto: 'image/*',
-  video: 'video/*',
-  presentación: '.ppt,.pptx,.pdf',
-  código: '.py,.js,.ts,.html,.css,.json,.zip',
-  enlace: '',
-}
 
 export default function NuevaEvidenciaPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const proyectoDesdeURL = searchParams.get('proyecto')
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
@@ -39,22 +33,28 @@ export default function NuevaEvidenciaPage() {
   })
 
   useEffect(() => {
-    supabase.from('projects').select('id, title').order('title')
-      .then(({ data }) => setProyectos(data ?? []))
-  }, [])
+    supabase
+      .from('projects')
+      .select('id, title, course_id, courses(name)')
+      .order('title')
+      .then(({ data }) => {
+        const lista = data ?? []
+        setProyectos(lista)
+        // Pre-seleccionar si viene por query param
+        if (proyectoDesdeURL) {
+          setForm(prev => ({ ...prev, project_id: proyectoDesdeURL }))
+        }
+      })
+  }, [proyectoDesdeURL])
+
+  const proyectoSeleccionado = proyectos.find(p => p.id === form.project_id)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setArchivoSeleccionado(file)
-
-    // Preview para imágenes y videos
-    if (file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file)
-      setPreview(url)
-    } else if (file.type.startsWith('video/')) {
-      const url = URL.createObjectURL(file)
-      setPreview(url)
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      setPreview(URL.createObjectURL(file))
     } else {
       setPreview(null)
     }
@@ -63,6 +63,14 @@ export default function NuevaEvidenciaPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    // Validar que haya proyecto seleccionado
+    if (!form.project_id) {
+      alert('Debes asociar esta evidencia a un proyecto antes de subirla.')
+      setLoading(false)
+      return
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     const tagsArray = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : []
 
@@ -71,13 +79,12 @@ export default function NuevaEvidenciaPage() {
     let file_type = null
     let file_size = null
 
-    // Subir archivo a Supabase Storage
     if (archivoSeleccionado) {
       const ext = archivoSeleccionado.name.split('.').pop()
       const path = `${user?.id}/${Date.now()}.${ext}`
       setUploadProgress(30)
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('evidencias')
         .upload(path, archivoSeleccionado, { upsert: true })
 
@@ -89,10 +96,7 @@ export default function NuevaEvidenciaPage() {
 
       setUploadProgress(70)
 
-      const { data: urlData } = supabase.storage
-        .from('evidencias')
-        .getPublicUrl(path)
-
+      const { data: urlData } = supabase.storage.from('evidencias').getPublicUrl(path)
       file_url = urlData.publicUrl
       file_name = archivoSeleccionado.name
       file_type = archivoSeleccionado.type
@@ -101,11 +105,11 @@ export default function NuevaEvidenciaPage() {
 
     setUploadProgress(90)
 
-    await supabase.from('evidences').insert({
+    const { error: insertError } = await supabase.from('evidences').insert({
       title: form.title,
       description: form.description,
       type: form.type,
-      project_id: form.project_id || null,
+      project_id: form.project_id,
       drive_url: form.drive_url || null,
       tags: tagsArray,
       created_by: user?.id,
@@ -120,6 +124,12 @@ export default function NuevaEvidenciaPage() {
       uso_ia: form.uso_ia || null,
       evidencia_tipo: form.evidencia_tipo,
     })
+
+    if (insertError) {
+      alert('Error al guardar la evidencia: ' + insertError.message)
+      setLoading(false)
+      return
+    }
 
     setUploadProgress(100)
     router.push('/evidencias')
@@ -154,7 +164,7 @@ export default function NuevaEvidenciaPage() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                   <select value={form.type} onChange={e => setForm({...form, type: e.target.value})}
@@ -171,14 +181,39 @@ export default function NuevaEvidenciaPage() {
                     <option value="final">🟢 Final</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
-                  <select value={form.project_id} onChange={e => setForm({...form, project_id: e.target.value})}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <option value="">Sin proyecto</option>
-                    {proyectos.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                  </select>
-                </div>
+              </div>
+
+              {/* Selector de proyecto — obligatorio */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Proyecto * <span className="text-gray-400 font-normal">(obligatorio)</span>
+                </label>
+                {proyectoDesdeURL && proyectoSeleccionado && (
+                  <div className="mb-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
+                    <span>📌 Proyecto preseleccionado desde la ficha</span>
+                    <button type="button" onClick={() => setForm(prev => ({ ...prev, project_id: '' }))}
+                      className="ml-auto text-xs text-blue-500 hover:underline">Cambiar</button>
+                  </div>
+                )}
+                <select
+                  required
+                  value={form.project_id}
+                  onChange={e => setForm({...form, project_id: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                  <option value="">Selecciona un proyecto</option>
+                  {proyectos.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}{p.courses?.name ? ` — ${p.courses.name}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {proyectoSeleccionado && (
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    📚 Curso: <span className="font-medium text-gray-700">
+                      {proyectoSeleccionado.courses?.name ?? 'Sin curso asignado'}
+                    </span>
+                  </p>
+                )}
               </div>
 
               <div>
@@ -200,22 +235,17 @@ export default function NuevaEvidenciaPage() {
           {/* Subida de archivo */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="font-semibold text-blue-900 mb-4">📁 Archivo</h2>
-
-            {/* Zona de subida */}
             <div
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-blue-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
               {archivoSeleccionado ? (
                 <div>
-                  {/* Preview imagen */}
                   {preview && archivoSeleccionado.type.startsWith('image/') && (
                     <img src={preview} alt="preview" className="max-h-48 mx-auto rounded-lg mb-3 object-contain" />
                   )}
-                  {/* Preview video */}
                   {preview && archivoSeleccionado.type.startsWith('video/') && (
                     <video src={preview} controls className="max-h-48 mx-auto rounded-lg mb-3 w-full" />
                   )}
-                  {/* Ícono para otros archivos */}
                   {!preview && (
                     <div className="text-5xl mb-3">
                       {archivoSeleccionado.name.endsWith('.pdf') ? '📄' :
@@ -245,7 +275,6 @@ export default function NuevaEvidenciaPage() {
               onChange={handleFileChange}
             />
 
-            {/* O link de Drive */}
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 O pega un link de Google Drive
