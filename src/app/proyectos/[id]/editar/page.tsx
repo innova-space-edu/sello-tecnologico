@@ -2,7 +2,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const TABS = [
   'A. Identificación',
@@ -128,8 +128,12 @@ export default function EditarProyectoPage() {
   const [noAutorizado, setNoAutorizado] = useState(false)
   const [proyectoTitulo, setProyectoTitulo] = useState('')
   const [etapas, setEtapas] = useState<EtapasMetodologia>(etapasIniciales())
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [draftTime, setDraftTime] = useState<string | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
+  const userIdRef = useRef<string | null>(null)
 
-  const [form, setForm] = useState({
+  const [form, setFormRaw] = useState({
     // A
     title: '', year: new Date().getFullYear().toString(),
     semestre: '1', asignaturas: '', docentes_responsables: '',
@@ -167,6 +171,18 @@ export default function EditarProyectoPage() {
     const cargar = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
+      userIdRef.current = user.id
+
+      // Restaurar borrador si existe
+      try {
+        const draftKey = `project-draft-edit-${proyectoId}-${user.id}`
+        const saved = localStorage.getItem(draftKey)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (parsed.updated_at) setDraftTime(parsed.updated_at)
+          // se restaurará después de cargar datos — ver abajo
+        }
+      } catch { /* ignorar */ }
 
       const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       const esAdmin = ['admin', 'docente', 'coordinador'].includes(perfil?.role ?? '')
@@ -242,9 +258,73 @@ export default function EditarProyectoPage() {
         setEtapas(prev => ({ ...prev, ...p.etapas_metodologia }))
       }
       setLoadingDatos(false)
+
+      // Restaurar borrador por encima de los datos cargados (si el usuario tenía cambios)
+      try {
+        const draftKey = `project-draft-edit-${proyectoId}-${user.id}`
+        const saved = localStorage.getItem(draftKey)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (parsed.form) setFormRaw(parsed.form)
+          if (parsed.etapas) setEtapas(prev => ({ ...prev, ...parsed.etapas }))
+          if (parsed.tab !== undefined) setTab(parsed.tab)
+        }
+      } catch { /* ignorar */ }
     }
     cargar()
   }, [proyectoId])
+
+  // setForm wrapper que activa hasChanges
+  const setForm = useCallback((val: any) => { setFormRaw(val); setHasChanges(true) }, [])
+
+  // Autosave en localStorage
+  useEffect(() => {
+    if (!hasChanges || loadingDatos) return
+    const timer = setTimeout(() => {
+      if (!userIdRef.current) return
+      try {
+        const draftKey = `project-draft-edit-${proyectoId}-${userIdRef.current}`
+        const now = new Date().toISOString()
+        localStorage.setItem(draftKey, JSON.stringify({ form, etapas, tab, updated_at: now }))
+        setDraftTime(now)
+        setDraftStatus('saved')
+      } catch { setDraftStatus('error') }
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [form, etapas, tab, hasChanges, loadingDatos])
+
+  // Aviso al salir si hay cambios sin guardar
+  useEffect(() => {
+    if (!hasChanges) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasChanges])
+
+  const saveDraft = () => {
+    if (!userIdRef.current) return
+    try {
+      const draftKey = `project-draft-edit-${proyectoId}-${userIdRef.current}`
+      const now = new Date().toISOString()
+      localStorage.setItem(draftKey, JSON.stringify({ form, etapas, tab, updated_at: now }))
+      setDraftTime(now)
+      setDraftStatus('saved')
+      alert('📝 Borrador guardado localmente')
+    } catch { alert('Error al guardar borrador') }
+  }
+
+  const clearDraft = () => {
+    if (userIdRef.current) {
+      try { localStorage.removeItem(`project-draft-edit-${proyectoId}-${userIdRef.current}`) } catch { /* ignore */ }
+    }
+  }
+
+  const formatDraftTime = (iso: string) => {
+    try {
+      const d = new Date(iso)
+      return d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    } catch { return '' }
+  }
 
   const toggleArray = (field: string, value: string) => {
     const arr = (form as any)[field] as string[]
@@ -403,6 +483,8 @@ export default function EditarProyectoPage() {
     }).eq('id', proyectoId)
 
     if (!error) {
+      clearDraft()
+      setHasChanges(false)
       router.push(`/proyectos/${proyectoId}`)
     } else {
       console.error('Error al guardar:', error)
@@ -436,14 +518,29 @@ export default function EditarProyectoPage() {
           <>
             <div className="mb-6">
               <button onClick={() => router.push(`/proyectos/${proyectoId}`)} className="text-blue-600 text-sm hover:underline">← Volver al proyecto</button>
-              <h1 className="text-2xl font-bold text-blue-900 mt-2">Editar: {proyectoTitulo}</h1>
-              <p className="text-gray-500 mt-1 text-sm">Solo tú puedes editar tu copia — los cambios no afectan a otros usuarios</p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
+                <div>
+                  <h1 className="text-2xl font-bold text-blue-900">Editar: {proyectoTitulo}</h1>
+                  <p className="text-gray-500 mt-1 text-sm">Solo tú puedes editar tu copia — los cambios no afectan a otros usuarios</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {draftTime && (
+                    <span className="text-xs text-gray-400">
+                      {draftStatus === 'saving' ? '🔄 Guardando...' : `✅ Borrador: ${formatDraftTime(draftTime)}`}
+                    </span>
+                  )}
+                  <button type="button" onClick={saveDraft}
+                    className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+                    📝 Guardar borrador
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Tabs navegación */}
             <div className="flex gap-1 flex-wrap mb-6">
               {TABS.map((t, i) => (
-                <button key={i} onClick={() => setTab(i)}
+                <button key={i} onClick={() => { setTab(i); setHasChanges(true) }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === i ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-blue-50 border border-gray-200'}`}>
                   {t}
                 </button>
@@ -1136,6 +1233,10 @@ export default function EditarProyectoPage() {
                     {loading ? 'Guardando...' : '💾 Guardar cambios'}
                   </button>
                 )}
+                <button type="button" onClick={saveDraft}
+                  className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors">
+                  📝 Borrador
+                </button>
               </div>
             </form>
           </>
