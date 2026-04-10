@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
     const yaDistribuidosIds = new Set((yaDistribuidos ?? []).map((p: any) => p.owner_id))
 
     // Crear copia para cada miembro que aún no tenga una
+    // Se propaga group_id si la plantilla ya pertenece a un grupo
     const nuevascopias = miembros
       .filter((m: any) => !yaDistribuidosIds.has(m.user_id))
       .map((m: any) => ({
-        // Datos del proyecto copiados de la plantilla
         title: plantilla.title,
         description: plantilla.description,
         status: 'Borrador',
@@ -94,12 +94,13 @@ export async function POST(req: NextRequest) {
         dificultades: plantilla.dificultades,
         mejoras: plantilla.mejoras,
         impacto_comunidad: plantilla.impacto_comunidad,
-        // Metadatos de distribución
         owner_id: m.user_id,
         plantilla_id: proyectoId,
         distribuido_por: user.id,
         distribuido_at: new Date().toISOString(),
         es_copia_distribuida: true,
+        // Propagar grupo si la plantilla ya pertenece a uno
+        group_id: plantilla.group_id ?? null,
       }))
 
     if (nuevascopias.length === 0) {
