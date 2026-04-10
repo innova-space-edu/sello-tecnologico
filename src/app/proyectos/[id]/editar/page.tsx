@@ -1,6 +1,7 @@
 'use client'
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
+import { ensureProjectGroup } from '@/lib/project-groups'
 import { useRouter, useParams } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
 
@@ -437,6 +438,20 @@ export default function EditarProyectoPage() {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) { alert('Tu sesión expiró. Recarga la página.'); setLoading(false); return }
 
+    // Crear o recuperar grupo si hay curso e integrantes
+    let groupId: string | null = null
+    if (form.course_id && form.integrantes_roles.filter(Boolean).length > 0) {
+      try {
+        const result = await ensureProjectGroup({
+          courseId: form.course_id,
+          integrantes: form.integrantes_roles.filter(Boolean),
+          createdBy: user.id,
+          groupName: form.title || 'Grupo de proyecto',
+        })
+        groupId = result?.groupId ?? null
+      } catch (e) { console.warn('[group] No se pudo crear/recuperar grupo:', e) }
+    }
+
     const { error } = await supabase.from('projects').update({
       // Campos originales
       title: form.title, description: form.description, status: form.status,
@@ -480,6 +495,7 @@ export default function EditarProyectoPage() {
       boceto_descripcion: form.boceto_descripcion,
       boceto_url: form.boceto_url,
       fuentes_consultadas: form.fuentes_consultadas.filter(Boolean),
+      group_id: groupId,
     }).eq('id', proyectoId)
 
     if (!error) {
