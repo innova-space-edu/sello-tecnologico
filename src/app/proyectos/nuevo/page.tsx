@@ -3,6 +3,7 @@ import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { ensureProjectGroup } from '@/lib/project-groups'
 
 const TABS = [
   'A. Identificación',
@@ -355,6 +356,20 @@ export default function NuevoProyectoPage() {
       alert('Tu sesión expiró. Por favor recarga la página e inicia sesión nuevamente.')
       setLoading(false); return
     }
+    // Crear o recuperar grupo si hay curso e integrantes
+    let groupId: string | null = null
+    if (form.course_id && form.integrantes_roles.filter(Boolean).length > 0) {
+      try {
+        const result = await ensureProjectGroup({
+          courseId: form.course_id,
+          integrantes: form.integrantes_roles.filter(Boolean),
+          createdBy: user.id,
+          groupName: form.title || 'Grupo de proyecto',
+        })
+        groupId = result?.groupId ?? null
+      } catch (e) { console.warn('[group] No se pudo crear/recuperar grupo:', e) }
+    }
+
     const { error } = await supabase.from('projects').insert({
       // Campos originales
       title: form.title, description: form.description, status: form.status,
@@ -397,6 +412,7 @@ export default function NuevoProyectoPage() {
       boceto_descripcion: form.boceto_descripcion,
       boceto_url: form.boceto_url,
       fuentes_consultadas: form.fuentes_consultadas.filter(Boolean),
+      group_id: groupId,
     })
     if (!error) {
       clearDraft()
