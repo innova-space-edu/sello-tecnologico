@@ -5,14 +5,6 @@ import { useRouter, useParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 
 const TIPOS = ['documento', 'foto', 'video', 'enlace', 'presentación', 'código']
-const ACCEPT = {
-  documento: '.pdf,.doc,.docx,.txt',
-  foto: 'image/*',
-  video: 'video/*',
-  presentación: '.ppt,.pptx,.pdf',
-  código: '.py,.js,.ts,.html,.css,.json,.zip',
-  enlace: '',
-}
 
 export default function EditarEvidenciaPage() {
   const router = useRouter()
@@ -43,7 +35,11 @@ export default function EditarEvidenciaPage() {
   })
 
   useEffect(() => {
-    supabase.from('projects').select('id, title').order('title')
+    // Cargar proyectos con curso asociado
+    supabase
+      .from('projects')
+      .select('id, title, course_id, courses(name)')
+      .order('title')
       .then(({ data }) => setProyectos(data ?? []))
 
     const cargar = async () => {
@@ -83,6 +79,8 @@ export default function EditarEvidenciaPage() {
     }
     cargar()
   }, [evidenciaId])
+
+  const proyectoSeleccionado = proyectos.find(p => p.id === form.project_id)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -147,7 +145,6 @@ export default function EditarEvidenciaPage() {
       evidencia_tipo: form.evidencia_tipo,
     }
 
-    // Solo incluir campos de archivo si se subió uno nuevo
     if (archivoSeleccionado) {
       updateData.file_url = file_url
       updateData.file_name = file_name
@@ -196,7 +193,6 @@ export default function EditarEvidenciaPage() {
           </div>
         )}
 
-        {/* ── Fragment wrapper evita el error JSX de múltiples hijos ── */}
         {!loadingDatos && !noAutorizado && (
           <>
             <div className="mb-8">
@@ -219,7 +215,7 @@ export default function EditarEvidenciaPage() {
                       className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
                       <select value={form.type} onChange={e => setForm({...form, type: e.target.value})}
@@ -236,14 +232,27 @@ export default function EditarEvidenciaPage() {
                         <option value="final">🟢 Final</option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
-                      <select value={form.project_id} onChange={e => setForm({...form, project_id: e.target.value})}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="">Sin proyecto</option>
-                        {proyectos.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                      </select>
-                    </div>
+                  </div>
+
+                  {/* Selector de proyecto con curso */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Proyecto</label>
+                    <select value={form.project_id} onChange={e => setForm({...form, project_id: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                      <option value="">Sin proyecto</option>
+                      {proyectos.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}{p.courses?.name ? ` — ${p.courses.name}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {proyectoSeleccionado && (
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        📚 Curso: <span className="font-medium text-gray-700">
+                          {proyectoSeleccionado.courses?.name ?? 'Sin curso asignado'}
+                        </span>
+                      </p>
+                    )}
                   </div>
 
                   <div>
