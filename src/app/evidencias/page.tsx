@@ -129,147 +129,149 @@ export default function EvidenciasPage() {
           </p>
         )}
 
-        {evidenciasFiltradas.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
-            {evidenciasFiltradas.map((ev) => {
-              const uploader = ev.profiles
-              const proyecto = ev.projects
-              const curso = proyecto?.courses?.name
-              const grupo = proyecto?.project_groups?.group_name
-              const isImage = ev.file_type?.startsWith('image/')
-              const isVideo = ev.file_type?.startsWith('video/')
+        {evidenciasFiltradas.length > 0 ? (() => {
+          // Agrupar por curso (del proyecto asociado)
+          const grupos: Record<string, typeof evidenciasFiltradas> = {}
+          for (const ev of evidenciasFiltradas) {
+            const curso = ev.projects?.courses?.name ?? 'Sin curso asignado'
+            if (!grupos[curso]) grupos[curso] = []
+            grupos[curso].push(ev)
+          }
+          const cursosOrdenados = Object.keys(grupos).sort((a, b) => {
+            if (a === 'Sin curso asignado') return 1
+            if (b === 'Sin curso asignado') return -1
+            return a.localeCompare(b, 'es')
+          })
 
-              return (
-                <div key={ev.id} className="bg-white rounded-xl shadow-sm border border-transparent hover:border-blue-300 hover:shadow-md transition-all overflow-hidden">
-                  {/* Miniatura de imagen */}
-                  {isImage && ev.file_url && (
-                    <Link href={`/evidencias/${ev.id}`}>
-                      <div className="relative h-36 bg-gray-100 overflow-hidden">
-                        <img
-                          src={ev.file_url}
-                          alt={ev.title}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                      </div>
-                    </Link>
-                  )}
-                  {/* Miniatura video */}
-                  {isVideo && ev.file_url && (
-                    <Link href={`/evidencias/${ev.id}`}>
-                      <div className="relative h-36 bg-gray-900 flex items-center justify-center overflow-hidden">
-                        <video src={ev.file_url} className="w-full h-full object-cover opacity-60" muted />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-12 h-12 bg-white/80 rounded-full flex items-center justify-center text-xl shadow">▶</div>
-                        </div>
-                      </div>
-                    </Link>
-                  )}
+          return (
+            <div className="space-y-6">
+              {cursosOrdenados.map(curso => (
+                <div key={curso}>
+                  {/* Header de curso */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-2 bg-blue-900 text-white px-4 py-1.5 rounded-full">
+                      <span className="text-sm">📚</span>
+                      <span className="text-sm font-semibold">{curso}</span>
+                    </div>
+                    <span className="text-xs text-gray-400">{grupos[curso].length} evidencia{grupos[curso].length !== 1 ? 's' : ''}</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
 
-                  <div className="p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="text-2xl shrink-0">{typeIcon[ev.type] ?? '📎'}</div>
-                      <div className="flex-1 min-w-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {grupos[curso].map((ev) => {
+                      const uploader = ev.profiles
+                      const proyecto = ev.projects
+                      const grupo = proyecto?.project_groups?.group_name
+                      const isImage = ev.file_type?.startsWith('image/')
+                      const isVideo = ev.file_type?.startsWith('video/')
 
-                        {/* Título */}
-                        <Link href={`/evidencias/${ev.id}`}
-                          className="font-semibold text-gray-800 hover:text-blue-700 block truncate">
-                          {ev.title}
-                        </Link>
-
-                        {/* Proyecto + Curso + Grupo */}
-                        <div className="mt-1 space-y-0.5">
-                          {proyecto && (
-                            <Link href={`/proyectos/${proyecto.id}`}
-                              className="text-xs text-blue-600 hover:underline font-medium block truncate">
-                              📌 {proyecto.title}
+                      return (
+                        <div key={ev.id} className="bg-white rounded-xl shadow-sm border border-transparent hover:border-blue-300 hover:shadow-md transition-all overflow-hidden">
+                          {isImage && ev.file_url && (
+                            <Link href={`/evidencias/${ev.id}`}>
+                              <div className="relative h-36 bg-gray-100 overflow-hidden">
+                                <img src={ev.file_url} alt={ev.title}
+                                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                              </div>
                             </Link>
                           )}
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                            {curso && <p className="text-xs text-gray-400">📚 {curso}</p>}
-                            {grupo && <p className="text-xs text-gray-400">👥 {grupo}</p>}
-                          </div>
-                        </div>
+                          {isVideo && ev.file_url && (
+                            <Link href={`/evidencias/${ev.id}`}>
+                              <div className="relative h-36 bg-gray-900 flex items-center justify-center overflow-hidden">
+                                <video src={ev.file_url} className="w-full h-full object-cover opacity-60" muted />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-12 h-12 bg-white/80 rounded-full flex items-center justify-center text-xl shadow">▶</div>
+                                </div>
+                              </div>
+                            </Link>
+                          )}
 
-                        {/* Quién subió */}
-                        {uploader && (
-                          <div className="flex items-center gap-1.5 mt-2">
-                            <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
-                              {uploader.full_name?.[0]?.toUpperCase() ?? '?'}
+                          <div className="p-5">
+                            <div className="flex items-start gap-3">
+                              <div className="text-2xl shrink-0">{typeIcon[ev.type] ?? '📎'}</div>
+                              <div className="flex-1 min-w-0">
+                                <Link href={`/evidencias/${ev.id}`}
+                                  className="font-semibold text-gray-800 hover:text-blue-700 block truncate">
+                                  {ev.title}
+                                </Link>
+                                <div className="mt-1 space-y-0.5">
+                                  {proyecto && (
+                                    <Link href={`/proyectos/${proyecto.id}`}
+                                      className="text-xs text-blue-600 hover:underline font-medium block truncate">
+                                      📌 {proyecto.title}
+                                    </Link>
+                                  )}
+                                  {grupo && <p className="text-xs text-gray-400">👥 {grupo}</p>}
+                                </div>
+                                {uploader && (
+                                  <div className="flex items-center gap-1.5 mt-2">
+                                    <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
+                                      {uploader.full_name?.[0]?.toUpperCase() ?? '?'}
+                                    </div>
+                                    <p className="text-xs text-gray-500 truncate">
+                                      {uploader.full_name ?? uploader.email}
+                                      {uploader.curso && <span className="text-gray-400"> · {uploader.curso}</span>}
+                                    </p>
+                                  </div>
+                                )}
+                                {ev.description && (
+                                  <p className="text-xs text-gray-400 mt-1.5 line-clamp-2">{ev.description}</p>
+                                )}
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {ev.evidencia_tipo && (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${etapaColor[ev.evidencia_tipo] ?? 'bg-gray-100 text-gray-500'}`}>
+                                      {etapaIcon[ev.evidencia_tipo]} {ev.evidencia_tipo}
+                                    </span>
+                                  )}
+                                  {ev.tags?.slice(0, 2).map((tag: string) => (
+                                    <span key={tag} className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">{tag}</span>
+                                  ))}
+                                  {ev.tags?.length > 2 && <span className="text-xs text-gray-400">+{ev.tags.length - 2}</span>}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col gap-1 shrink-0">
+                                <Link href={`/evidencias/${ev.id}`}
+                                  className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-sm text-center"
+                                  title="Ver evidencia">👁️</Link>
+                                {ev.file_url && (
+                                  <a href={ev.file_url} download={ev.file_name || true} target="_blank" rel="noopener noreferrer"
+                                    className="text-green-400 hover:text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors text-sm text-center"
+                                    title="Descargar">⬇️</a>
+                                )}
+                                {(ev.created_by === userId || !esEstudiante) && (
+                                  <Link href={`/evidencias/${ev.id}/editar`}
+                                    className="text-gray-400 hover:text-gray-600 hover:bg-gray-50 p-1.5 rounded-lg transition-colors text-sm text-center"
+                                    title="Editar">✏️</Link>
+                                )}
+                                {(ev.created_by === userId || !esEstudiante) && (
+                                  <button onClick={() => handleDelete(ev.id, ev.title)}
+                                    className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors text-sm"
+                                    title="Eliminar">🗑️</button>
+                                )}
+                              </div>
                             </div>
-                            <p className="text-xs text-gray-500 truncate">
-                              {uploader.full_name ?? uploader.email}
-                              {uploader.curso && <span className="text-gray-400"> · {uploader.curso}</span>}
+                            {ev.drive_url && (
+                              <a href={ev.drive_url} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:underline">
+                                🔗 Ver en Drive
+                              </a>
+                            )}
+                            <p className="text-xs text-gray-300 mt-2">
+                              {new Date(ev.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </p>
                           </div>
-                        )}
-
-                        {ev.description && (
-                          <p className="text-xs text-gray-400 mt-1.5 line-clamp-2">{ev.description}</p>
-                        )}
-
-                        {/* Tags y etapa */}
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {ev.evidencia_tipo && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${etapaColor[ev.evidencia_tipo] ?? 'bg-gray-100 text-gray-500'}`}>
-                              {etapaIcon[ev.evidencia_tipo]} {ev.evidencia_tipo}
-                            </span>
-                          )}
-                          {ev.tags?.slice(0, 2).map((tag: string) => (
-                            <span key={tag} className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">{tag}</span>
-                          ))}
-                          {ev.tags?.length > 2 && (
-                            <span className="text-xs text-gray-400">+{ev.tags.length - 2}</span>
-                          )}
                         </div>
-                      </div>
-
-                      {/* Acciones rápidas */}
-                      <div className="flex flex-col gap-1 shrink-0">
-                        <Link href={`/evidencias/${ev.id}`}
-                          className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors text-sm text-center"
-                          title="Ver evidencia">
-                          👁️
-                        </Link>
-                        {ev.file_url && (
-                          <a href={ev.file_url} download={ev.file_name || true} target="_blank" rel="noopener noreferrer"
-                            className="text-green-400 hover:text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors text-sm text-center"
-                            title="Descargar">
-                            ⬇️
-                          </a>
-                        )}
-                        {(ev.created_by === userId || !esEstudiante) && (
-                          <Link href={`/evidencias/${ev.id}/editar`}
-                            className="text-gray-400 hover:text-gray-600 hover:bg-gray-50 p-1.5 rounded-lg transition-colors text-sm text-center"
-                            title="Editar">✏️</Link>
-                        )}
-                        {(ev.created_by === userId || !esEstudiante) && (
-                          <button onClick={() => handleDelete(ev.id, ev.title)}
-                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors text-sm"
-                            title="Eliminar">🗑️</button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Drive link */}
-                    {ev.drive_url && (
-                      <a href={ev.drive_url} target="_blank" rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:underline">
-                        🔗 Ver en Drive
-                      </a>
-                    )}
-
-                    {/* Fecha */}
-                    <p className="text-xs text-gray-300 mt-2">
-                      {new Date(ev.created_at).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
+                      )
+                    })}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        ) : evidencias.length === 0 ? (
+              ))}
+            </div>
+          )
+        })() : evidencias.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">📎</div>
             <h3 className="text-lg font-semibold text-gray-700">No hay evidencias aún</h3>
