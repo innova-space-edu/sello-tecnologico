@@ -86,6 +86,92 @@ const etapasIniciales = (): EtapasMetodologia => ({
   cierre: { ...etapaBaseVacia(), tipo_presentacion: [], entregables: '', difusion: '', reflexion_equipo: '', lecciones: '', continuidad: '' },
 })
 
+// ─── CSS class constants (module-level so inline components can use them) ─────
+const IC = "w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+const TC = `${IC} resize-none`
+const LC = "block text-sm font-medium text-gray-700 mb-1"
+
+// ─── CheckBox (module-level to prevent remount on every keystroke) ─────────────
+function CheckBox({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer group">
+      <div onClick={onToggle}
+        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover:border-blue-400'}`}>
+        {checked && <span className="text-white text-xs">✓</span>}
+      </div>
+      <span className="text-sm text-gray-700">{label}</span>
+    </label>
+  )
+}
+
+// ─── EtapaCheckBox (module-level) ─────────────────────────────────────────────
+function EtapaCheckBox({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer group">
+      <div onClick={onToggle}
+        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover:border-blue-400'}`}>
+        {checked && <span className="text-white text-xs">✓</span>}
+      </div>
+      <span className="text-sm text-gray-700">{label}</span>
+    </label>
+  )
+}
+
+// ─── CamposComunes (module-level) ──────────────────────────────────────────────
+function CamposComunes({ e, color, onChange }: {
+  e: EtapaBase
+  color: string
+  onChange: (field: string, value: any) => void
+}) {
+  return (
+    <>
+      <div className="mt-4">
+        <label className={LC}>Descripción general de la etapa</label>
+        <textarea value={e.descripcion} onChange={ev => onChange('descripcion', ev.target.value)}
+          rows={3} placeholder="¿Qué actividades se realizarán en esta etapa?" className={TC} />
+      </div>
+      <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 p-3 bg-${color}-50 rounded-lg border border-${color}-100`}>
+        <div>
+          <label className={LC}>N° de sesiones</label>
+          <input type="number" min="1" value={e.num_sesiones} onChange={ev => onChange('num_sesiones', ev.target.value)} placeholder="Ej: 3" className={IC} />
+        </div>
+        <div>
+          <label className={LC}>Minutos por sesión</label>
+          <input type="number" min="1" value={e.duracion_sesion} onChange={ev => onChange('duracion_sesion', ev.target.value)} placeholder="Ej: 90" className={IC} />
+        </div>
+        <div>
+          <label className={LC}>Estado</label>
+          <select value={e.estado} onChange={ev => onChange('estado', ev.target.value)} className={IC}>
+            {['Pendiente', 'En progreso', 'Completada', 'Postergada'].map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className={LC}>Fecha inicio</label>
+          <input type="date" value={e.fecha_inicio} onChange={ev => onChange('fecha_inicio', ev.target.value)} className={IC} />
+        </div>
+        <div>
+          <label className={LC}>Fecha término estimada</label>
+          <input type="date" value={e.fecha_fin} onChange={ev => onChange('fecha_fin', ev.target.value)} className={IC} />
+        </div>
+      </div>
+      <div className="mt-3">
+        <label className={LC}>Responsable(s) de la etapa</label>
+        <input value={e.responsable} onChange={ev => onChange('responsable', ev.target.value)} placeholder="Ej: Grupo completo / Nombre del docente guía" className={IC} />
+      </div>
+      <div className="mt-3">
+        <label className={LC}>Evidencias esperadas</label>
+        <input value={e.evidencias_esperadas} onChange={ev => onChange('evidencias_esperadas', ev.target.value)} placeholder="Ej: Informe de investigación, fotos del proceso, boceto digital..." className={IC} />
+      </div>
+      <div className="mt-3">
+        <label className={LC}>Observaciones / Notas adicionales</label>
+        <textarea value={e.observaciones} onChange={ev => onChange('observaciones', ev.target.value)} rows={2} placeholder="Cualquier nota relevante para esta etapa..." className={TC} />
+      </div>
+    </>
+  )
+}
+
 // ─── Componente para listas editables dinámicas ────────────────────────────────
 function ListaEditable({
   items, onChange, placeholder, label,
@@ -342,87 +428,10 @@ export default function EditarProyectoPage() {
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], activa: !etapas[etapa].activa } })
   }
 
-  const inputClass = "w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
-  const labelClass = "block text-sm font-medium text-gray-700 mb-1"
-  const textareaClass = `${inputClass} resize-none`
+  const inputClass = IC
+  const labelClass = LC
+  const textareaClass = TC
   const subLabelClass = "block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 mt-4"
-
-  const CheckBox = ({ field, value, label }: { field: string; value: string; label?: string }) => {
-    const arr = (form as any)[field] as string[]
-    return (
-      <label className="flex items-center gap-2 cursor-pointer group">
-        <div onClick={() => toggleArray(field, value)}
-          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${arr.includes(value) ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover:border-blue-400'}`}>
-          {arr.includes(value) && <span className="text-white text-xs">✓</span>}
-        </div>
-        <span className="text-sm text-gray-700">{label ?? value}</span>
-      </label>
-    )
-  }
-
-  const EtapaCheckBox = ({ etapa, field, value }: { etapa: keyof EtapasMetodologia; field: string; value: string }) => {
-    const arr = ((etapas[etapa] as any)[field] as string[]) ?? []
-    return (
-      <label className="flex items-center gap-2 cursor-pointer group">
-        <div onClick={() => toggleEtapaArray(etapa, field, value)}
-          className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${arr.includes(value) ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover:border-blue-400'}`}>
-          {arr.includes(value) && <span className="text-white text-xs">✓</span>}
-        </div>
-        <span className="text-sm text-gray-700">{value}</span>
-      </label>
-    )
-  }
-
-  const CamposComunes = ({ etapa, color }: { etapa: keyof EtapasMetodologia; color: string }) => {
-    const e = etapas[etapa] as EtapaBase
-    return (
-      <>
-        <div className="mt-4">
-          <label className={labelClass}>Descripción general de la etapa</label>
-          <textarea value={e.descripcion} onChange={ev => updateEtapa(etapa, 'descripcion', ev.target.value)}
-            rows={3} placeholder="¿Qué actividades se realizarán en esta etapa?" className={textareaClass} />
-        </div>
-        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 p-3 bg-${color}-50 rounded-lg border border-${color}-100`}>
-          <div>
-            <label className={labelClass}>N° de sesiones</label>
-            <input type="number" min="1" value={e.num_sesiones} onChange={ev => updateEtapa(etapa, 'num_sesiones', ev.target.value)} placeholder="Ej: 3" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Minutos por sesión</label>
-            <input type="number" min="1" value={e.duracion_sesion} onChange={ev => updateEtapa(etapa, 'duracion_sesion', ev.target.value)} placeholder="Ej: 90" className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Estado</label>
-            <select value={e.estado} onChange={ev => updateEtapa(etapa, 'estado', ev.target.value)} className={inputClass}>
-              {['Pendiente', 'En progreso', 'Completada', 'Postergada'].map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className={labelClass}>Fecha inicio</label>
-            <input type="date" value={e.fecha_inicio} onChange={ev => updateEtapa(etapa, 'fecha_inicio', ev.target.value)} className={inputClass} />
-          </div>
-          <div>
-            <label className={labelClass}>Fecha término estimada</label>
-            <input type="date" value={e.fecha_fin} onChange={ev => updateEtapa(etapa, 'fecha_fin', ev.target.value)} className={inputClass} />
-          </div>
-        </div>
-        <div className="mt-3">
-          <label className={labelClass}>Responsable(s) de la etapa</label>
-          <input value={e.responsable} onChange={ev => updateEtapa(etapa, 'responsable', ev.target.value)} placeholder="Ej: Grupo completo / Nombre del docente guía" className={inputClass} />
-        </div>
-        <div className="mt-3">
-          <label className={labelClass}>Evidencias esperadas</label>
-          <input value={e.evidencias_esperadas} onChange={ev => updateEtapa(etapa, 'evidencias_esperadas', ev.target.value)} placeholder="Ej: Informe de investigación, fotos del proceso, boceto digital..." className={inputClass} />
-        </div>
-        <div className="mt-3">
-          <label className={labelClass}>Observaciones / Notas adicionales</label>
-          <textarea value={e.observaciones} onChange={ev => updateEtapa(etapa, 'observaciones', ev.target.value)} rows={2} placeholder="Cualquier nota relevante para esta etapa..." className={textareaClass} />
-        </div>
-      </>
-    )
-  }
 
   const estadoBadge = (estado: string) => {
     const colores: Record<string, string> = {
@@ -609,7 +618,7 @@ export default function EditarProyectoPage() {
                     <label className={labelClass}>Tipo de proyecto</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                       {['ABP', 'STEAM', 'Investigación', 'Prototipo', 'Comunitario', 'Otro'].map(v => (
-                        <CheckBox key={v} field="tipo_proyecto" value={v} />
+                        <CheckBox key={v} checked={((form as any)["tipo_proyecto"] as string[]).includes(v)} onToggle={() => toggleArray("tipo_proyecto", v)} label={v} />
                       ))}
                     </div>
                   </div>
@@ -660,7 +669,7 @@ export default function EditarProyectoPage() {
                     <label className={labelClass}>Habilidades trabajadas</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                       {['Pensamiento crítico', 'Resolución de problemas', 'Trabajo colaborativo', 'Comunicación', 'Uso de tecnologías'].map(v => (
-                        <CheckBox key={v} field="habilidades" value={v} />
+                        <CheckBox key={v} checked={((form as any)["habilidades"] as string[]).includes(v)} onToggle={() => toggleArray("habilidades", v)} label={v} />
                       ))}
                     </div>
                   </div>
@@ -707,7 +716,7 @@ export default function EditarProyectoPage() {
                     <label className={labelClass}>Contexto del problema</label>
                     <div className="grid grid-cols-3 gap-2 mb-2 mt-1">
                       {['Local', 'Escolar', 'Comunitario'].map(v => (
-                        <CheckBox key={v} field="contexto_problema" value={v} />
+                        <CheckBox key={v} checked={((form as any)["contexto_problema"] as string[]).includes(v)} onToggle={() => toggleArray("contexto_problema", v)} label={v} />
                       ))}
                     </div>
                     <textarea value={form.contexto_problema} onChange={e => setForm({ ...form, contexto_problema: e.target.value })}
@@ -803,7 +812,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Fuentes de información</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Web / Internet', 'Libros y textos', 'Entrevistas a expertos', 'Experimentos propios', 'Observación directa', 'Encuestas', 'Artículos científicos', 'Documentales / videos', 'Bases de datos'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="investigacion" field="fuentes" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["investigacion"] as any)["fuentes"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("investigacion", "fuentes", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -811,7 +820,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Técnicas de recolección de datos</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Encuesta escrita', 'Entrevista', 'Observación sistemática', 'Experimento de laboratorio', 'Análisis documental', 'Revisión bibliográfica', 'Registro fotográfico', 'Diario de campo', 'Análisis estadístico'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="investigacion" field="tecnicas_recoleccion" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["investigacion"] as any)["tecnicas_recoleccion"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("investigacion", "tecnicas_recoleccion", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -820,7 +829,7 @@ export default function EditarProyectoPage() {
                               <textarea value={etapas.investigacion.hallazgos} onChange={e => updateEtapa('investigacion', 'hallazgos', e.target.value)}
                                 rows={3} placeholder="¿Qué encontraron en la investigación?" className={textareaClass} />
                             </div>
-                            <CamposComunes etapa="investigacion" color="blue" />
+                            <CamposComunes e={etapas["investigacion"] as EtapaBase} color="blue" onChange={(field, val) => updateEtapa("investigacion", field, val)} />
                           </div>
                         )}
                       </div>
@@ -850,7 +859,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Tipo de diseño a utilizar</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Boceto manual', 'Diagrama de flujo', 'Plano técnico', 'Wireframe digital', 'Maqueta en papel', 'Modelado 3D', 'Prototipo rápido', 'Mapa conceptual', 'Otro'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="diseno" field="tipo_diseno" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["diseno"] as any)["tipo_diseno"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("diseno", "tipo_diseno", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -858,7 +867,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Herramientas de diseño</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Papel y lápiz', 'Canva', 'Figma', 'Google Slides', 'Tinkercad', 'AutoCAD / LibreCAD', 'Scratch (diagrama)', 'Miro', 'Otro'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="diseno" field="herramientas_diseno" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["diseno"] as any)["herramientas_diseno"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("diseno", "herramientas_diseno", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -872,7 +881,7 @@ export default function EditarProyectoPage() {
                               <textarea value={etapas.diseno.revision_diseno} onChange={e => updateEtapa('diseno', 'revision_diseno', e.target.value)}
                                 rows={2} placeholder="¿Quién revisará y aprobará el diseño antes de pasar al desarrollo?" className={textareaClass} />
                             </div>
-                            <CamposComunes etapa="diseno" color="violet" />
+                            <CamposComunes e={etapas["diseno"] as EtapaBase} color="violet" onChange={(field, val) => updateEtapa("diseno", field, val)} />
                           </div>
                         )}
                       </div>
@@ -902,7 +911,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Tipo de desarrollo</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Construcción física', 'Programación / código', 'Diseño gráfico digital', 'Fabricación con impresora 3D', 'Electrónica / Arduino', 'Producción audiovisual', 'Investigación experimental', 'Desarrollo mixto'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="desarrollo" field="tipo_desarrollo" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["desarrollo"] as any)["tipo_desarrollo"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("desarrollo", "tipo_desarrollo", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -926,7 +935,7 @@ export default function EditarProyectoPage() {
                               <textarea value={etapas.desarrollo.obstaculos} onChange={e => updateEtapa('desarrollo', 'obstaculos', e.target.value)}
                                 rows={3} placeholder="¿Qué dificultades surgieron durante el desarrollo?" className={textareaClass} />
                             </div>
-                            <CamposComunes etapa="desarrollo" color="amber" />
+                            <CamposComunes e={etapas["desarrollo"] as EtapaBase} color="amber" onChange={(field, val) => updateEtapa("desarrollo", field, val)} />
                           </div>
                         )}
                       </div>
@@ -956,7 +965,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Tipo de evaluación</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Diagnóstica', 'Formativa', 'Sumativa', 'Autoevaluación', 'Coevaluación', 'Heteroevaluación'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="evaluacion" field="tipo_evaluacion" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["evaluacion"] as any)["tipo_evaluacion"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("evaluacion", "tipo_evaluacion", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -964,7 +973,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Instrumento de evaluación principal</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Rúbrica', 'Lista de cotejo', 'Escala de apreciación', 'Portafolio', 'Prueba escrita', 'Presentación oral', 'Registro de observación', 'Informe de proyecto'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="evaluacion" field="instrumento" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["evaluacion"] as any)["instrumento"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("evaluacion", "instrumento", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -983,7 +992,7 @@ export default function EditarProyectoPage() {
                               <textarea value={etapas.evaluacion.retroalimentacion} onChange={e => updateEtapa('evaluacion', 'retroalimentacion', e.target.value)}
                                 rows={3} placeholder="¿Qué retroalimentación dieron el docente, los pares o la comunidad?" className={textareaClass} />
                             </div>
-                            <CamposComunes etapa="evaluacion" color="green" />
+                            <CamposComunes e={etapas["evaluacion"] as EtapaBase} color="green" onChange={(field, val) => updateEtapa("evaluacion", field, val)} />
                           </div>
                         )}
                       </div>
@@ -1013,7 +1022,7 @@ export default function EditarProyectoPage() {
                               <p className={subLabelClass}>Forma de presentación del producto</p>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {['Feria tecnológica', 'Exposición al curso', 'Video presentación', 'Informe escrito', 'Prototipo funcional', 'App / demo en vivo', 'Póster científico', 'Publicación web', 'Otro'].map(v => (
-                                  <EtapaCheckBox key={v} etapa="cierre" field="tipo_presentacion" value={v} />
+                                  <EtapaCheckBox key={v} checked={(((etapas["cierre"] as any)["tipo_presentacion"] as string[]) ?? []).includes(v)} onToggle={() => toggleEtapaArray("cierre", "tipo_presentacion", v)} label={v} />
                                 ))}
                               </div>
                             </div>
@@ -1042,7 +1051,7 @@ export default function EditarProyectoPage() {
                               <textarea value={etapas.cierre.continuidad} onChange={e => updateEtapa('cierre', 'continuidad', e.target.value)}
                                 rows={2} placeholder="¿Tiene este proyecto una continuación?" className={textareaClass} />
                             </div>
-                            <CamposComunes etapa="cierre" color="rose" />
+                            <CamposComunes e={etapas["cierre"] as EtapaBase} color="rose" onChange={(field, val) => updateEtapa("cierre", field, val)} />
                           </div>
                         )}
                       </div>
@@ -1088,7 +1097,7 @@ export default function EditarProyectoPage() {
                       <label className={labelClass}>Uso de IA en el proyecto</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                         {['No se utilizó', 'Apoyo conceptual', 'Generación de ideas', 'Análisis / retroalimentación'].map(v => (
-                          <CheckBox key={v} field="uso_ia" value={v} />
+                          <CheckBox key={v} checked={((form as any)["uso_ia"] as string[]).includes(v)} onToggle={() => toggleArray("uso_ia", v)} label={v} />
                         ))}
                       </div>
                     </div>
@@ -1146,7 +1155,7 @@ export default function EditarProyectoPage() {
                       <label className={labelClass}>Tipo de producto</label>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                         {['Prototipo', 'Informe', 'App / programa', 'Video', 'Presentación', 'Otro'].map(v => (
-                          <CheckBox key={v} field="tipo_producto" value={v} />
+                          <CheckBox key={v} checked={((form as any)["tipo_producto"] as string[]).includes(v)} onToggle={() => toggleArray("tipo_producto", v)} label={v} />
                         ))}
                       </div>
                     </div>
@@ -1171,7 +1180,7 @@ export default function EditarProyectoPage() {
                     <label className={labelClass}>Instrumento(s) de evaluación</label>
                     <div className="flex gap-4 mt-2">
                       {['Rúbrica', 'Lista de cotejo', 'Autoevaluación', 'Coevaluación'].map(v => (
-                        <CheckBox key={v} field="instrumento_evaluacion" value={v} />
+                        <CheckBox key={v} checked={((form as any)["instrumento_evaluacion"] as string[]).includes(v)} onToggle={() => toggleArray("instrumento_evaluacion", v)} label={v} />
                       ))}
                     </div>
                   </div>
@@ -1179,7 +1188,7 @@ export default function EditarProyectoPage() {
                     <label className={labelClass}>Criterios evaluados</label>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       {['Proceso', 'Producto', 'Trabajo en equipo', 'Presentación', 'Creatividad', 'Innovación'].map(v => (
-                        <CheckBox key={v} field="criterios_evaluados" value={v} />
+                        <CheckBox key={v} checked={((form as any)["criterios_evaluados"] as string[]).includes(v)} onToggle={() => toggleArray("criterios_evaluados", v)} label={v} />
                       ))}
                     </div>
                   </div>
