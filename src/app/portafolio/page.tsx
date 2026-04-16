@@ -162,29 +162,68 @@ export default function PortafolioPage() {
       <Sidebar />
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
 
-        {/* Vista admin/docente: lista de todos los portafolios */}
-        {['admin', 'docente', 'coordinador'].includes(rol) && todosPortafolios.length > 0 && (
-          <div className="mb-6 bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-blue-900">📋 Portafolios de estudiantes ({todosPortafolios.length})</h2>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {todosPortafolios.map((port: any) => (
-                <Link key={port.id} href={`/portafolio/${port.id}`}
-                  className="flex items-center gap-4 px-6 py-3 hover:bg-blue-50 transition-colors">
-                  <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
-                    {port.profiles?.full_name?.[0]?.toUpperCase() ?? '?'}
+        {/* Vista admin/docente: lista de portafolios agrupados por curso */}
+        {['admin', 'docente', 'coordinador'].includes(rol) && todosPortafolios.length > 0 && (() => {
+          // Agrupar por curso
+          const grupos: Record<string, any[]> = {}
+          for (const port of todosPortafolios) {
+            const curso = port.profiles?.curso ?? 'Sin curso asignado'
+            if (!grupos[curso]) grupos[curso] = []
+            grupos[curso].push(port)
+          }
+          const cursosOrdenados = Object.keys(grupos).sort((a, b) => {
+            if (a === 'Sin curso asignado') return 1
+            if (b === 'Sin curso asignado') return -1
+            return a.localeCompare(b, 'es')
+          })
+
+          return (
+            <div className="mb-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-blue-900 text-lg">
+                  📋 Portafolios de estudiantes
+                  <span className="ml-2 text-sm font-normal text-gray-400">({todosPortafolios.length} en total)</span>
+                </h2>
+                <span className="text-xs text-gray-400">{cursosOrdenados.length} cursos</span>
+              </div>
+              {cursosOrdenados.map(curso => (
+                <div key={curso} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">📚</span>
+                      <span className="font-semibold text-blue-900 text-sm">{curso}</span>
+                    </div>
+                    <span className="text-xs text-blue-500 font-medium">{grupos[curso].length} estudiante{grupos[curso].length !== 1 ? 's' : ''}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-800 text-sm truncate">{port.profiles?.full_name ?? port.profiles?.email}</p>
-                    <p className="text-xs text-gray-400">{port.profiles?.curso ?? '—'} · {port.year}</p>
+                  <div className="divide-y divide-gray-100">
+                    {grupos[curso]
+                      .sort((a, b) => (a.profiles?.full_name ?? '').localeCompare(b.profiles?.full_name ?? '', 'es'))
+                      .map((port: any) => (
+                        <Link key={port.id} href={`/portafolio/${port.id}`}
+                          className="flex items-center gap-4 px-5 py-3 hover:bg-blue-50 transition-colors">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm shrink-0">
+                            {port.profiles?.full_name?.[0]?.toUpperCase() ?? '?'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-800 text-sm truncate">
+                              {port.profiles?.full_name ?? port.profiles?.email ?? '—'}
+                            </p>
+                            {port.profiles?.rut && (
+                              <p className="text-xs text-gray-400">RUT: {port.profiles.rut}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs text-gray-400">{port.year}</span>
+                            <span className="text-xs text-blue-600 font-medium">Ver →</span>
+                          </div>
+                        </Link>
+                      ))}
                   </div>
-                  <span className="text-xs text-blue-600 hover:underline shrink-0">Ver portafolio →</span>
-                </Link>
+                </div>
               ))}
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Header */}
         <div className="mb-6 flex justify-between items-start flex-wrap gap-3">
