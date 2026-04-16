@@ -41,6 +41,8 @@ export default function AdminProyectosPage() {
   }
 
   useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
@@ -54,17 +56,18 @@ export default function AdminProyectosPage() {
 
       await fetchProyectos()
       setLoading(false)
+
+      // Realtime — actualización instantánea
+      channel = supabase
+        .channel('admin-proyectos-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+          fetchProyectos()
+        })
+        .subscribe()
     }
     init()
 
-    // Auto-refresh cada 5 segundos
-    const interval = setInterval(() => {
-      if (autorizadoRef.current) {
-        fetchProyectos()
-      }
-    }, 5000)
-
-    return () => clearInterval(interval)
+    return () => { channel && supabase.removeChannel(channel) }
   }, [])
 
   const handleDelete = async (id: string, titulo: string) => {
