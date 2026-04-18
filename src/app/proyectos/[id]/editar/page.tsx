@@ -218,6 +218,7 @@ export default function EditarProyectoPage() {
   const [draftStatus, setDraftStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [draftTime, setDraftTime] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved-server' | 'saved-local' | 'error'>('idle')
   const userIdRef = useRef<string | null>(null)
 
   const [form, setFormRaw] = useState({
@@ -364,19 +365,82 @@ export default function EditarProyectoPage() {
   // setForm wrapper que activa hasChanges
   const setForm = useCallback((val: any) => { setFormRaw(val); setHasChanges(true) }, [])
 
-  // Autosave en localStorage
+  // Helper: construir payload completo para Supabase
+  const buildPayload = (form: any, etapas: any) => ({
+    title: form.title, description: form.description, status: form.status,
+    type: form.tipo_proyecto.join(', ') || 'Proyecto',
+    course_id: form.course_id || null,
+    start_date: form.start_date || null, end_date: form.end_date || null,
+    semestre: form.semestre,
+    asignaturas: form.asignaturas ? form.asignaturas.split(',').map((s: string) => s.trim()) : [],
+    docentes_responsables: form.docentes_responsables ? form.docentes_responsables.split(',').map((s: string) => s.trim()) : [],
+    tipo_proyecto: form.tipo_proyecto,
+    objetivos_aprendizaje: form.objetivos_aprendizaje,
+    habilidades: form.habilidades, vinculacion_pei: form.vinculacion_pei,
+    pregunta_guia: form.pregunta_guia, contexto_problema: form.contexto_problema,
+    justificacion: form.justificacion, metodologia: form.metodologia,
+    organizacion_trabajo: form.organizacion_trabajo,
+    herramientas_tecnologicas: form.herramientas_tecnologicas ? form.herramientas_tecnologicas.split(',').map((s: string) => s.trim()) : [],
+    herramientas_materiales: form.herramientas_materiales ? form.herramientas_materiales.split(',').map((s: string) => s.trim()) : [],
+    etapas_metodologia: etapas,
+    uso_ia: form.uso_ia, estrategia_verificacion: form.estrategia_verificacion,
+    tipo_producto: form.tipo_producto,
+    instrumento_evaluacion: form.instrumento_evaluacion,
+    criterios_evaluados: form.criterios_evaluados, autoevaluacion: form.autoevaluacion,
+    aprendizajes_logrados: form.aprendizajes_logrados, dificultades: form.dificultades,
+    mejoras: form.mejoras, impacto_comunidad: form.impacto_comunidad,
+    integrantes_roles: form.integrantes_roles.filter(Boolean),
+    indicador_oa: form.indicador_oa,
+    problema_detectado: form.problema_detectado,
+    evidencia_problema: form.evidencia_problema,
+    preguntas_investigacion: form.preguntas_investigacion.filter(Boolean),
+    hipotesis: form.hipotesis,
+    steam_ciencia: form.steam_ciencia, steam_tecnologia: form.steam_tecnologia,
+    steam_ingenieria: form.steam_ingenieria, steam_arte: form.steam_arte,
+    steam_matematica: form.steam_matematica,
+    objetivo_general: form.objetivo_general,
+    objetivos_especificos: form.objetivos_especificos.filter(Boolean),
+    solucion_propuesta: form.solucion_propuesta,
+    boceto_descripcion: form.boceto_descripcion, boceto_url: form.boceto_url,
+    fuentes_consultadas: form.fuentes_consultadas.filter(Boolean),
+    updated_at: new Date().toISOString(),
+  })
+
+  // Autosave dual: localStorage (respaldo) + Supabase (plataforma)
   useEffect(() => {
     if (!hasChanges || loadingDatos) return
-    const timer = setTimeout(() => {
+    setSyncStatus('saving')
+    const timer = setTimeout(async () => {
       if (!userIdRef.current) return
+      const now = new Date().toISOString()
+
+      // Capa 1: localStorage como respaldo rápido
       try {
         const draftKey = `project-draft-edit-${proyectoId}-${userIdRef.current}`
-        const now = new Date().toISOString()
         localStorage.setItem(draftKey, JSON.stringify({ form, etapas, tab, updated_at: now }))
         setDraftTime(now)
         setDraftStatus('saved')
-      } catch { setDraftStatus('error') }
-    }, 1500)
+      } catch { /* ignorar */ }
+
+      // Capa 2: Supabase — guardado real en plataforma
+      try {
+        const payload = buildPayload(form, etapas)
+        const { error } = await supabase.from('projects').update({
+          ...payload,
+          last_autosave_at: now,
+          autosave_source: 'server',
+        } as any).eq('id', proyectoId)
+
+        if (!error) {
+          setSyncStatus('saved-server')
+          setDraftTime(now)
+        } else {
+          setSyncStatus('saved-local')
+        }
+      } catch {
+        setSyncStatus('saved-local')
+      }
+    }, 2000)
     return () => clearTimeout(timer)
   }, [form, etapas, tab, hasChanges, loadingDatos])
 
@@ -388,16 +452,35 @@ export default function EditarProyectoPage() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [hasChanges])
 
-  const saveDraft = () => {
+  const saveDraft = async () => {
     if (!userIdRef.current) return
+    setSyncStatus('saving')
+    const now = new Date().toISOString()
+    // localStorage backup
     try {
       const draftKey = `project-draft-edit-${proyectoId}-${userIdRef.current}`
-      const now = new Date().toISOString()
       localStorage.setItem(draftKey, JSON.stringify({ form, etapas, tab, updated_at: now }))
       setDraftTime(now)
       setDraftStatus('saved')
-      alert('📝 Borrador guardado localmente')
-    } catch { alert('Error al guardar borrador') }
+    } catch { /* ignorar */ }
+    // Supabase
+    try {
+      const payload = buildPayload(form, etapas)
+      const { error } = await supabase.from('projects').update({
+        ...payload, last_autosave_at: now, autosave_source: 'manual',
+      } as any).eq('id', proyectoId)
+      if (!error) {
+        setSyncStatus('saved-server')
+        setDraftTime(now)
+        alert('✅ Guardado en plataforma correctamente')
+      } else {
+        setSyncStatus('saved-local')
+        alert('📝 Guardado localmente (sin conexión al servidor)')
+      }
+    } catch {
+      setSyncStatus('saved-local')
+      alert('📝 Guardado localmente')
+    }
   }
 
   const clearDraft = () => {
@@ -549,11 +632,20 @@ export default function EditarProyectoPage() {
                   <p className="text-gray-500 mt-1 text-sm">Solo tú puedes editar tu copia — los cambios no afectan a otros usuarios</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {draftTime && (
-                    <span className="text-xs text-gray-400">
-                      {draftStatus === 'saving' ? '🔄 Guardando...' : `✅ Borrador: ${formatDraftTime(draftTime)}`}
-                    </span>
-                  )}
+                  {/* Indicador de sincronización */}
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
+                    syncStatus === 'saving' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                    syncStatus === 'saved-server' ? 'bg-green-50 text-green-700 border-green-200' :
+                    syncStatus === 'saved-local' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                    syncStatus === 'error' ? 'bg-red-50 text-red-600 border-red-200' :
+                    'bg-gray-50 text-gray-400 border-gray-200'
+                  }`}>
+                    {syncStatus === 'saving' && '🟡 Guardando...'}
+                    {syncStatus === 'saved-server' && `🟢 Guardado en plataforma${draftTime ? ' · ' + formatDraftTime(draftTime) : ''}`}
+                    {syncStatus === 'saved-local' && `🟠 Guardado local${draftTime ? ' · ' + formatDraftTime(draftTime) : ''}`}
+                    {syncStatus === 'error' && '🔴 Error de sincronización'}
+                    {syncStatus === 'idle' && (draftTime ? `✅ ${formatDraftTime(draftTime)}` : '⚪ Sin cambios')}
+                  </span>
                   <button type="button" onClick={saveDraft}
                     className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
                     📝 Guardar borrador
