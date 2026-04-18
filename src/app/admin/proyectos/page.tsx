@@ -84,6 +84,30 @@ export default function AdminProyectosPage() {
     return matchSearch && matchEstado && matchCurso
   })
 
+  // Agrupar por curso
+  const [cursosAbiertos, setCursosAbiertos] = useState<Record<string, boolean>>({})
+  const toggleCurso = (key: string) => setCursosAbiertos(prev => ({ ...prev, [key]: !prev[key] }))
+
+  const grupos = proyectosFiltrados.reduce((acc: Record<string, { nombre: string; proyectos: any[] }>, p) => {
+    const key = p.course_id ?? '__sin_curso__'
+    const nombre = p.courses?.name ?? 'Sin curso asignado'
+    if (!acc[key]) acc[key] = { nombre, proyectos: [] }
+    acc[key].proyectos.push(p)
+    return acc
+  }, {})
+  const gruposOrdenados = Object.entries(grupos).sort(([aKey, a], [bKey, b]) => {
+    if (aKey === '__sin_curso__') return 1
+    if (bKey === '__sin_curso__') return -1
+    return a.nombre.localeCompare(b.nombre, 'es')
+  })
+  useEffect(() => {
+    if (gruposOrdenados.length > 0 && Object.keys(cursosAbiertos).length === 0) {
+      const init: Record<string, boolean> = {}
+      gruposOrdenados.forEach(([k]) => { init[k] = true })
+      setCursosAbiertos(init)
+    }
+  }, [gruposOrdenados.length])
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
@@ -177,63 +201,80 @@ export default function AdminProyectosPage() {
             <p className="text-gray-400 mt-1 text-sm">Prueba con otros filtros de búsqueda</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium text-xs">Proyecto</th>
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium text-xs">Alumno</th>
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium text-xs">Curso</th>
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium text-xs">Estado</th>
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium text-xs">Fecha inicio</th>
-                    <th className="text-left px-6 py-3 text-gray-500 font-medium text-xs">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {proyectosFiltrados.map(p => (
-                    <tr key={p.id} className="hover:bg-blue-50 transition-colors">
-                      <td className="px-6 py-3">
-                        <Link href={`/proyectos/${p.id}`}
-                          className="font-medium text-blue-700 hover:underline text-sm line-clamp-1 max-w-xs block">
-                          {p.title}
-                        </Link>
-                        {p.year && (
-                          <span className="text-xs text-gray-400">Año {p.year} · Sem. {p.semestre}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="text-sm text-gray-700">{p.profiles?.full_name ?? '—'}</div>
-                        <div className="text-xs text-gray-400">{p.profiles?.email ?? ''}</div>
-                      </td>
-                      <td className="px-6 py-3 text-gray-500 text-sm whitespace-nowrap">{p.courses?.name ?? '—'}</td>
-                      <td className="px-6 py-3">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {p.status}
+          <div className="space-y-3">
+            {gruposOrdenados.map(([cursoKey, grupo]) => {
+              const abierto = cursosAbiertos[cursoKey] ?? true
+              const esSinCurso = cursoKey === '__sin_curso__'
+              return (
+                <div key={cursoKey} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                  <button onClick={() => toggleCurso(cursoKey)}
+                    className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${esSinCurso ? 'bg-gray-50 hover:bg-gray-100' : 'bg-blue-50 hover:bg-blue-100'}`}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{esSinCurso ? '📁' : '🏫'}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold text-sm ${esSinCurso ? 'text-gray-600' : 'text-blue-900'}`}>{grupo.nombre}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${esSinCurso ? 'bg-gray-200 text-gray-500' : 'bg-blue-200 text-blue-700'}`}>
+                          {grupo.proyectos.length} proyecto{grupo.proyectos.length !== 1 ? 's' : ''}
                         </span>
-                      </td>
-                      <td className="px-6 py-3 text-gray-500 text-xs whitespace-nowrap">{p.start_date ?? '—'}</td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link href={`/proyectos/${p.id}`}
-                            className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium whitespace-nowrap">
-                            👁️ Ver
-                          </Link>
-                          <Link href={`/proyectos/${p.id}/editar`}
-                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200 whitespace-nowrap">
-                            ✏️ Editar
-                          </Link>
-                          <button onClick={() => handleDelete(p.id, p.title)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200 whitespace-nowrap">
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="hidden sm:flex gap-1.5">
+                        {Object.entries(grupo.proyectos.reduce((acc: Record<string, number>, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc }, {})).map(([s, count]) => (
+                          <span key={s} className={`text-xs px-1.5 py-0.5 rounded font-medium ${statusColor[s] ?? 'bg-gray-100 text-gray-500'}`}>{s}: {count}</span>
+                        ))}
+                      </div>
+                      <span className={`text-base ${esSinCurso ? 'text-gray-400' : 'text-blue-400'}`}>{abierto ? '▼' : '▶'}</span>
+                    </div>
+                  </button>
+                  {abierto && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50/60 border-b border-gray-100">
+                          <tr>
+                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Proyecto</th>
+                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Alumno</th>
+                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Estado</th>
+                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Última edición</th>
+                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {grupo.proyectos.map(p => (
+                            <tr key={p.id} className="hover:bg-blue-50/50 transition-colors">
+                              <td className="px-5 py-3">
+                                <Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline text-sm">{p.title}</Link>
+                                {p.is_draft && <span className="ml-2 text-xs text-orange-500 font-medium">📋 Borrador</span>}
+                                {p.year && <div className="text-xs text-gray-400">Año {p.year} · Sem. {p.semestre}</div>}
+                              </td>
+                              <td className="px-5 py-3">
+                                <div className="text-sm text-gray-700">{p.profiles?.full_name ?? '—'}</div>
+                                <div className="text-xs text-gray-400">{p.profiles?.email ?? ''}</div>
+                              </td>
+                              <td className="px-5 py-3">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
+                              </td>
+                              <td className="px-5 py-3 text-gray-400 text-xs whitespace-nowrap">
+                                {p.last_autosave_at
+                                  ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                                  : (p.start_date ?? '—')}
+                              </td>
+                              <td className="px-5 py-3">
+                                <div className="flex items-center gap-1.5">
+                                  <Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:bg-gray-100 px-2 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap">👁️ Ver</Link>
+                                  <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg text-xs font-medium border border-blue-200 whitespace-nowrap">✏️ Editar</Link>
+                                  <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg text-xs font-medium border border-red-200 whitespace-nowrap">🗑️</button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </main>
