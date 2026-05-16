@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { ensureProjectGroup } from '@/lib/project-groups'
 import { useRouter, useParams } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import ProjectCollaboratorsPanel from '../ProjectCollaboratorsPanel'
 
 const TABS = [
   'A. Identificación',
@@ -202,6 +203,77 @@ function ListaEditable({
   )
 }
 
+
+type PresenceMeta = {
+  user_id: string
+  full_name?: string | null
+  role?: string | null
+  active_tab?: string
+  active_field?: string
+  online_at?: string
+}
+
+function projectToForm(p: any) {
+  return {
+    // A
+    title: p.title ?? '',
+    year: p.year ?? new Date().getFullYear().toString(),
+    semestre: p.semestre ?? '1',
+    asignaturas: Array.isArray(p.asignaturas) ? p.asignaturas.join(', ') : (p.asignaturas ?? ''),
+    docentes_responsables: Array.isArray(p.docentes_responsables) ? p.docentes_responsables.join(', ') : (p.docentes_responsables ?? ''),
+    tipo_proyecto: p.tipo_proyecto ?? [],
+    status: p.status ?? 'Borrador',
+    course_id: p.course_id ?? '',
+    start_date: p.start_date ?? '',
+    end_date: p.end_date ?? '',
+    integrantes_roles: Array.isArray(p.integrantes_roles) ? p.integrantes_roles : [],
+    // B
+    objetivos_aprendizaje: p.objetivos_aprendizaje ?? '',
+    habilidades: p.habilidades ?? [],
+    vinculacion_pei: p.vinculacion_pei ?? '',
+    indicador_oa: p.indicador_oa ?? '',
+    // C
+    pregunta_guia: p.pregunta_guia ?? '',
+    contexto_problema: p.contexto_problema ?? '',
+    justificacion: p.justificacion ?? '',
+    problema_detectado: p.problema_detectado ?? '',
+    evidencia_problema: p.evidencia_problema ?? '',
+    preguntas_investigacion: Array.isArray(p.preguntas_investigacion) ? p.preguntas_investigacion : [],
+    hipotesis: p.hipotesis ?? '',
+    // D
+    metodologia: p.metodologia ?? '',
+    organizacion_trabajo: p.organizacion_trabajo ?? 'Grupal',
+    herramientas_tecnologicas: Array.isArray(p.herramientas_tecnologicas) ? p.herramientas_tecnologicas.join(', ') : (p.herramientas_tecnologicas ?? ''),
+    herramientas_materiales: Array.isArray(p.herramientas_materiales) ? p.herramientas_materiales.join(', ') : (p.herramientas_materiales ?? ''),
+    // E
+    steam_ciencia: p.steam_ciencia ?? '',
+    steam_tecnologia: p.steam_tecnologia ?? '',
+    steam_ingenieria: p.steam_ingenieria ?? '',
+    steam_arte: p.steam_arte ?? '',
+    steam_matematica: p.steam_matematica ?? '',
+    uso_ia: p.uso_ia ?? [],
+    estrategia_verificacion: p.estrategia_verificacion ?? '',
+    // F
+    objetivo_general: p.objetivo_general ?? '',
+    objetivos_especificos: Array.isArray(p.objetivos_especificos) ? p.objetivos_especificos : [],
+    solucion_propuesta: p.solucion_propuesta ?? '',
+    boceto_descripcion: p.boceto_descripcion ?? '',
+    boceto_url: p.boceto_url ?? '',
+    tipo_producto: p.tipo_producto ?? [],
+    description: p.description ?? '',
+    // G
+    instrumento_evaluacion: p.instrumento_evaluacion ?? [],
+    criterios_evaluados: p.criterios_evaluados ?? [],
+    autoevaluacion: p.autoevaluacion ?? '',
+    // H
+    aprendizajes_logrados: p.aprendizajes_logrados ?? '',
+    dificultades: p.dificultades ?? '',
+    mejoras: p.mejoras ?? '',
+    impacto_comunidad: p.impacto_comunidad ?? '',
+    fuentes_consultadas: Array.isArray(p.fuentes_consultadas) ? p.fuentes_consultadas : [],
+  }
+}
+
 // ─── Componente principal ──────────────────────────────────────────────────────
 export default function EditarProyectoPage() {
   const router = useRouter()
@@ -220,6 +292,11 @@ export default function EditarProyectoPage() {
   const [hasChanges, setHasChanges] = useState(false)
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved-server' | 'saved-local' | 'error'>('idle')
   const userIdRef = useRef<string | null>(null)
+  const profileRef = useRef<{ full_name?: string | null; role?: string | null } | null>(null)
+  const applyingRemoteRef = useRef(false)
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const [activeEditors, setActiveEditors] = useState<PresenceMeta[]>([])
+  const [remoteNotice, setRemoteNotice] = useState<string | null>(null)
 
   const [form, setFormRaw] = useState({
     // A
@@ -272,75 +349,31 @@ export default function EditarProyectoPage() {
         }
       } catch { /* ignorar */ }
 
-      const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const { data: perfil } = await supabase.from('profiles').select('role, full_name').eq('id', user.id).single()
+      profileRef.current = { full_name: perfil?.full_name ?? user.email, role: perfil?.role ?? '' }
       const esAdmin = ['admin', 'docente', 'coordinador'].includes(perfil?.role ?? '')
 
       const { data: p, error } = await supabase.from('projects').select('*').eq('id', proyectoId).single()
       if (error || !p) { router.push('/proyectos'); return }
 
-      if (p.owner_id !== user.id && !esAdmin) {
+      let esColaborador = false
+      if (!esAdmin && p.owner_id !== user.id) {
+        const { data: membership } = await supabase
+          .from('project_collaborators')
+          .select('id, role, status')
+          .eq('project_id', proyectoId)
+          .eq('user_id', user.id)
+          .eq('status', 'accepted')
+          .maybeSingle()
+        esColaborador = !!membership
+      }
+
+      if (p.owner_id !== user.id && !esAdmin && !esColaborador) {
         setNoAutorizado(true); setLoadingDatos(false); return
       }
 
       setProyectoTitulo(p.title ?? '')
-      setForm({
-        // A
-        title: p.title ?? '',
-        year: p.year ?? new Date().getFullYear().toString(),
-        semestre: p.semestre ?? '1',
-        asignaturas: Array.isArray(p.asignaturas) ? p.asignaturas.join(', ') : (p.asignaturas ?? ''),
-        docentes_responsables: Array.isArray(p.docentes_responsables) ? p.docentes_responsables.join(', ') : (p.docentes_responsables ?? ''),
-        tipo_proyecto: p.tipo_proyecto ?? [],
-        status: p.status ?? 'Borrador',
-        course_id: p.course_id ?? '',
-        start_date: p.start_date ?? '',
-        end_date: p.end_date ?? '',
-        integrantes_roles: Array.isArray(p.integrantes_roles) ? p.integrantes_roles : [],
-        // B
-        objetivos_aprendizaje: p.objetivos_aprendizaje ?? '',
-        habilidades: p.habilidades ?? [],
-        vinculacion_pei: p.vinculacion_pei ?? '',
-        indicador_oa: p.indicador_oa ?? '',
-        // C
-        pregunta_guia: p.pregunta_guia ?? '',
-        contexto_problema: p.contexto_problema ?? '',
-        justificacion: p.justificacion ?? '',
-        problema_detectado: p.problema_detectado ?? '',
-        evidencia_problema: p.evidencia_problema ?? '',
-        preguntas_investigacion: Array.isArray(p.preguntas_investigacion) ? p.preguntas_investigacion : [],
-        hipotesis: p.hipotesis ?? '',
-        // D
-        metodologia: p.metodologia ?? '',
-        organizacion_trabajo: p.organizacion_trabajo ?? 'Grupal',
-        herramientas_tecnologicas: Array.isArray(p.herramientas_tecnologicas) ? p.herramientas_tecnologicas.join(', ') : (p.herramientas_tecnologicas ?? ''),
-        herramientas_materiales: Array.isArray(p.herramientas_materiales) ? p.herramientas_materiales.join(', ') : (p.herramientas_materiales ?? ''),
-        // E
-        steam_ciencia: p.steam_ciencia ?? '',
-        steam_tecnologia: p.steam_tecnologia ?? '',
-        steam_ingenieria: p.steam_ingenieria ?? '',
-        steam_arte: p.steam_arte ?? '',
-        steam_matematica: p.steam_matematica ?? '',
-        uso_ia: p.uso_ia ?? [],
-        estrategia_verificacion: p.estrategia_verificacion ?? '',
-        // F
-        objetivo_general: p.objetivo_general ?? '',
-        objetivos_especificos: Array.isArray(p.objetivos_especificos) ? p.objetivos_especificos : [],
-        solucion_propuesta: p.solucion_propuesta ?? '',
-        boceto_descripcion: p.boceto_descripcion ?? '',
-        boceto_url: p.boceto_url ?? '',
-        tipo_producto: p.tipo_producto ?? [],
-        description: p.description ?? '',
-        // G
-        instrumento_evaluacion: p.instrumento_evaluacion ?? [],
-        criterios_evaluados: p.criterios_evaluados ?? [],
-        autoevaluacion: p.autoevaluacion ?? '',
-        // H
-        aprendizajes_logrados: p.aprendizajes_logrados ?? '',
-        dificultades: p.dificultades ?? '',
-        mejoras: p.mejoras ?? '',
-        impacto_comunidad: p.impacto_comunidad ?? '',
-        fuentes_consultadas: Array.isArray(p.fuentes_consultadas) ? p.fuentes_consultadas : [],
-      })
+      setFormRaw(projectToForm(p))
 
       if (p.etapas_metodologia && typeof p.etapas_metodologia === 'object' && Object.keys(p.etapas_metodologia).length > 0) {
         setEtapas(prev => ({ ...prev, ...p.etapas_metodologia }))
@@ -429,6 +462,7 @@ export default function EditarProyectoPage() {
           ...payload,
           last_autosave_at: now,
           autosave_source: 'server',
+          last_edited_by: userIdRef.current,
         } as any).eq('id', proyectoId)
 
         if (!error) {
@@ -443,6 +477,83 @@ export default function EditarProyectoPage() {
     }, 2000)
     return () => clearTimeout(timer)
   }, [form, etapas, tab, hasChanges, loadingDatos])
+
+  // Sincronización colaborativa: presencia + cambios de la tabla projects
+  useEffect(() => {
+    if (loadingDatos || noAutorizado || !userIdRef.current) return
+
+    const channel = supabase.channel(`project-edit-${proyectoId}`, {
+      config: { presence: { key: userIdRef.current } },
+    })
+    realtimeChannelRef.current = channel
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState<PresenceMeta>()
+        const editors = Object.values(state)
+          .flat()
+          .filter((m: PresenceMeta) => m.user_id && m.user_id !== userIdRef.current)
+        setActiveEditors(editors)
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'projects', filter: `id=eq.${proyectoId}` }, (payload: any) => {
+        const remote = payload.new
+        if (!remote || remote.last_edited_by === userIdRef.current) return
+        applyingRemoteRef.current = true
+        setProyectoTitulo(remote.title ?? '')
+        setFormRaw(projectToForm(remote))
+        if (remote.etapas_metodologia && typeof remote.etapas_metodologia === 'object') {
+          setEtapas(prev => ({ ...prev, ...remote.etapas_metodologia }))
+        }
+        setDraftTime(remote.updated_at ?? new Date().toISOString())
+        setSyncStatus('saved-server')
+        setRemoteNotice('🔄 Otro integrante actualizó el proyecto. La pantalla se sincronizó automáticamente.')
+        window.setTimeout(() => setRemoteNotice(null), 4500)
+        window.setTimeout(() => { applyingRemoteRef.current = false }, 0)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            user_id: userIdRef.current,
+            full_name: profileRef.current?.full_name ?? 'Usuario',
+            role: profileRef.current?.role ?? '',
+            active_tab: TABS[tab],
+            active_field: 'Viendo el proyecto',
+            online_at: new Date().toISOString(),
+          })
+        }
+      })
+
+    return () => {
+      realtimeChannelRef.current = null
+      supabase.removeChannel(channel)
+    }
+  }, [loadingDatos, noAutorizado, proyectoId])
+
+  useEffect(() => {
+    const channel = realtimeChannelRef.current
+    if (!channel || !userIdRef.current) return
+    channel.track({
+      user_id: userIdRef.current,
+      full_name: profileRef.current?.full_name ?? 'Usuario',
+      role: profileRef.current?.role ?? '',
+      active_tab: TABS[tab],
+      active_field: 'Viendo esta sección',
+      online_at: new Date().toISOString(),
+    })
+  }, [tab])
+
+  const trackActiveField = useCallback((fieldName: string) => {
+    const channel = realtimeChannelRef.current
+    if (!channel || !userIdRef.current) return
+    channel.track({
+      user_id: userIdRef.current,
+      full_name: profileRef.current?.full_name ?? 'Usuario',
+      role: profileRef.current?.role ?? '',
+      active_tab: TABS[tab],
+      active_field: fieldName || 'Editando contenido',
+      online_at: new Date().toISOString(),
+    })
+  }, [tab])
 
   // Aviso al salir si hay cambios sin guardar
   useEffect(() => {
@@ -467,7 +578,7 @@ export default function EditarProyectoPage() {
     try {
       const payload = buildPayload(form, etapas)
       const { error } = await supabase.from('projects').update({
-        ...payload, last_autosave_at: now, autosave_source: 'manual',
+        ...payload, last_autosave_at: now, autosave_source: 'manual', last_edited_by: userIdRef.current,
       } as any).eq('id', proyectoId)
       if (!error) {
         setSyncStatus('saved-server')
@@ -503,12 +614,15 @@ export default function EditarProyectoPage() {
   const toggleEtapaArray = (etapa: keyof EtapasMetodologia, field: string, value: string) => {
     const arr = ((etapas[etapa] as any)[field] as string[]) ?? []
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], [field]: arr.includes(value) ? arr.filter((v: string) => v !== value) : [...arr, value] } })
+    if (!applyingRemoteRef.current) setHasChanges(true)
   }
   const updateEtapa = (etapa: keyof EtapasMetodologia, field: string, value: any) => {
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], [field]: value } })
+    if (!applyingRemoteRef.current) setHasChanges(true)
   }
   const toggleEtapaAbierta = (etapa: keyof EtapasMetodologia) => {
     setEtapas({ ...etapas, [etapa]: { ...etapas[etapa], activa: !etapas[etapa].activa } })
+    if (!applyingRemoteRef.current) setHasChanges(true)
   }
 
   const inputClass = IC
@@ -588,6 +702,7 @@ export default function EditarProyectoPage() {
       boceto_url: form.boceto_url,
       fuentes_consultadas: form.fuentes_consultadas.filter(Boolean),
       group_id: groupId,
+      last_edited_by: user.id,
     }).eq('id', proyectoId)
 
     if (!error) {
@@ -629,7 +744,7 @@ export default function EditarProyectoPage() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
                 <div>
                   <h1 className="text-2xl font-bold text-blue-900">Editar: {proyectoTitulo}</h1>
-                  <p className="text-gray-500 mt-1 text-sm">Solo tú puedes editar tu copia — los cambios no afectan a otros usuarios</p>
+                  <p className="text-gray-500 mt-1 text-sm">Edición colaborativa: los integrantes trabajan sobre el mismo proyecto y los cambios se sincronizan en vivo</p>
                 </div>
                 <div className="flex items-center gap-3">
                   {/* Indicador de sincronización */}
@@ -654,6 +769,40 @@ export default function EditarProyectoPage() {
               </div>
             </div>
 
+            <ProjectCollaboratorsPanel projectId={proyectoId} />
+
+            {remoteNotice && (
+              <div className="mb-4 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-4 py-3 text-sm font-medium">
+                {remoteNotice}
+              </div>
+            )}
+
+            <div className="mb-5 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-sm font-bold text-blue-900">Usuarios editando ahora</p>
+                  <p className="text-xs text-gray-400">Se actualiza con Supabase Realtime Presence.</p>
+                </div>
+                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-full">
+                  {activeEditors.length + 1} conectado(s)
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-full shadow-sm">
+                  Tú · {TABS[tab]}
+                </span>
+                {activeEditors.length === 0 ? (
+                  <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-full">
+                    No hay otros integrantes editando ahora.
+                  </span>
+                ) : activeEditors.map((editor, idx) => (
+                  <span key={`${editor.user_id}-${idx}`} className="text-xs bg-purple-50 text-purple-700 border border-purple-100 px-3 py-1.5 rounded-full">
+                    {editor.full_name ?? 'Usuario'} · {editor.active_tab ?? 'Proyecto'} · {editor.active_field ?? 'Editando'}
+                  </span>
+                ))}
+              </div>
+            </div>
+
             {/* Tabs navegación */}
             <div className="flex gap-1 flex-wrap mb-6">
               {TABS.map((t, i) => (
@@ -664,7 +813,15 @@ export default function EditarProyectoPage() {
               ))}
             </div>
 
-            <form onSubmit={handleSubmit} className="max-w-3xl space-y-4">
+            <form
+              onSubmit={handleSubmit}
+              onFocusCapture={(e) => {
+                const target = e.target as unknown as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+                const readable = target.getAttribute('aria-label') || target.name || ('placeholder' in target ? target.placeholder : '') || target.type || 'Campo del proyecto'
+                trackActiveField(readable)
+              }}
+              className="max-w-3xl space-y-4"
+            >
 
               {/* ── A — Identificación ───────────────────────────────────────── */}
               {tab === 0 && (
