@@ -4,6 +4,7 @@ import Link from 'next/link'
 import ComentariosSection from './ComentariosSection'
 import ExportProyectoPDF from '@/components/ExportProyectoPDF'
 import DistribuirProyecto from './DistribuirProyecto'
+import ProjectCollaboratorsPanel from './ProjectCollaboratorsPanel'
 
 const statusColor: Record<string, string> = {
   'Borrador': 'bg-gray-100 text-gray-600',
@@ -68,6 +69,17 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
     .from('profiles').select('role').eq('id', user?.id ?? '').single()
 
   const puedeDistribuir = ['admin', 'docente', 'coordinador'].includes(perfilActual?.role ?? '')
+
+  const { data: colaboracionActual } = user?.id
+    ? await supabase
+        .from('project_collaborators')
+        .select('id, role, status')
+        .eq('project_id', id)
+        .eq('user_id', user.id)
+        .eq('status', 'accepted')
+        .maybeSingle()
+    : { data: null }
+  const puedeEditarProyecto = proyecto?.owner_id === user?.id || puedeDistribuir || !!colaboracionActual
 
   // Copias distribuidas de este proyecto
   const { data: copiasDistribuidas } = await supabase
@@ -205,13 +217,15 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
               </Link>
             </div>
           </div>
-          {(proyecto.owner_id === user?.id || puedeDistribuir) && (
+          {puedeEditarProyecto && (
             <Link href={`/proyectos/${proyecto.id}/editar`}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
               ✏️ Editar
             </Link>
           )}
         </div>
+
+        {puedeEditarProyecto && <ProjectCollaboratorsPanel projectId={proyecto.id} />}
 
         {/* Banner de proyecto en común */}
         {proyecto?.group_id && (
