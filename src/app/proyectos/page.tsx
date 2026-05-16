@@ -25,11 +25,44 @@ export default function ProyectosPage() {
   const userIdRef = useRef('')
 
   const fetchProyectos = async (userRole: string, uid: string) => {
-    let query = supabase
+    const baseSelect = '*, courses(name), profiles!projects_owner_id_fkey(full_name)'
+
+    if (userRole === 'estudiante') {
+      const [{ data: propios }, { data: colaboraciones }] = await Promise.all([
+        supabase
+          .from('projects')
+          .select(baseSelect)
+          .eq('owner_id', uid)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('project_collaborators')
+          .select('project_id')
+          .eq('user_id', uid)
+          .eq('status', 'accepted'),
+      ])
+
+      const ids = Array.from(new Set((colaboraciones ?? []).map((c: any) => c.project_id).filter(Boolean)))
+      let compartidos: any[] = []
+      if (ids.length > 0) {
+        const { data } = await supabase
+          .from('projects')
+          .select(baseSelect)
+          .in('id', ids)
+          .order('created_at', { ascending: false })
+        compartidos = data ?? []
+      }
+
+      const merged = [...(propios ?? []), ...compartidos]
+      const unique = Array.from(new Map(merged.map((p: any) => [p.id, p])).values())
+      setProyectos(unique.sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()))
+      setUltimaActualizacion(new Date())
+      return
+    }
+
+    const { data } = await supabase
       .from('projects')
-      .select('*, courses(name), profiles!projects_owner_id_fkey(full_name)')
-    if (userRole === 'estudiante') query = query.eq('owner_id', uid)
-    const { data } = await query.order('created_at', { ascending: false })
+      .select(baseSelect)
+      .order('created_at', { ascending: false })
     setProyectos(data ?? [])
     setUltimaActualizacion(new Date())
   }
@@ -47,7 +80,11 @@ export default function ProyectosPage() {
       channel = supabase.channel('proyectos-realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
           fetchProyectos(rolRef.current, userIdRef.current)
-        }).subscribe()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'project_collaborators' }, () => {
+          fetchProyectos(rolRef.current, userIdRef.current)
+        })
+        .subscribe()
     }
     init()
     return () => { channel && supabase.removeChannel(channel) }
@@ -119,7 +156,7 @@ export default function ProyectosPage() {
           <div>
             <h1 className="text-2xl font-bold text-blue-900">Proyectos</h1>
             <p className="text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
-              Agrupados por curso · Sello Tecnológico
+              Agrupados por curso · Proyectos propios y compartidos · Sello Tecnológico
               <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
                 ⚡ Tiempo real · {ultimaActualizacion.toLocaleTimeString('es-CL')}
               </span>
