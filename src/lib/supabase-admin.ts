@@ -12,3 +12,5 @@ export function createAdminSupabaseClient() {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }
+
+export const createSupabaseAdminClient = createAdminSupabaseClient
