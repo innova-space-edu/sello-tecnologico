@@ -65,6 +65,11 @@ export default function LoginPage() {
       email: form.email.trim().toLowerCase(), password: form.password,
     })
     if (loginError) { setError('Correo o contraseña incorrectos'); setLoading(false); return }
+    await fetch('/api/access-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_type: 'login', pathname: '/login', metadata: { email: form.email.trim().toLowerCase() } }),
+    }).catch(() => {})
     router.push('/dashboard')
     setLoading(false)
   }
@@ -131,6 +136,12 @@ export default function LoginPage() {
         }, { onConflict: 'course_id,user_id' })
       }
     }
+
+    await fetch('/api/access-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_type: 'register', pathname: '/login', metadata: { email, role, curso: cursoNormalizado } }),
+    }).catch(() => {})
 
     router.push('/dashboard')
     setLoading(false)
