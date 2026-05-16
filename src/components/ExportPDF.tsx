@@ -1,115 +1,288 @@
 'use client'
 import { useState } from 'react'
 
-export default function ExportPDF({ data }: {
-  data: {
-    cursos: number
-    proyectos: number
-    evidencias: number
-    usuarios: number
-    porEstado: Record<string, number>
-    porRol: Record<string, number>
-  }
-}) {
+type ReportData = {
+  isAdmin?: boolean
+  cursos: number
+  proyectos: number
+  evidencias: number
+  usuarios: number
+  mensajes?: number
+  incidencias?: number
+  incidenciasPendientes?: number
+  usuariosBloqueados?: number
+  portafolios?: number
+  proyectosActivos?: number
+  mensajesNoLeidos?: number
+  ingresosRegistrados?: number
+  visitasEduAI?: number
+  descargasPDF?: number
+  porEstado: Record<string, number>
+  porRol: Record<string, number>
+  evidenciasTipo?: Record<string, number>
+  evidenciasEtapa?: Record<string, number>
+  flaggedCategory?: Record<string, number>
+  invitationsStatus?: Record<string, number>
+  accessEvents?: Record<string, number>
+  accessPages?: Record<string, number>
+  recientes?: Record<string, any[]>
+}
+
+const trunc = (value: unknown, max = 80) => {
+  const text = String(value ?? '—')
+  return text.length > max ? `${text.slice(0, max)}...` : text
+}
+
+const pct = (value: number, total: number) => total ? `${Math.round((value / total) * 100)}%` : '0%'
+
+async function imageToDataUrl(src: string) {
+  const response = await fetch(src)
+  const blob = await response.blob()
+  return await new Promise<string>((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(String(reader.result))
+    reader.readAsDataURL(blob)
+  })
+}
+
+export default function ExportPDF({ data }: { data: ReportData }) {
   const [loading, setLoading] = useState(false)
 
   const handleExport = async () => {
     setLoading(true)
-    const { default: jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
 
-    const doc = new jsPDF()
-    const today = new Date().toLocaleDateString('es-CL')
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const today = new Date().toLocaleString('es-CL')
+      const fileDate = new Date().toISOString().slice(0, 10)
 
-    // Header
-    doc.setFillColor(30, 58, 138)
-    doc.rect(0, 0, 210, 35, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Sello Tecnológico', 14, 15)
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'normal')
-    doc.text('Colegio Providencia', 14, 23)
-    doc.text(`Reporte generado: ${today}`, 14, 30)
+      const BLUE = [30, 58, 138] as [number, number, number]
+      const CYAN = [14, 165, 233] as [number, number, number]
+      const INDIGO = [79, 70, 229] as [number, number, number]
+      const LIGHT = [248, 250, 252] as [number, number, number]
+      const TEXT = [15, 23, 42] as [number, number, number]
 
-    // Resumen general
-    doc.setTextColor(30, 58, 138)
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Resumen General', 14, 48)
+      doc.setFillColor(...BLUE)
+      doc.rect(0, 0, 210, 42, 'F')
+      doc.setFillColor(...CYAN)
+      doc.rect(0, 36, 210, 6, 'F')
 
-    autoTable(doc, {
-      startY: 52,
-      head: [['Indicador', 'Valor']],
-      body: [
-        ['Total de cursos', data.cursos],
-        ['Total de proyectos', data.proyectos],
-        ['Total de evidencias', data.evidencias],
-        ['Total de usuarios', data.usuarios],
-      ],
-      headStyles: { fillColor: [30, 58, 138], textColor: 255 },
-      alternateRowStyles: { fillColor: [239, 246, 255] },
-      styles: { fontSize: 11 },
-    })
+      try {
+        const logo = await imageToDataUrl('/logo-empresa.png')
+        doc.addImage(logo, 'PNG', 166, 8, 24, 23)
+      } catch {}
 
-    // Proyectos por estado
-    const y1 = (doc as any).lastAutoTable.finalY + 12
-    doc.setTextColor(30, 58, 138)
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Proyectos por Estado', 14, y1)
+      doc.setTextColor(255, 255, 255)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(18)
+      doc.text('Reporte Sello Tecnológico', 14, 16)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text('Colegio Providencia · Innova Space Education', 14, 24)
+      doc.text(`Generado: ${today}`, 14, 31)
 
-    autoTable(doc, {
-      startY: y1 + 4,
-      head: [['Estado', 'Cantidad', 'Porcentaje']],
-      body: Object.entries(data.porEstado).map(([estado, cantidad]) => [
-        estado,
-        cantidad,
-        `${Math.round((cantidad / data.proyectos) * 100)}%`
-      ]),
-      headStyles: { fillColor: [30, 58, 138], textColor: 255 },
-      alternateRowStyles: { fillColor: [239, 246, 255] },
-      styles: { fontSize: 11 },
-    })
+      doc.setTextColor(...TEXT)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13)
+      doc.text(data.isAdmin ? 'Resumen administrativo completo' : 'Resumen general', 14, 54)
 
-    // Usuarios por rol
-    const y2 = (doc as any).lastAutoTable.finalY + 12
-    doc.setTextColor(30, 58, 138)
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Usuarios por Rol', 14, y2)
+      autoTable(doc, {
+        startY: 60,
+        head: [['Indicador', 'Valor', 'Lectura rápida']],
+        body: [
+          ['Usuarios', data.usuarios, 'Cuentas registradas en la plataforma'],
+          ['Proyectos', data.proyectos, 'Fichas y trabajos creados'],
+          ['Evidencias', data.evidencias, 'Archivos o registros subidos'],
+          ['Cursos', data.cursos, 'Cursos disponibles'],
+          ...(data.isAdmin ? [
+            ['Mensajes', data.mensajes ?? 0, 'Mensajes directos monitoreados'],
+            ['Incidencias', data.incidencias ?? 0, 'Mensajes peligrosos o alertas'],
+            ['Incidencias pendientes', data.incidenciasPendientes ?? 0, 'Requieren revisión administrativa'],
+            ['Usuarios bloqueados', data.usuariosBloqueados ?? 0, 'Cuentas con bloqueo activo'],
+            ['Portafolios', data.portafolios ?? 0, 'Portafolios creados o actualizados'],
+            ['Ingresos registrados', data.ingresosRegistrados ?? 0, 'Eventos de inicio de sesión capturados'],
+            ['Visitas a EduAI', data.visitasEduAI ?? 0, 'Aperturas de la integración EduAI'],
+            ['Descargas PDF', data.descargasPDF ?? 0, 'Exportaciones del reporte administrativo'],
+          ] : []),
+        ],
+        headStyles: { fillColor: BLUE, textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: LIGHT },
+        styles: { fontSize: 9.5, cellPadding: 3, textColor: TEXT },
+        columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } },
+      })
 
-    autoTable(doc, {
-      startY: y2 + 4,
-      head: [['Rol', 'Cantidad', 'Porcentaje']],
-      body: Object.entries(data.porRol).map(([rol, cantidad]) => [
-        rol,
-        cantidad,
-        `${Math.round((cantidad / data.usuarios) * 100)}%`
-      ]),
-      headStyles: { fillColor: [30, 58, 138], textColor: 255 },
-      alternateRowStyles: { fillColor: [239, 246, 255] },
-      styles: { fontSize: 11 },
-    })
+      let y = (doc as any).lastAutoTable.finalY + 10
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.setTextColor(...BLUE)
+      doc.text('Distribuciones principales', 14, y)
 
-    // Footer
-    const pageCount = doc.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
-      doc.setFontSize(8)
-      doc.setTextColor(150)
-      doc.text(`Innova Space Education 2026 · Página ${i} de ${pageCount}`, 14, 290)
+      const distributionRows = [
+        ...Object.entries(data.porRol).map(([k, v]) => ['Usuarios por rol', k, v, pct(v, data.usuarios)]),
+        ...Object.entries(data.porEstado).map(([k, v]) => ['Proyectos por estado', k, v, pct(v, data.proyectos)]),
+        ...Object.entries(data.evidenciasTipo ?? {}).map(([k, v]) => ['Evidencias por tipo', k, v, pct(v, data.evidencias)]),
+        ...Object.entries(data.evidenciasEtapa ?? {}).map(([k, v]) => ['Evidencias por etapa', k, v, pct(v, data.evidencias)]),
+        ...Object.entries(data.flaggedCategory ?? {}).map(([k, v]) => ['Incidencias por categoría', k, v, pct(v, data.incidencias ?? 0)]),
+        ...Object.entries(data.accessEvents ?? {}).map(([k, v]) => ['Accesos por evento', k, v, pct(v, Object.values(data.accessEvents ?? {}).reduce((a, b) => a + b, 0))]),
+        ...Object.entries(data.accessPages ?? {}).slice(0, 10).map(([k, v]) => ['Páginas visitadas', k, v, pct(v, Object.values(data.accessPages ?? {}).reduce((a, b) => a + b, 0))]),
+      ]
+
+      autoTable(doc, {
+        startY: y + 5,
+        head: [['Área', 'Categoría', 'Cantidad', '%']],
+        body: distributionRows.length ? distributionRows : [['Sin datos', '—', 0, '0%']],
+        headStyles: { fillColor: INDIGO, textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        styles: { fontSize: 9, cellPadding: 2.8, textColor: TEXT },
+        columnStyles: { 2: { halign: 'center' }, 3: { halign: 'center' } },
+      })
+
+      if (data.isAdmin) {
+        y = (doc as any).lastAutoTable.finalY + 10
+        if (y > 235) { doc.addPage(); y = 20 }
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.setTextColor(...BLUE)
+        doc.text('Detalle de incidencias recientes', 14, y)
+
+        const flagged = data.recientes?.flagged ?? []
+        autoTable(doc, {
+          startY: y + 5,
+          head: [['Categoría', 'Mensaje', 'Emisor', 'Receptor', 'Estado', 'Fecha']],
+          body: flagged.length ? flagged.map((f: any) => [
+            f.category ?? '—',
+            trunc(f.content, 70),
+            trunc(f.sender?.full_name ?? f.sender?.email, 28),
+            trunc(f.receiver?.full_name ?? f.receiver?.email, 28),
+            f.reviewed ? 'Revisado' : 'Pendiente',
+            f.created_at ? new Date(f.created_at).toLocaleDateString('es-CL') : '—',
+          ]) : [['Sin incidencias recientes', '—', '—', '—', '—', '—']],
+          headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [254, 242, 242] },
+          styles: { fontSize: 7.8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
+          columnStyles: { 1: { cellWidth: 55 } },
+        })
+
+        y = (doc as any).lastAutoTable.finalY + 10
+        if (y > 235) { doc.addPage(); y = 20 }
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.setTextColor(...BLUE)
+        doc.text('Actividad administrativa reciente', 14, y)
+
+        const audit = data.recientes?.audit ?? []
+        autoTable(doc, {
+          startY: y + 5,
+          head: [['Acción', 'Entidad', 'Detalle', 'Usuario', 'Fecha']],
+          body: audit.length ? audit.map((a: any) => [
+            a.action ?? '—',
+            a.entity ?? '—',
+            trunc(a.entity_name, 44),
+            trunc(a.user_email, 35),
+            a.created_at ? new Date(a.created_at).toLocaleString('es-CL') : '—',
+          ]) : [['Sin actividad reciente', '—', '—', '—', '—']],
+          headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          styles: { fontSize: 8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
+        })
+
+        y = (doc as any).lastAutoTable.finalY + 10
+        if (y > 235) { doc.addPage(); y = 20 }
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.setTextColor(...BLUE)
+        doc.text('Ingresos y descargas recientes', 14, y)
+
+        const accessLogs = data.recientes?.accessLogs ?? []
+        const reportDownloads = data.recientes?.reportDownloads ?? []
+        const activityRows = [
+          ...accessLogs.slice(0, 18).map((l: any) => [
+            'Acceso',
+            l.event_type ?? '—',
+            trunc(l.pathname, 40),
+            trunc(l.profiles?.full_name ?? l.profiles?.email, 34),
+            l.created_at ? new Date(l.created_at).toLocaleString('es-CL') : '—',
+          ]),
+          ...reportDownloads.slice(0, 12).map((d: any) => [
+            'PDF',
+            d.report_type ?? '—',
+            'Descarga de reporte',
+            trunc(d.profiles?.full_name ?? d.profiles?.email, 34),
+            d.created_at ? new Date(d.created_at).toLocaleString('es-CL') : '—',
+          ]),
+        ].sort((a: any, b: any) => String(b[4]).localeCompare(String(a[4])))
+
+        autoTable(doc, {
+          startY: y + 5,
+          head: [['Tipo', 'Evento', 'Detalle', 'Usuario', 'Fecha']],
+          body: activityRows.length ? activityRows : [['Sin registros recientes', '—', '—', '—', '—']],
+          headStyles: { fillColor: [8, 145, 178], textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [236, 254, 255] },
+          styles: { fontSize: 8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
+        })
+
+        y = (doc as any).lastAutoTable.finalY + 10
+        if (y > 230) { doc.addPage(); y = 20 }
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(12)
+        doc.setTextColor(...BLUE)
+        doc.text('Proyectos recientes', 14, y)
+
+        const proyectos = data.recientes?.proyectos ?? []
+        autoTable(doc, {
+          startY: y + 5,
+          head: [['Proyecto', 'Estado', 'Tipo', 'Curso', 'Fecha']],
+          body: proyectos.length ? proyectos.map((p: any) => [
+            trunc(p.title, 48),
+            p.status ?? '—',
+            trunc(p.type, 26),
+            p.courses?.name ?? '—',
+            p.created_at ? new Date(p.created_at).toLocaleDateString('es-CL') : '—',
+          ]) : [['Sin proyectos recientes', '—', '—', '—', '—']],
+          headStyles: { fillColor: BLUE, textColor: 255, fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: LIGHT },
+          styles: { fontSize: 8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
+        })
+      }
+
+      const pageCount = doc.getNumberOfPages()
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        doc.setDrawColor(226, 232, 240)
+        doc.line(14, 282, 196, 282)
+        doc.setFontSize(8)
+        doc.setTextColor(100, 116, 139)
+        doc.text(`Sello Tecnológico · Reporte de análisis · Página ${i} de ${pageCount}`, 14, 288)
+      }
+
+      await fetch('/api/report-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          report_type: data.isAdmin ? 'reporte-admin-completo' : 'reporte-general',
+          filters: { generated_from: 'reportes-page' },
+          summary: {
+            usuarios: data.usuarios,
+            proyectos: data.proyectos,
+            evidencias: data.evidencias,
+            incidencias: data.incidencias ?? 0,
+            accesos: Object.values(data.accessEvents ?? {}).reduce((a, b) => a + b, 0),
+          },
+        }),
+      }).catch(() => {})
+
+      doc.save(`reporte-sello-tecnologico-${fileDate}.pdf`)
+    } finally {
+      setLoading(false)
     }
-
-    doc.save(`reporte-sello-tecnologico-${today}.pdf`)
-    setLoading(false)
   }
 
   return (
     <button onClick={handleExport} disabled={loading}
-      className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
-      {loading ? '⏳ Generando...' : '📄 Exportar PDF'}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50">
+      {loading ? '⏳ Generando PDF...' : '📄 Descargar reporte PDF'}
     </button>
   )
 }
