@@ -11,6 +11,7 @@ const menu = [
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
+  { href: '/seguimientos', label: 'Seguimiento', icon: '🧭' },
   { href: '/admin/plantillas', label: 'Plantillas', icon: '🧩' },
   { href: '/documentos', label: 'Documentos', icon: '📄' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
