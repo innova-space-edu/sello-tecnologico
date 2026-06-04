@@ -26,7 +26,7 @@ export async function getSurveyActor(): Promise<SurveyActor | null> {
 }
 
 export function canManageSurveys(actor: SurveyActor | null) {
-  return Boolean(actor && ['admin', 'docente', 'coordinador', 'utp'].includes(actor.role))
+  return Boolean(actor && ['admin', 'docente'].includes(actor.role))
 }
 
 export async function canReadSurvey(actor: SurveyActor | null, surveyId: string) {
