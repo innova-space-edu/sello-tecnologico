@@ -135,7 +135,7 @@ export default function Sidebar() {
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null
             if (item.href === '/usuarios' && esEstudianteRol) return null
             if (item.href === '/reportes' && esEstudianteRol) return null
-            if (item.href === '/encuestas' && esEstudianteRol) return null
+            if (item.href === '/encuestas' && !['admin', 'docente'].includes(rol)) return null
 
             const active = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href))
