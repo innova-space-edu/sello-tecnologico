@@ -34,6 +34,14 @@ function validateQuestions(questions: any[]) {
   return ''
 }
 
+async function replaceStaff(admin: ReturnType<typeof createAdminSupabaseClient>, surveyId: string, actorId: string, staffIds: string[]) {
+  const { error: deleteStaffError } = await admin.from('survey_course_staff').delete().eq('survey_id', surveyId)
+  if (deleteStaffError) return deleteStaffError
+  const allowedStaff = Array.from(new Set([actorId, ...staffIds]))
+  const { error: staffError } = await admin.from('survey_course_staff').insert(allowedStaff.map(teacherId => ({ survey_id: surveyId, teacher_id: teacherId })))
+  return staffError
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const actor = await getSurveyActor()
@@ -62,30 +70,37 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const courseId = body.course_id ? String(body.course_id) : null
   const questions = Array.isArray(body.questions) ? body.questions : []
   const staffIds = Array.isArray(body.staff_ids) ? body.staff_ids.map(String) : []
-  const normalizedQuestions = normalizeQuestions(questions, id)
-  const validationError = validateQuestions(normalizedQuestions)
-
-  if (!title || !courseId) return NextResponse.json({ error: 'Completa título y curso.' }, { status: 400 })
-  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
 
   const admin = createAdminSupabaseClient()
   const { count: responseCount } = await admin.from('survey_responses').select('*', { count: 'exact', head: true }).eq('survey_id', id)
-  if ((responseCount ?? 0) > 0) return NextResponse.json({ error: 'La pauta ya no puede modificarse porque existen respuestas registradas.' }, { status: 409 })
+
+  if ((responseCount ?? 0) > 0) {
+    const { error: updateError } = await admin.from('surveys').update({
+      is_active: body.is_active !== false,
+      allow_anonymous: body.allow_anonymous !== false,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
+    const staffError = await replaceStaff(admin, id, actor.id, staffIds)
+    if (staffError) return NextResponse.json({ error: staffError.message }, { status: 400 })
+    return NextResponse.json({ ok: true, locked: true })
+  }
+
+  const normalizedQuestions = normalizeQuestions(questions, id)
+  const validationError = validateQuestions(normalizedQuestions)
+  if (!title || !courseId) return NextResponse.json({ error: 'Completa título y curso.' }, { status: 400 })
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
 
   const { error: updateError } = await admin.from('surveys').update({ title, description: description || null, course_id: courseId, is_active: body.is_active !== false, allow_anonymous: body.allow_anonymous !== false, updated_at: new Date().toISOString() }).eq('id', id)
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
 
-  const [{ error: deleteQuestionError }, { error: deleteStaffError }] = await Promise.all([
-    admin.from('survey_questions').delete().eq('survey_id', id),
-    admin.from('survey_course_staff').delete().eq('survey_id', id),
-  ])
-  if (deleteQuestionError || deleteStaffError) return NextResponse.json({ error: deleteQuestionError?.message ?? deleteStaffError?.message }, { status: 400 })
+  const { error: deleteQuestionError } = await admin.from('survey_questions').delete().eq('survey_id', id)
+  if (deleteQuestionError) return NextResponse.json({ error: deleteQuestionError.message }, { status: 400 })
 
   const { error: questionError } = await admin.from('survey_questions').insert(normalizedQuestions)
   if (questionError) return NextResponse.json({ error: questionError.message }, { status: 400 })
 
-  const allowedStaff = Array.from(new Set([actor.id, ...staffIds]))
-  const { error: staffError } = await admin.from('survey_course_staff').insert(allowedStaff.map(teacherId => ({ survey_id: id, teacher_id: teacherId })))
+  const staffError = await replaceStaff(admin, id, actor.id, staffIds)
   if (staffError) return NextResponse.json({ error: staffError.message }, { status: 400 })
 
   return NextResponse.json({ ok: true })
