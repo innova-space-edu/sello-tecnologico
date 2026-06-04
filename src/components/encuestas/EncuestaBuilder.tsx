@@ -50,7 +50,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
       const userId = auth.user?.id ?? ''
       const [{ data: courseRows }, { data: teacherRows }, { data: memberRow }, { data: profile }] = await Promise.all([
         supabase.from('courses').select('id, name').order('name'),
-        supabase.from('profiles').select('id, full_name, email, role').in('role', ['docente', 'coordinador', 'utp', 'admin']).order('full_name'),
+        supabase.from('profiles').select('id, full_name, email, role').in('role', ['docente', 'admin']).order('full_name'),
         userId ? supabase.from('course_members').select('course_id').eq('user_id', userId).limit(1).maybeSingle() : Promise.resolve({ data: null }),
         userId ? supabase.from('profiles').select('curso').eq('id', userId).maybeSingle() : Promise.resolve({ data: null }),
       ])
