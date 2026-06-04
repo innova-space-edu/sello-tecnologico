@@ -113,7 +113,7 @@ $$;
 
 revoke all on function public.can_read_survey_results(uuid) from public;
 revoke all on function public.can_submit_survey_answer(uuid, uuid) from public;
-grant execute on function public.can_read_survey_results(uuid) to authenticated;
+grant execute on function public.can_read_survey_results(uuid) to anon, authenticated;
 grant execute on function public.can_submit_survey_answer(uuid, uuid) to anon, authenticated;
 
 alter table public.surveys enable row level security;
