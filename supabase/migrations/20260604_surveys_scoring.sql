@@ -1,7 +1,7 @@
 -- ================================================================
 -- Encuestas evaluadas: puntaje automático y nota chilena 1,0–7,0
 -- Exigencia: 60% equivale a nota 4,0.
--- Ejecutar una sola vez en Supabase SQL Editor.
+-- Ejecutar después de 20260604_surveys.sql.
 -- ================================================================
 
 alter table public.survey_questions
@@ -42,6 +42,21 @@ begin
     result := 4.0 + ((normalized - 60.0) / 40.0) * 3.0;
   end if;
   return round(result, 1);
+end;
+$$;
+
+create or replace function public.reset_survey_response_score()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  new.earned_points := 0;
+  new.max_points := 0;
+  new.achievement_percent := 0;
+  new.grade := 1.0;
+  return new;
 end;
 $$;
 
@@ -155,6 +170,11 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_reset_survey_response_score on public.survey_responses;
+create trigger trg_reset_survey_response_score
+before insert on public.survey_responses
+for each row execute function public.reset_survey_response_score();
+
 drop trigger if exists trg_score_survey_answer on public.survey_answers;
 create trigger trg_score_survey_answer
 before insert or update on public.survey_answers
@@ -177,6 +197,7 @@ end;
 $$;
 
 revoke all on function public.chilean_grade_from_percent(numeric) from public;
+revoke all on function public.reset_survey_response_score() from public;
 revoke all on function public.score_survey_answer() from public;
 revoke all on function public.recalculate_survey_response(uuid) from public;
 revoke all on function public.refresh_survey_response_score() from public;
