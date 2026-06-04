@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server'
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
 
-  const publicPaths = ['/login', '/registro', '/bloqueado']
+  const publicPaths = ['/login', '/registro', '/bloqueado', '/formularios']
   if (publicPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
     return response
   }
@@ -50,7 +50,6 @@ export async function proxy(request: NextRequest) {
     '/historial',
   ]
 
-  // Rutas bloqueadas para estudiantes
   if (perfil?.role === 'estudiante') {
     const restringida = rutasRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
     if (restringida) {
@@ -58,7 +57,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Rutas bloqueadas para docentes/coordinador/utp
   const rolesDocente = ['docente', 'coordinador', 'utp']
   const rutasDocenteRestringidas = [
     '/admin',
@@ -78,6 +76,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|woff|woff2|ttf)$|login|registro|bloqueado).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|woff|woff2|ttf)$|login|registro|bloqueado|formularios).*)',
   ],
 }

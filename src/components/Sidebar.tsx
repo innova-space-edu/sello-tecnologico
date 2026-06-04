@@ -12,6 +12,7 @@ const menu = [
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/seguimientos', label: 'Seguimiento', icon: '🧭' },
+  { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/admin/plantillas', label: 'Plantillas', icon: '🧩' },
   { href: '/documentos', label: 'Documentos', icon: '📄' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
@@ -47,14 +48,12 @@ export default function Sidebar() {
       setNombre(perfil?.full_name ?? user.email ?? '')
 
       if (perfil?.role === 'admin') {
-        // Contar alertas de moderación pendientes
         const { count } = await supabase
           .from('flagged_messages')
           .select('*', { count: 'exact', head: true })
           .eq('reviewed', false)
         setAlertasMod(count ?? 0)
 
-        // Suscribir a nuevas alertas en tiempo real
         const modChannel = supabase
           .channel('mod-alerts')
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'flagged_messages' }, () => {
@@ -72,7 +71,6 @@ export default function Sidebar() {
         return () => { supabase.removeChannel(modChannel) }
       }
 
-      // Contar mensajes no leídos para todos
       const { count: unread } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
@@ -100,7 +98,6 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Botón hamburguesa móvil */}
       <button onClick={() => setOpen(!open)}
         className="lg:hidden fixed top-4 left-4 z-50 bg-blue-900 text-white p-2.5 rounded-xl shadow-lg">
         {open ? '✕' : '☰'}
@@ -109,13 +106,11 @@ export default function Sidebar() {
         )}
       </button>
 
-      {/* Overlay móvil */}
       {open && (
         <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
           onClick={() => setOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`
         fixed left-0 top-0 h-full bg-blue-900 text-white flex flex-col z-40 transition-transform duration-300
         w-64
@@ -129,14 +124,7 @@ export default function Sidebar() {
 
         <nav className="flex-1 p-4 space-y-0.5 overflow-y-auto">
           {menu.map((item) => {
-            // ── ADMIN: ve todo ─────────────────────────────────────────
-            // ── DOCENTE: cursos, proyectos, portafolio, evidencias,
-            //             usuarios, reportes, calendario, configuración
-            //             NO: mensajes, admin, moderación, historial, notificaciones, importar
-            // ── ESTUDIANTE: sin admin, sin moderación, sin historial,
-            //                sin notificaciones, sin importar
             const esAdmin = rol === 'admin'
-            const esDocente = rol === 'docente' || rol === 'coordinador' || rol === 'utp'
             const esEstudianteRol = rol === 'estudiante'
 
             if (item.href === '/admin' && !esAdmin) return null
@@ -147,11 +135,11 @@ export default function Sidebar() {
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null
             if (item.href === '/usuarios' && esEstudianteRol) return null
             if (item.href === '/reportes' && esEstudianteRol) return null
+            if (item.href === '/encuestas' && esEstudianteRol) return null
 
             const active = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href))
 
-            // Badges de alerta
             const esMod = item.href === '/admin/moderacion'
             const esMensajes = item.href === '/mensajes'
 
@@ -163,15 +151,11 @@ export default function Sidebar() {
                 }`}>
                 <span className="text-base">{item.icon}</span>
                 <span>{item.label}</span>
-
-                {/* Punto rojo moderación */}
                 {esMod && alertasMod > 0 && (
                   <span className="ml-auto flex items-center justify-center bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 font-bold">
                     {alertasMod > 9 ? '9+' : alertasMod}
                   </span>
                 )}
-
-                {/* Punto rojo mensajes */}
                 {esMensajes && unreadMessages > 0 && (
                   <span className="ml-auto flex items-center justify-center bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 font-bold">
                     {unreadMessages > 9 ? '9+' : unreadMessages}
