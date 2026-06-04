@@ -87,6 +87,7 @@ export async function POST(request: Request) {
   const allowAnonymous = body.allow_anonymous !== false
   const questions = Array.isArray(body.questions) ? body.questions : []
   const staffIds = Array.isArray(body.staff_ids) ? body.staff_ids.map(String) : []
+  const studentIds = Array.isArray(body.student_ids) ? [...new Set(body.student_ids.map(String))] : []
 
   if (!title) return NextResponse.json({ error: 'El título es obligatorio.' }, { status: 400 })
   if (!courseId) return NextResponse.json({ error: 'Selecciona un curso.' }, { status: 400 })
@@ -125,9 +126,17 @@ export async function POST(request: Request) {
 
   const allowedStaff = Array.from(new Set([actor!.id, ...staffIds]))
   if (allowedStaff.length > 0) {
-    await admin.from('survey_course_staff').insert(
+    const { error: staffError } = await admin.from('survey_course_staff').insert(
       allowedStaff.map(teacherId => ({ survey_id: survey.id, teacher_id: teacherId }))
     )
+    if (staffError) return NextResponse.json({ error: staffError.message }, { status: 400 })
+  }
+
+  if (studentIds.length > 0) {
+    const { error: studentError } = await admin.from('survey_students').insert(
+      studentIds.map(studentId => ({ survey_id: survey.id, student_id: studentId }))
+    )
+    if (studentError) return NextResponse.json({ error: studentError.message }, { status: 400 })
   }
 
   return NextResponse.json({ id: survey.id, slug: survey.slug }, { status: 201 })
