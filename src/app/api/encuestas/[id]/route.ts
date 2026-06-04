@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { canEditSurvey, getSurveyActor } from '@/lib/survey-auth'
 
+function normalizeQuestions(questions: any[], surveyId: string) {
+  return questions.map((question: any, index: number) => ({
+    survey_id: surveyId,
+    prompt: String(question.prompt ?? '').trim(),
+    question_type: String(question.question_type ?? 'text'),
+    required: Boolean(question.required),
+    sort_order: index,
+    options: Array.isArray(question.options) ? question.options.map(String).filter(Boolean) : [],
+    appreciation_min_label: String(question.appreciation_min_label ?? 'Muy en desacuerdo').trim() || 'Muy en desacuerdo',
+    appreciation_max_label: String(question.appreciation_max_label ?? 'Muy de acuerdo').trim() || 'Muy de acuerdo',
+  })).filter((question: any) => question.prompt)
+}
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const actor = await getSurveyActor()
@@ -33,9 +46,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const courseId = body.course_id ? String(body.course_id) : null
   const questions = Array.isArray(body.questions) ? body.questions : []
   const staffIds = Array.isArray(body.staff_ids) ? body.staff_ids.map(String) : []
+  const normalizedQuestions = normalizeQuestions(questions, id)
 
   if (!title || !courseId) {
     return NextResponse.json({ error: 'Completa título y curso.' }, { status: 400 })
+  }
+  if (normalizedQuestions.length === 0) {
+    return NextResponse.json({ error: 'Agrega al menos una pregunta válida.' }, { status: 400 })
   }
 
   const admin = createAdminSupabaseClient()
@@ -50,34 +67,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
 
-  await Promise.all([
+  const [{ error: deleteQuestionError }, { error: deleteStaffError }] = await Promise.all([
     admin.from('survey_questions').delete().eq('survey_id', id),
     admin.from('survey_course_staff').delete().eq('survey_id', id),
   ])
-
-  const normalizedQuestions = questions.map((question: any, index: number) => ({
-    survey_id: id,
-    prompt: String(question.prompt ?? '').trim(),
-    question_type: String(question.question_type ?? 'text'),
-    required: Boolean(question.required),
-    sort_order: index,
-    options: Array.isArray(question.options) ? question.options.map(String).filter(Boolean) : [],
-    appreciation_min_label: String(question.appreciation_min_label ?? 'Muy en desacuerdo').trim() || 'Muy en desacuerdo',
-    appreciation_max_label: String(question.appreciation_max_label ?? 'Muy de acuerdo').trim() || 'Muy de acuerdo',
-  })).filter((question: any) => question.prompt)
-
-  if (normalizedQuestions.length > 0) {
-    const { error } = await admin.from('survey_questions').insert(normalizedQuestions)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+  if (deleteQuestionError || deleteStaffError) {
+    return NextResponse.json({ error: deleteQuestionError?.message ?? deleteStaffError?.message }, { status: 400 })
   }
+
+  const { error: questionError } = await admin.from('survey_questions').insert(normalizedQuestions)
+  if (questionError) return NextResponse.json({ error: questionError.message }, { status: 400 })
 
   const allowedStaff = Array.from(new Set([actor.id, ...staffIds]))
-  if (allowedStaff.length > 0) {
-    const { error } = await admin.from('survey_course_staff').insert(
-      allowedStaff.map(teacherId => ({ survey_id: id, teacher_id: teacherId }))
-    )
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  }
+  const { error: staffError } = await admin.from('survey_course_staff').insert(
+    allowedStaff.map(teacherId => ({ survey_id: id, teacher_id: teacherId }))
+  )
+  if (staffError) return NextResponse.json({ error: staffError.message }, { status: 400 })
 
   return NextResponse.json({ ok: true })
 }
