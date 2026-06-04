@@ -20,7 +20,6 @@ type Survey = {
   description?: string | null
   course_id: string
   is_active: boolean
-  courses?: { name?: string | null } | null
   survey_questions?: Question[] | null
 }
 
@@ -53,7 +52,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
 
       const { data, error: surveyError } = await supabase
         .from('surveys')
-        .select('id, title, description, course_id, is_active, courses(name), survey_questions(id, prompt, question_type, required, options, appreciation_min_label, appreciation_max_label, sort_order)')
+        .select('id, title, description, course_id, is_active, survey_questions(id, prompt, question_type, required, options, appreciation_min_label, appreciation_max_label, sort_order)')
         .eq('slug', slug)
         .eq('is_active', true)
         .single()
@@ -146,7 +145,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
           <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">Encuesta · Sello Tecnológico</p>
           <h1 className="text-2xl font-bold text-blue-900 mt-2">{survey?.title}</h1>
           {survey?.description && <p className="text-gray-600 mt-2 whitespace-pre-wrap">{survey.description}</p>}
-          <p className="text-sm text-gray-400 mt-3">Curso: {survey?.courses?.name ?? '—'}</p>
+          <p className="text-sm text-gray-400 mt-3">Formulario público de opinión</p>
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
