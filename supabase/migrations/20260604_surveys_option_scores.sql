@@ -16,18 +16,18 @@ alter table public.survey_questions
 update public.survey_questions sq
 set option_scores = case
   when sq.question_type = 'single' then (
-    select coalesce(jsonb_object_agg(option_value, case when sq.correct_answers ? option_value then sq.max_points else 0 end), '{}'::jsonb)
-    from jsonb_array_elements_text(coalesce(sq.options, '[]'::jsonb)) as option_value
+    select coalesce(jsonb_object_agg(option_row.value, case when sq.correct_answers ? option_row.value then sq.max_points else 0 end), '{}'::jsonb)
+    from jsonb_array_elements_text(coalesce(sq.options, '[]'::jsonb)) as option_row(value)
   )
   when sq.question_type = 'multiple' then (
-    select coalesce(jsonb_object_agg(option_value,
+    select coalesce(jsonb_object_agg(option_row.value,
       case
-        when sq.correct_answers ? option_value and jsonb_array_length(coalesce(sq.correct_answers, '[]'::jsonb)) > 0
+        when sq.correct_answers ? option_row.value and jsonb_array_length(coalesce(sq.correct_answers, '[]'::jsonb)) > 0
           then round(sq.max_points / jsonb_array_length(sq.correct_answers), 2)
         else 0
       end
     ), '{}'::jsonb)
-    from jsonb_array_elements_text(coalesce(sq.options, '[]'::jsonb)) as option_value
+    from jsonb_array_elements_text(coalesce(sq.options, '[]'::jsonb)) as option_row(value)
   )
   else '{}'::jsonb
 end
@@ -94,4 +94,6 @@ set value_text = value_text,
     value_number = value_number;
 
 -- El formulario público no puede leer puntajes internos por alternativa.
+-- No existe un GRANT de tabla completa; se mantiene únicamente la selección
+-- de columnas públicas definida en 20260604_surveys.sql.
 revoke select (option_scores) on public.survey_questions from anon, authenticated;
