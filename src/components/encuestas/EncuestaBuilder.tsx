@@ -13,10 +13,17 @@ type Question = {
   appreciation_max_label: string
   max_points: number
   correct_answers: string[]
+  option_scores: Record<string, number>
 }
 
 type Course = { id: string; name: string }
 type Teacher = { id: string; full_name?: string | null; email?: string | null; role?: string | null }
+
+const calculateClosedMaxPoints = (type: Question['question_type'], optionScores: Record<string, number>) => {
+  const values = Object.values(optionScores).map(Number).filter(Number.isFinite)
+  if (type === 'multiple') return values.reduce((total, value) => total + Math.max(0, value), 0)
+  return values.length > 0 ? Math.max(...values, 0) : 0
+}
 
 const emptyQuestion = (): Question => ({
   prompt: '',
@@ -27,7 +34,21 @@ const emptyQuestion = (): Question => ({
   appreciation_max_label: 'Muy de acuerdo',
   max_points: 1,
   correct_answers: ['Alternativa 1'],
+  option_scores: { 'Alternativa 1': 1, 'Alternativa 2': 0 },
 })
+
+const normalizeLoadedScores = (question: any) => {
+  const options = Array.isArray(question.options) ? question.options : []
+  const rawScores = question.option_scores && typeof question.option_scores === 'object' && !Array.isArray(question.option_scores)
+    ? question.option_scores as Record<string, unknown>
+    : null
+  if (rawScores) return Object.fromEntries(options.map((option: string) => [option, Number(rawScores[option] ?? 0)]))
+
+  const correctAnswers = Array.isArray(question.correct_answers) ? question.correct_answers : []
+  const maxPoints = Number(question.max_points ?? 1)
+  const divided = correctAnswers.length > 0 ? maxPoints / correctAnswers.length : 0
+  return Object.fromEntries(options.map((option: string) => [option, correctAnswers.includes(option) ? divided : 0]))
+}
 
 export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
   const supabase = useMemo(() => createClient(), [])
@@ -70,7 +91,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
             prompt: question.prompt ?? '', question_type: question.question_type ?? 'text', required: Boolean(question.required),
             options: Array.isArray(question.options) ? question.options : [], appreciation_min_label: question.appreciation_min_label ?? 'Muy en desacuerdo',
             appreciation_max_label: question.appreciation_max_label ?? 'Muy de acuerdo', max_points: Number(question.max_points ?? 1),
-            correct_answers: Array.isArray(question.correct_answers) ? question.correct_answers : [],
+            correct_answers: Array.isArray(question.correct_answers) ? question.correct_answers : [], option_scores: normalizeLoadedScores(question),
           })))
         }
       } else {
@@ -84,27 +105,37 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
   }, [surveyId, supabase])
 
   const updateQuestion = (index: number, patch: Partial<Question>) => setQuestions(prev => prev.map((question, current) => current === index ? { ...question, ...patch } : question))
-  const changeType = (index: number, type: Question['question_type']) => setQuestions(prev => prev.map((question, current) => current !== index ? question : {
-    ...question,
-    question_type: type,
-    correct_answers: type === 'single' ? [question.options[0] ?? 'Alternativa 1'] : [],
+  const changeType = (index: number, type: Question['question_type']) => setQuestions(prev => prev.map((question, current) => {
+    if (current !== index) return question
+    const optionScores = ['single', 'multiple'].includes(type)
+      ? Object.fromEntries(question.options.map(option => [option, Number(question.option_scores[option] ?? 0)]))
+      : {}
+    return { ...question, question_type: type, option_scores: optionScores, max_points: ['single', 'multiple'].includes(type) ? calculateClosedMaxPoints(type, optionScores) : Math.max(1, Number(question.max_points) || 1) }
   }))
   const updateOption = (questionIndex: number, optionIndex: number, value: string) => setQuestions(prev => prev.map((question, current) => {
     if (current !== questionIndex) return question
     const oldValue = question.options[optionIndex]
-    return { ...question, options: question.options.map((option, optionCurrent) => optionCurrent === optionIndex ? value : option), correct_answers: question.correct_answers.map(answer => answer === oldValue ? value : answer) }
+    const options = question.options.map((option, optionCurrent) => optionCurrent === optionIndex ? value : option)
+    const optionScores = Object.fromEntries(options.map(option => [option, option === value ? Number(question.option_scores[oldValue] ?? 0) : Number(question.option_scores[option] ?? 0)]))
+    return { ...question, options, option_scores: optionScores, max_points: calculateClosedMaxPoints(question.question_type, optionScores) }
   }))
-  const addOption = (questionIndex: number) => setQuestions(prev => prev.map((question, current) => current === questionIndex ? { ...question, options: [...question.options, `Alternativa ${question.options.length + 1}`] } : question))
+  const updateOptionScore = (questionIndex: number, option: string, value: number) => setQuestions(prev => prev.map((question, current) => {
+    if (current !== questionIndex) return question
+    const optionScores = { ...question.option_scores, [option]: Math.max(0, Number.isFinite(value) ? value : 0) }
+    return { ...question, option_scores: optionScores, max_points: calculateClosedMaxPoints(question.question_type, optionScores) }
+  }))
+  const addOption = (questionIndex: number) => setQuestions(prev => prev.map((question, current) => {
+    if (current !== questionIndex) return question
+    const option = `Alternativa ${question.options.length + 1}`
+    const optionScores = { ...question.option_scores, [option]: 0 }
+    return { ...question, options: [...question.options, option], option_scores: optionScores, max_points: calculateClosedMaxPoints(question.question_type, optionScores) }
+  }))
   const removeOption = (questionIndex: number, optionIndex: number) => setQuestions(prev => prev.map((question, current) => {
     if (current !== questionIndex) return question
     const removed = question.options[optionIndex]
     const options = question.options.filter((_, optionCurrent) => optionCurrent !== optionIndex)
-    const correct = question.correct_answers.filter(answer => answer !== removed)
-    return { ...question, options, correct_answers: question.question_type === 'single' && correct.length === 0 && options[0] ? [options[0]] : correct }
-  }))
-  const toggleCorrect = (questionIndex: number, option: string, checked: boolean) => setQuestions(prev => prev.map((question, current) => current !== questionIndex ? question : {
-    ...question,
-    correct_answers: question.question_type === 'single' ? [option] : checked ? [...new Set([...question.correct_answers, option])] : question.correct_answers.filter(answer => answer !== option),
+    const optionScores = Object.fromEntries(Object.entries(question.option_scores).filter(([option]) => option !== removed))
+    return { ...question, options, option_scores: optionScores, max_points: calculateClosedMaxPoints(question.question_type, optionScores) }
   }))
 
   const save = async (event: React.FormEvent) => {
@@ -141,8 +172,8 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
       <div className="space-y-4">{questions.map((question, index) => <article key={index} className="border rounded-xl p-4 space-y-3">
         <div className="flex justify-between gap-3"><h3 className="font-semibold">Ítem {index + 1}</h3><button disabled={locked} type="button" onClick={() => setQuestions(prev => prev.filter((_, current) => current !== index))} className="text-red-500 text-sm disabled:opacity-50">Eliminar</button></div>
         <input disabled={locked} value={question.prompt} onChange={e => updateQuestion(index, { prompt: e.target.value })} placeholder="Escribe la pregunta o afirmación" className="w-full border rounded-lg px-3 py-2.5 text-sm disabled:bg-gray-100" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><select disabled={locked} value={question.question_type} onChange={e => changeType(index, e.target.value as Question['question_type'])} className="border rounded-lg px-3 py-2.5 text-sm disabled:bg-gray-100"><option value="single">Alternativa única</option><option value="multiple">Selección múltiple</option><option value="appreciation">Evaluación apreciativa 1–5</option><option value="text">Respuesta abierta</option></select><label className="flex items-center gap-2 text-sm"><input disabled={locked} type="checkbox" checked={question.required} onChange={e => updateQuestion(index, { required: e.target.checked })} /> Obligatoria</label><label className="text-sm">Puntaje máximo<input disabled={locked} type="number" min="0.1" step="0.1" value={question.max_points} onChange={e => updateQuestion(index, { max_points: Number(e.target.value) })} className="ml-2 w-24 border rounded-lg px-2 py-1.5 disabled:bg-gray-100" /></label></div>
-        {(question.question_type === 'single' || question.question_type === 'multiple') && <div className="space-y-2"><p className="text-xs text-gray-500">Marca la(s) alternativa(s) correcta(s).</p>{question.options.map((option, optionIndex) => <div key={optionIndex} className="flex gap-2"><input disabled={locked} type={question.question_type === 'single' ? 'radio' : 'checkbox'} name={`correct-${index}`} checked={question.correct_answers.includes(option)} onChange={e => toggleCorrect(index, option, e.target.checked)} /><input disabled={locked} value={option} onChange={e => updateOption(index, optionIndex, e.target.value)} className="flex-1 border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100" /><button disabled={locked} type="button" onClick={() => removeOption(index, optionIndex)} className="text-red-400 px-2 disabled:opacity-50">✕</button></div>)}<button disabled={locked} type="button" onClick={() => addOption(index)} className="text-blue-600 text-sm disabled:opacity-50">+ Agregar alternativa</button></div>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><select disabled={locked} value={question.question_type} onChange={e => changeType(index, e.target.value as Question['question_type'])} className="border rounded-lg px-3 py-2.5 text-sm disabled:bg-gray-100"><option value="single">Alternativa única</option><option value="multiple">Selección múltiple</option><option value="appreciation">Evaluación apreciativa 1–5</option><option value="text">Respuesta abierta</option></select><label className="flex items-center gap-2 text-sm"><input disabled={locked} type="checkbox" checked={question.required} onChange={e => updateQuestion(index, { required: e.target.checked })} /> Obligatoria</label><label className="text-sm">Puntaje máximo<input disabled={locked || ['single', 'multiple'].includes(question.question_type)} type="number" min="0.1" step="0.1" value={question.max_points} onChange={e => updateQuestion(index, { max_points: Number(e.target.value) })} className="ml-2 w-24 border rounded-lg px-2 py-1.5 disabled:bg-gray-100" /></label></div>
+        {(question.question_type === 'single' || question.question_type === 'multiple') && <div className="space-y-2"><p className="text-xs text-gray-500">Asigna un puntaje independiente a cada alternativa. {question.question_type === 'single' ? 'El máximo del ítem será el mayor puntaje.' : 'El máximo del ítem será la suma de los puntajes positivos.'}</p>{question.options.map((option, optionIndex) => <div key={optionIndex} className="grid grid-cols-[1fr_90px_32px] gap-2"><input disabled={locked} value={option} onChange={e => updateOption(index, optionIndex, e.target.value)} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100" /><input disabled={locked} aria-label={`Puntaje de ${option}`} type="number" min="0" step="0.1" value={question.option_scores[option] ?? 0} onChange={e => updateOptionScore(index, option, Number(e.target.value))} className="border rounded-lg px-2 py-2 text-sm disabled:bg-gray-100" /><button disabled={locked} type="button" onClick={() => removeOption(index, optionIndex)} className="text-red-400 px-2 disabled:opacity-50">✕</button></div>)}<button disabled={locked} type="button" onClick={() => addOption(index)} className="text-blue-600 text-sm disabled:opacity-50">+ Agregar alternativa</button></div>}
         {question.question_type === 'appreciation' && <div><p className="text-xs text-gray-500 mb-2">La escala otorga puntaje proporcional: 1 = 20%, 5 = 100%.</p><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><input disabled={locked} value={question.appreciation_min_label} onChange={e => updateQuestion(index, { appreciation_min_label: e.target.value })} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100" /><input disabled={locked} value={question.appreciation_max_label} onChange={e => updateQuestion(index, { appreciation_max_label: e.target.value })} className="border rounded-lg px-3 py-2 text-sm disabled:bg-gray-100" /></div></div>}
         {question.question_type === 'text' && <p className="text-xs text-gray-500">La respuesta abierta recibe el puntaje máximo cuando contiene texto.</p>}
       </article>)}</div>
