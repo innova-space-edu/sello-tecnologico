@@ -45,11 +45,16 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: courseRows }, { data: teacherRows }] = await Promise.all([
+      const { data: auth } = await supabase.auth.getUser()
+      const userId = auth.user?.id ?? ''
+      const [{ data: courseRows }, { data: teacherRows }, { data: memberRow }, { data: profile }] = await Promise.all([
         supabase.from('courses').select('id, name').order('name'),
         supabase.from('profiles').select('id, full_name, email, role').in('role', ['docente', 'coordinador', 'utp', 'admin']).order('full_name'),
+        userId ? supabase.from('course_members').select('course_id').eq('user_id', userId).limit(1).maybeSingle() : Promise.resolve({ data: null }),
+        userId ? supabase.from('profiles').select('curso').eq('id', userId).maybeSingle() : Promise.resolve({ data: null }),
       ])
-      setCourses((courseRows ?? []) as Course[])
+      const normalizedCourses = (courseRows ?? []) as Course[]
+      setCourses(normalizedCourses)
       setTeachers((teacherRows ?? []) as Teacher[])
 
       if (surveyId) {
@@ -75,6 +80,11 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
             appreciation_max_label: question.appreciation_max_label ?? 'Muy de acuerdo',
           })))
         }
+      } else {
+        const memberCourseId = memberRow?.course_id ?? ''
+        const profileCourse = normalizedCourses.find(course => course.name === profile?.curso)?.id ?? ''
+        const defaultCourseId = memberCourseId || profileCourse
+        if (defaultCourseId) setForm(prev => ({ ...prev, course_id: defaultCourseId }))
       }
       setLoading(false)
     }
@@ -155,7 +165,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
         <details className="group">
           <summary className="cursor-pointer list-none flex justify-between font-bold text-blue-900"><span>👨‍🏫 Docentes autorizados para ver resultados ({staffIds.length})</span><span className="text-gray-400">▼</span></summary>
           <div className="mt-4 border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-60 overflow-y-auto">
-            {teachers.map(teacher => <label key={teacher.id} className="flex gap-3 px-4 py-3 hover:bg-blue-50 text-sm"><input type="checkbox" checked={staffIds.includes(teacher.id)} onChange={e => setStaffIds(prev => e.target.checked ? [...prev, teacher.id] : prev.filter(id => id !== teacher.id))} /><span>{teacher.full_name ?? teacher.email} <span className="text-gray-400">· {teacher.role}</span></span></label>)}
+            {teachers.map(teacher => <label key={teacher.id} className="flex gap-3 px-4 py-3 hover:bg-blue-50 text-sm"><input type="checkbox" checked={staffIds.includes(teacher.id)} onChange={e => setStaffIds(prev => e.target.checked ? [...new Set([...prev, teacher.id])] : prev.filter(id => id !== teacher.id))} /><span>{teacher.full_name ?? teacher.email} <span className="text-gray-400">· {teacher.role}</span></span></label>)}
           </div>
         </details>
       </section>
