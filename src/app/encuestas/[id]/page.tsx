@@ -5,6 +5,34 @@ import { redirect } from 'next/navigation'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { canReadSurvey, getSurveyActor } from '@/lib/survey-auth'
 
+type SurveyQuestion = {
+  id: string
+  prompt: string
+  question_type: string
+  sort_order: number
+  max_points: number
+  options?: string[] | null
+  option_scores?: Record<string, number> | null
+}
+
+function countSelections(question: SurveyQuestion, responses: any[]) {
+  const options = Array.isArray(question.options) ? question.options : []
+  return options.map(option => {
+    const selected = responses.reduce((total, response) => {
+      const answer = (response.survey_answers ?? []).find((row: any) => row.question_id === question.id)
+      if (!answer) return total
+      if (question.question_type === 'multiple') return total + (Array.isArray(answer.value_json) && answer.value_json.includes(option) ? 1 : 0)
+      return total + (answer.value_text === option ? 1 : 0)
+    }, 0)
+    return {
+      option,
+      score: Number(question.option_scores?.[option] ?? 0),
+      selected,
+      percent: responses.length > 0 ? (selected / responses.length) * 100 : 0,
+    }
+  })
+}
+
 export default async function EncuestaDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const actor = await getSurveyActor()
@@ -14,17 +42,20 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
   const admin = createAdminSupabaseClient()
   const [{ data: survey }, { data: questions }, { data: responses }] = await Promise.all([
     admin.from('surveys').select('id, title, description, slug, is_active, allow_anonymous, creator_id, created_at, courses(name)').eq('id', id).single(),
-    admin.from('survey_questions').select('id, prompt, question_type, sort_order, max_points').eq('survey_id', id).order('sort_order'),
+    admin.from('survey_questions').select('id, prompt, question_type, sort_order, max_points, options, option_scores').eq('survey_id', id).order('sort_order'),
     admin.from('survey_responses').select('id, respondent_name, respondent_email, registered_user_id, created_at, earned_points, max_points, achievement_percent, grade, survey_answers(question_id, value_text, value_json, value_number, awarded_points)').eq('survey_id', id).order('created_at', { ascending: false }),
   ])
 
   if (!survey) redirect('/encuestas')
   const canEdit = actor.role === 'admin' || survey.creator_id === actor.id
-  const questionMap = new Map((questions ?? []).map(question => [question.id, question]))
+  const normalizedQuestions = (questions ?? []) as SurveyQuestion[]
+  const normalizedResponses = responses ?? []
+  const questionMap = new Map(normalizedQuestions.map(question => [question.id, question]))
+  const closedQuestions = normalizedQuestions.filter(question => ['single', 'multiple'].includes(question.question_type))
   const courseName = survey.courses?.[0]?.name ?? 'Sin curso'
-  const totalResponses = responses?.length ?? 0
-  const averageGrade = totalResponses > 0 ? (responses ?? []).reduce((total, response) => total + Number(response.grade ?? 1), 0) / totalResponses : 0
-  const averageAchievement = totalResponses > 0 ? (responses ?? []).reduce((total, response) => total + Number(response.achievement_percent ?? 0), 0) / totalResponses : 0
+  const totalResponses = normalizedResponses.length
+  const averageGrade = totalResponses > 0 ? normalizedResponses.reduce((total, response) => total + Number(response.grade ?? 1), 0) / totalResponses : 0
+  const averageAchievement = totalResponses > 0 ? normalizedResponses.reduce((total, response) => total + Number(response.achievement_percent ?? 0), 0) / totalResponses : 0
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -53,6 +84,20 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
             <div className="bg-white rounded-xl shadow-sm p-5"><p className="text-sm text-gray-500">Promedio de notas</p><p className="text-2xl font-bold text-blue-900 mt-1">{totalResponses > 0 ? averageGrade.toFixed(1) : '—'}</p></div>
           </div>
 
+          {closedQuestions.length > 0 && <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
+            <div className="mb-4"><h2 className="font-bold text-blue-900">📊 Tendencias por alternativa</h2><p className="text-sm text-gray-500 mt-1">Análisis interno para revisar cómo se distribuyen las respuestas y detectar necesidades de refuerzo.</p></div>
+            <div className="space-y-4">{closedQuestions.map((question, index) => {
+              const rows = countSelections(question, normalizedResponses)
+              return <details key={question.id} className="border border-gray-200 rounded-lg p-4" open={index === 0}>
+                <summary className="cursor-pointer font-semibold text-gray-700">{question.sort_order + 1}. {question.prompt}</summary>
+                <div className="overflow-x-auto mt-4"><table className="w-full text-sm">
+                  <thead><tr className="text-left text-gray-500 border-b"><th className="py-2 pr-3">Alternativa</th><th className="py-2 px-3 text-right">Puntaje</th><th className="py-2 px-3 text-right">Selecciones</th><th className="py-2 pl-3 text-right">Porcentaje</th></tr></thead>
+                  <tbody>{rows.map(row => <tr key={row.option} className="border-b last:border-0"><td className="py-2 pr-3 text-gray-700">{row.option}</td><td className="py-2 px-3 text-right font-semibold text-blue-700">{row.score.toFixed(1)}</td><td className="py-2 px-3 text-right text-gray-700">{row.selected}</td><td className="py-2 pl-3 text-right text-gray-700">{row.percent.toFixed(1)}%</td></tr>)}</tbody>
+                </table></div>
+              </details>
+            })}</div>
+          </section>}
+
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
             <div className="xl:col-span-2 space-y-5">
               <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
@@ -60,10 +105,10 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
                   <div><h2 className="font-bold text-blue-900">🗳️ Respuestas evaluadas</h2><p className="text-sm text-gray-500 mt-1">Puntajes y notas visibles solo para administración y docentes autorizados.</p></div>
                   <span className="bg-blue-100 text-blue-700 rounded-full px-3 py-1 text-sm font-bold">{totalResponses}</span>
                 </div>
-                {responses && responses.length > 0 ? <div className="space-y-3">{responses.map((response: any, index: number) => (
+                {normalizedResponses.length > 0 ? <div className="space-y-3">{normalizedResponses.map((response: any, index: number) => (
                   <details key={response.id} className="border border-gray-200 rounded-lg p-4 group">
                     <summary className="cursor-pointer list-none flex flex-wrap justify-between gap-3 items-center">
-                      <span className="font-semibold text-gray-700">Respuesta {responses.length - index} · {response.respondent_name || response.respondent_email || 'Anónima'}</span>
+                      <span className="font-semibold text-gray-700">Respuesta {normalizedResponses.length - index} · {response.respondent_name || response.respondent_email || 'Anónima'}</span>
                       <div className="flex flex-wrap gap-2 items-center text-xs">
                         <span className="bg-gray-100 text-gray-700 rounded-full px-2.5 py-1">{Number(response.earned_points ?? 0).toFixed(1)}/{Number(response.max_points ?? 0).toFixed(1)} pts</span>
                         <span className="bg-blue-100 text-blue-700 rounded-full px-2.5 py-1">{Number(response.achievement_percent ?? 0).toFixed(1)}%</span>
@@ -89,7 +134,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
                 <h2 className="font-bold text-blue-900 mb-3">📌 Resumen</h2>
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Curso</dt><dd className="font-medium text-gray-700 text-right">{courseName}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Ítems</dt><dd className="font-medium text-gray-700">{questions?.length ?? 0}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Ítems</dt><dd className="font-medium text-gray-700">{normalizedQuestions.length}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Respuestas</dt><dd className="font-medium text-gray-700">{totalResponses}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Exigencia</dt><dd className="font-medium text-gray-700">60% = 4,0</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Escala</dt><dd className="font-medium text-gray-700">1,0 a 7,0</dd></div>
