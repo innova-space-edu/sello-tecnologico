@@ -18,7 +18,7 @@ function calculateClosedMaxPoints(questionType: string, optionScores: Record<str
 function normalizeQuestions(questions: any[], surveyId: string) {
   return questions.map((question: any, index: number) => {
     const questionType = String(question.question_type ?? 'text')
-    const options = Array.isArray(question.options) ? question.options.map(String).map((option: string) => option.trim()).filter(Boolean) : []
+    const options: string[] = Array.isArray(question.options) ? question.options.map(String).map((option: string) => option.trim()).filter(Boolean) : []
     const isClosed = ['single', 'multiple'].includes(questionType)
     const optionScores = isClosed ? normalizeOptionScores(options, question.option_scores) : {}
     const maxPoints = isClosed ? calculateClosedMaxPoints(questionType, optionScores) : Number(question.max_points ?? 1)
