@@ -11,6 +11,7 @@ type Question = {
   options: string[] | null
   appreciation_min_label?: string | null
   appreciation_max_label?: string | null
+  sort_order?: number | null
 }
 
 type Survey = {
@@ -41,6 +42,13 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
       if (auth.user) {
         setUserId(auth.user.id)
         setEmail(auth.user.email ?? '')
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', auth.user.id)
+          .single()
+        setName(profile?.full_name ?? '')
+        setEmail(profile?.email ?? auth.user.email ?? '')
       }
 
       const { data, error: surveyError } = await supabase
@@ -54,7 +62,8 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
         setError('La encuesta no está disponible o fue cerrada.')
       } else {
         const normalized = data as unknown as Survey
-        normalized.survey_questions = [...(normalized.survey_questions ?? [])].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        normalized.survey_questions = [...(normalized.survey_questions ?? [])]
+          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
         setSurvey(normalized)
       }
       setLoading(false)
@@ -84,20 +93,20 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
     }
 
     setSaving(true)
-    const { data: response, error: responseError } = await supabase
+    const responseId = crypto.randomUUID()
+    const { error: responseError } = await supabase
       .from('survey_responses')
       .insert({
+        id: responseId,
         survey_id: survey.id,
         course_id: survey.course_id,
         registered_user_id: userId,
         respondent_name: name.trim() || null,
         respondent_email: email.trim() || null,
       })
-      .select('id')
-      .single()
 
-    if (responseError || !response) {
-      setError(responseError?.message ?? 'No fue posible guardar tu respuesta.')
+    if (responseError) {
+      setError(responseError.message || 'No fue posible guardar tu respuesta.')
       setSaving(false)
       return
     }
@@ -105,7 +114,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
     const rows = (survey.survey_questions ?? []).map(question => {
       const value = answers[question.id]
       return {
-        response_id: response.id,
+        response_id: responseId,
         question_id: question.id,
         value_text: typeof value === 'string' ? value : null,
         value_json: Array.isArray(value) ? value : null,
