@@ -2,7 +2,7 @@
 
 ## Qué incorpora
 
-- Menú lateral **Encuestas** para administración, docentes, coordinación y UTP.
+- Menú lateral **Encuestas** para cuentas con rol `docente` o `admin`.
 - Creación y edición visual de encuestas por curso.
 - Curso predeterminado cuando el usuario ya tiene membresía o curso registrado.
 - Ítems editables: alternativa única, selección múltiple, respuesta abierta y evaluación apreciativa de 1 a 5.
@@ -10,11 +10,12 @@
 - Pauta de corrección para preguntas cerradas.
 - Cálculo automático de puntaje obtenido, porcentaje de logro y nota chilena de 1,0 a 7,0.
 - Exigencia del 60% para alcanzar nota 4,0.
-- Panel plegable para seleccionar docentes autorizados a revisar resultados.
+- Panel plegable para seleccionar docentes y administradores autorizados a revisar resultados.
 - Página pública compartible mediante enlace y código QR.
 - Respuestas anónimas opcionales.
-- Panel interno con respuestas detalladas, puntajes y notas, restringido a administración, creador y docentes autorizados.
+- Panel interno con respuestas detalladas, puntajes y notas, restringido a docentes autorizados y administración.
 - Bloqueo automático de la pauta cuando ya existen respuestas, para preservar la validez de las calificaciones.
+- Después de recibir respuestas todavía se puede cerrar o reabrir la encuesta y ajustar revisores autorizados.
 
 ## Cálculo de la nota
 
@@ -40,6 +41,7 @@ Antes de probar el módulo en producción, ejecutar en **Supabase SQL Editor** e
 
 1. `supabase/migrations/20260604_surveys.sql`
 2. `supabase/migrations/20260604_surveys_scoring.sql`
+3. `supabase/migrations/20260604_surveys_teacher_admin_only.sql`
 
 La primera migración crea las tablas:
 
@@ -57,11 +59,13 @@ La segunda migración agrega:
 - Triggers para calcular puntaje y nota automáticamente en la base de datos.
 - Resguardos para impedir que una persona envíe una nota manipulada desde el navegador.
 
+La tercera migración restringe la lectura de resultados exclusivamente a cuentas con rol `docente` o `admin`. Un docente accede a encuestas creadas por él o donde haya sido autorizado; una cuenta administradora puede revisar todas.
+
 También se habilitan políticas RLS y permisos por columna para permitir responder públicamente sin exponer resultados ni pautas correctas.
 
 ## Prueba recomendada
 
-1. Ejecutar ambas migraciones SQL en orden.
+1. Ejecutar las tres migraciones SQL en orden.
 2. Desplegar la rama `feature/encuestas` en Vercel.
 3. Entrar como docente o administrador.
 4. Abrir **Encuestas** y crear una encuesta asociada a un curso.
@@ -71,3 +75,4 @@ También se habilitan políticas RLS y permisos por columna para permitir respon
 8. Responder el formulario sin iniciar sesión.
 9. Confirmar que el panel interno muestre puntaje, porcentaje y nota.
 10. Entrar como estudiante y comprobar que no aparece el menú interno de Encuestas.
+11. Confirmar que coordinación y UTP tampoco pueden abrir el panel interno de resultados.
