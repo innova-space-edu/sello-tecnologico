@@ -93,8 +93,28 @@ as $$
   );
 $$;
 
+create or replace function public.can_submit_survey_answer(target_response_id uuid, target_question_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.survey_responses sr
+    join public.survey_questions sq on sq.survey_id = sr.survey_id
+    join public.surveys s on s.id = sr.survey_id
+    where sr.id = target_response_id
+      and sq.id = target_question_id
+      and s.is_active = true
+  );
+$$;
+
 revoke all on function public.can_read_survey_results(uuid) from public;
+revoke all on function public.can_submit_survey_answer(uuid, uuid) from public;
 grant execute on function public.can_read_survey_results(uuid) to authenticated;
+grant execute on function public.can_submit_survey_answer(uuid, uuid) to anon, authenticated;
 
 alter table public.surveys enable row level security;
 alter table public.survey_questions enable row level security;
@@ -146,21 +166,11 @@ create policy survey_responses_read_authorized on public.survey_responses
 for select to authenticated
 using (public.can_read_survey_results(survey_id));
 
--- Se permite insertar una respuesta por pregunta solo si pertenece a la encuesta de la respuesta.
+-- Se permite insertar una respuesta por pregunta solo si pertenece a una encuesta activa.
 drop policy if exists survey_answers_public_insert_valid on public.survey_answers;
 create policy survey_answers_public_insert_valid on public.survey_answers
 for insert to anon, authenticated
-with check (
-  exists (
-    select 1
-    from public.survey_responses sr
-    join public.survey_questions sq on sq.survey_id = sr.survey_id
-    join public.surveys s on s.id = sr.survey_id
-    where sr.id = response_id
-      and sq.id = question_id
-      and s.is_active = true
-  )
-);
+with check (public.can_submit_survey_answer(response_id, question_id));
 
 drop policy if exists survey_answers_read_authorized on public.survey_answers;
 create policy survey_answers_read_authorized on public.survey_answers
@@ -171,3 +181,15 @@ using (
     where sr.id = response_id and public.can_read_survey_results(sr.survey_id)
   )
 );
+
+-- Permisos mínimos para el formulario público. El servidor usa service_role para administración.
+revoke all on table public.surveys from anon, authenticated;
+revoke all on table public.survey_questions from anon, authenticated;
+revoke all on table public.survey_course_staff from anon, authenticated;
+revoke all on table public.survey_responses from anon, authenticated;
+revoke all on table public.survey_answers from anon, authenticated;
+
+grant select (id, title, description, slug, course_id, is_active, allow_anonymous) on public.surveys to anon, authenticated;
+grant select (id, survey_id, prompt, question_type, required, sort_order, options, appreciation_min_label, appreciation_max_label) on public.survey_questions to anon, authenticated;
+grant insert (id, survey_id, course_id, registered_user_id, respondent_name, respondent_email) on public.survey_responses to anon, authenticated;
+grant insert (response_id, question_id, value_text, value_json, value_number) on public.survey_answers to anon, authenticated;
