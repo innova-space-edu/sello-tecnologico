@@ -13,13 +13,31 @@ function makeSlug(title: string) {
   return `${base}-${crypto.randomUUID().slice(0, 8)}`
 }
 
+function normalizeOptionScores(options: string[], rawScores: unknown) {
+  const scores = rawScores && typeof rawScores === 'object' && !Array.isArray(rawScores)
+    ? rawScores as Record<string, unknown>
+    : {}
+  return Object.fromEntries(options.map(option => [option, Number(scores[option] ?? 0)]))
+}
+
+function calculateClosedMaxPoints(questionType: string, optionScores: Record<string, number>) {
+  const values = Object.values(optionScores).map(Number).filter(Number.isFinite)
+  if (questionType === 'multiple') return values.reduce((total, value) => total + Math.max(0, value), 0)
+  return values.length > 0 ? Math.max(...values, 0) : 0
+}
+
 function normalizeQuestions(questions: any[]) {
   return questions.map((question: any, index: number) => {
     const questionType = String(question.question_type ?? 'text')
     const options = Array.isArray(question.options) ? question.options.map(String).map((option: string) => option.trim()).filter(Boolean) : []
-    const correctAnswers = ['single', 'multiple'].includes(questionType) && Array.isArray(question.correct_answers)
-      ? [...new Set(question.correct_answers.map(String).map((answer: string) => answer.trim()).filter(Boolean))]
-      : []
+    const isClosed = ['single', 'multiple'].includes(questionType)
+    const optionScores = isClosed ? normalizeOptionScores(options, question.option_scores) : {}
+    const maxPoints = isClosed ? calculateClosedMaxPoints(questionType, optionScores) : Number(question.max_points ?? 1)
+    const correctAnswers = questionType === 'single'
+      ? options.filter(option => Number(optionScores[option] ?? 0) === maxPoints && maxPoints > 0)
+      : questionType === 'multiple'
+        ? options.filter(option => Number(optionScores[option] ?? 0) > 0)
+        : []
 
     return {
       prompt: String(question.prompt ?? '').trim(),
@@ -29,8 +47,9 @@ function normalizeQuestions(questions: any[]) {
       options,
       appreciation_min_label: String(question.appreciation_min_label ?? 'Muy en desacuerdo').trim() || 'Muy en desacuerdo',
       appreciation_max_label: String(question.appreciation_max_label ?? 'Muy de acuerdo').trim() || 'Muy de acuerdo',
-      max_points: Number(question.max_points ?? 1),
+      max_points: maxPoints,
       correct_answers: correctAnswers,
+      option_scores: optionScores,
     }
   }).filter((question: any) => question.prompt)
 }
@@ -40,16 +59,14 @@ function validateQuestions(questions: any[]) {
 
   for (const question of questions) {
     if (!Number.isFinite(question.max_points) || question.max_points <= 0) {
-      return `El ítem “${question.prompt}” debe tener un puntaje mayor que 0.`
+      return `El ítem “${question.prompt}” debe tener un puntaje máximo mayor que 0.`
     }
-    if (question.question_type === 'single') {
-      if (question.correct_answers.length !== 1 || !question.options.includes(question.correct_answers[0])) {
-        return `Selecciona una alternativa correcta en el ítem “${question.prompt}”.`
-      }
-    }
-    if (question.question_type === 'multiple') {
-      if (question.correct_answers.length === 0 || question.correct_answers.some((answer: string) => !question.options.includes(answer))) {
-        return `Selecciona al menos una alternativa correcta en el ítem “${question.prompt}”.`
+    if (['single', 'multiple'].includes(question.question_type)) {
+      if (question.options.length < 2) return `Agrega al menos dos alternativas en el ítem “${question.prompt}”.`
+      if (new Set(question.options).size !== question.options.length) return `No repitas alternativas en el ítem “${question.prompt}”.`
+      for (const option of question.options) {
+        const score = Number(question.option_scores[option])
+        if (!Number.isFinite(score) || score < 0) return `Asigna un puntaje válido, igual o mayor que 0, a cada alternativa del ítem “${question.prompt}”.`
       }
     }
   }
