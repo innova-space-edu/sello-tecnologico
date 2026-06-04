@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { canEditSurvey, getSurveyActor } from '@/lib/survey-auth'
 
+type Student = {
+  id: string
+  full_name?: string | null
+  email?: string | null
+  curso?: string | null
+  role?: string | null
+}
+
 async function getSurveyCourse(admin: ReturnType<typeof createAdminSupabaseClient>, surveyId: string) {
   const { data: survey } = await admin
     .from('surveys')
@@ -25,18 +33,36 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const survey = await getSurveyCourse(admin, id)
   if (!survey) return NextResponse.json({ error: 'Encuesta no encontrada' }, { status: 404 })
 
-  const { data: rows, error } = await admin
-    .from('survey_students')
-    .select('student_id')
-    .eq('survey_id', id)
+  const [{ data: rows, error }, { data: members }, { data: fallbackProfiles }, { data: responses }] = await Promise.all([
+    admin.from('survey_students').select('student_id').eq('survey_id', id),
+    admin.from('course_members').select('user_id, profiles(id, full_name, email, curso, role)').eq('course_id', survey.courseId),
+    survey.courseName
+      ? admin.from('profiles').select('id, full_name, email, curso, role').eq('role', 'estudiante').eq('curso', survey.courseName)
+      : Promise.resolve({ data: [] as Student[] }),
+    admin.from('survey_responses').select('registered_user_id').eq('survey_id', id).not('registered_user_id', 'is', null),
+  ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  const fromMembers = (members ?? [])
+    .map((row: any) => Array.isArray(row.profiles) ? row.profiles[0] : row.profiles)
+    .filter((profile: Student | null): profile is Student => Boolean(profile && profile.role === 'estudiante'))
+
+  const merged = new Map<string, Student>()
+  for (const student of [...fromMembers, ...((fallbackProfiles ?? []) as Student[])]) {
+    if (student.id && student.role === 'estudiante') merged.set(student.id, student)
+  }
+
+  const students = [...merged.values()].sort((a, b) => (a.full_name ?? a.email ?? '').localeCompare(b.full_name ?? b.email ?? '', 'es'))
+  const respondedIds = [...new Set((responses ?? []).map(row => row.registered_user_id).filter(Boolean))]
 
   return NextResponse.json({
     survey_id: id,
     course_id: survey.courseId,
     course_name: survey.courseName,
     student_ids: (rows ?? []).map(row => row.student_id),
+    responded_student_ids: respondedIds,
+    students,
   })
 }
 
