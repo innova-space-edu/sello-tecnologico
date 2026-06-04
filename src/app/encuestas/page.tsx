@@ -56,7 +56,7 @@ export default async function EncuestasPage() {
                 <div className="flex flex-wrap gap-3 text-xs text-gray-400 mt-4">
                   <span>📚 {survey.courses?.name ?? 'Sin curso'}</span>
                   <span>🗳️ {survey.survey_responses?.[0]?.count ?? 0} respuestas</span>
-                  <span>🔗 /encuesta/{survey.slug}</span>
+                  <span>🔗 /formularios/{survey.slug}</span>
                 </div>
               </Link>
             ))}
