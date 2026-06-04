@@ -1,5 +1,5 @@
 import Sidebar from '@/components/Sidebar'
-import CompartirEncuesta from '@/components/encuestas/CompartirEncuesta'
+import CompartirFormulario from '@/components/encuestas/CompartirFormulario'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
@@ -69,7 +69,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
             </div>
 
             <aside className="space-y-5">
-              <CompartirEncuesta slug={survey.slug} />
+              <CompartirFormulario slug={survey.slug} />
               <section className="bg-white rounded-xl shadow-sm p-5">
                 <h2 className="font-bold text-blue-900 mb-3">📌 Resumen</h2>
                 <dl className="space-y-2 text-sm">
