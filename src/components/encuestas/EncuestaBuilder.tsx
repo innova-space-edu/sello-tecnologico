@@ -110,7 +110,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); setError('')
     if (!form.title.trim() || !form.course_id) return setError('Completa el título y selecciona un curso.')
-    if (questions.length === 0 || questions.some(question => !question.prompt.trim())) return setError('Cada pregunta debe tener un enunciado.')
+    if (!locked && (questions.length === 0 || questions.some(question => !question.prompt.trim()))) return setError('Cada pregunta debe tener un enunciado.')
     setSaving(true)
     const response = await fetch(surveyId ? `/api/encuestas/${surveyId}` : '/api/encuestas', { method: surveyId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, questions, staff_ids: staffIds }) })
     const data = await response.json()
@@ -122,7 +122,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
 
   return <form onSubmit={save} className="space-y-5">
     {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">⚠️ {error}</div>}
-    {locked && <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">🔒 Esta encuesta ya tiene {responseCount} respuesta(s). Puedes revisar resultados, pero la pauta y los puntajes quedaron bloqueados para preservar las notas.</div>}
+    {locked && <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">🔒 Esta encuesta ya tiene {responseCount} respuesta(s). La pauta y los puntajes quedaron bloqueados para preservar las notas. Todavía puedes cerrar o reabrir la encuesta y cambiar los docentes autorizados.</div>}
 
     <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
       <h2 className="font-bold text-blue-900 mb-4">📋 Datos de la encuesta</h2>
@@ -130,11 +130,11 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
         <label className="text-sm font-medium text-gray-700 md:col-span-2">Título *<input disabled={locked} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100" /></label>
         <label className="text-sm font-medium text-gray-700 md:col-span-2">Descripción<textarea disabled={locked} rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100" /></label>
         <label className="text-sm font-medium text-gray-700">Curso asociado *<select disabled={locked} value={form.course_id} onChange={e => setForm({ ...form, course_id: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100"><option value="">Selecciona un curso</option>{courses.map(course => <option key={course.id} value={course.id}>{course.name}</option>)}</select></label>
-        <div className="space-y-2 pt-6"><label className="flex items-center gap-2 text-sm"><input disabled={locked} type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} /> Encuesta activa</label><label className="flex items-center gap-2 text-sm"><input disabled={locked} type="checkbox" checked={form.allow_anonymous} onChange={e => setForm({ ...form, allow_anonymous: e.target.checked })} /> Permitir respuestas anónimas</label></div>
+        <div className="space-y-2 pt-6"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} /> Encuesta activa</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.allow_anonymous} onChange={e => setForm({ ...form, allow_anonymous: e.target.checked })} /> Permitir respuestas anónimas</label></div>
       </div>
     </section>
 
-    <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6"><details className="group"><summary className="cursor-pointer list-none flex justify-between font-bold text-blue-900"><span>👨‍🏫 Docentes autorizados ({staffIds.length})</span><span>▼</span></summary><div className="mt-4 border rounded-lg divide-y max-h-60 overflow-y-auto">{teachers.map(teacher => <label key={teacher.id} className="flex gap-3 px-4 py-3 text-sm"><input disabled={locked} type="checkbox" checked={staffIds.includes(teacher.id)} onChange={e => setStaffIds(prev => e.target.checked ? [...new Set([...prev, teacher.id])] : prev.filter(id => id !== teacher.id))} />{teacher.full_name ?? teacher.email} · {teacher.role}</label>)}</div></details></section>
+    <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6"><details className="group"><summary className="cursor-pointer list-none flex justify-between font-bold text-blue-900"><span>👨‍🏫 Docentes autorizados ({staffIds.length})</span><span>▼</span></summary><div className="mt-4 border rounded-lg divide-y max-h-60 overflow-y-auto">{teachers.map(teacher => <label key={teacher.id} className="flex gap-3 px-4 py-3 text-sm"><input type="checkbox" checked={staffIds.includes(teacher.id)} onChange={e => setStaffIds(prev => e.target.checked ? [...new Set([...prev, teacher.id])] : prev.filter(id => id !== teacher.id))} />{teacher.full_name ?? teacher.email} · {teacher.role}</label>)}</div></details></section>
 
     <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
       <div className="flex flex-wrap justify-between gap-3 mb-4"><div><h2 className="font-bold text-blue-900">🧩 Ítems evaluados</h2><p className="text-xs text-gray-400 mt-1">Total de la encuesta: {totalPoints.toFixed(1)} puntos · exigencia: 60% para nota 4,0.</p></div><button disabled={locked} type="button" onClick={() => setQuestions(prev => [...prev, emptyQuestion()])} className="bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">+ Agregar ítem</button></div>
@@ -147,6 +147,6 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
         {question.question_type === 'text' && <p className="text-xs text-gray-500">La respuesta abierta recibe el puntaje máximo cuando contiene texto.</p>}
       </article>)}</div>
     </section>
-    <div className="flex justify-end gap-3 pb-5"><button type="button" onClick={() => router.back()} className="bg-gray-100 px-5 py-2.5 rounded-lg text-sm font-semibold">Cancelar</button>{!locked && <button disabled={saving} className="bg-blue-600 disabled:bg-blue-300 text-white px-6 py-2.5 rounded-lg text-sm font-semibold">{saving ? 'Guardando…' : surveyId ? 'Guardar cambios' : 'Crear encuesta'}</button>}</div>
+    <div className="flex justify-end gap-3 pb-5"><button type="button" onClick={() => router.back()} className="bg-gray-100 px-5 py-2.5 rounded-lg text-sm font-semibold">Cancelar</button><button disabled={saving} className="bg-blue-600 disabled:bg-blue-300 text-white px-6 py-2.5 rounded-lg text-sm font-semibold">{saving ? 'Guardando…' : locked ? 'Guardar configuración' : surveyId ? 'Guardar cambios' : 'Crear encuesta'}</button></div>
   </form>
 }
