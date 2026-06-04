@@ -21,6 +21,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
   if (!survey) redirect('/encuestas')
   const canEdit = actor.role === 'admin' || survey.creator_id === actor.id
   const questionMap = new Map((questions ?? []).map(question => [question.id, question]))
+  const courseName = survey.courses?.[0]?.name ?? 'Sin curso'
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -34,7 +35,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className={`text-xs rounded-full px-2.5 py-1 font-semibold ${survey.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{survey.is_active ? 'Activa' : 'Cerrada'}</span>
-                  <span className="text-xs text-gray-400">📚 {survey.courses?.name ?? 'Sin curso'}</span>
+                  <span className="text-xs text-gray-400">📚 {courseName}</span>
                 </div>
                 <h1 className="text-2xl font-bold text-blue-900">{survey.title}</h1>
                 {survey.description && <p className="text-gray-500 mt-2 whitespace-pre-wrap">{survey.description}</p>}
@@ -73,7 +74,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
               <section className="bg-white rounded-xl shadow-sm p-5">
                 <h2 className="font-bold text-blue-900 mb-3">📌 Resumen</h2>
                 <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Curso</dt><dd className="font-medium text-gray-700 text-right">{survey.courses?.name ?? '—'}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Curso</dt><dd className="font-medium text-gray-700 text-right">{courseName}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Ítems</dt><dd className="font-medium text-gray-700">{questions?.length ?? 0}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Respuestas</dt><dd className="font-medium text-gray-700">{responses?.length ?? 0}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Anónimas</dt><dd className="font-medium text-gray-700">{survey.allow_anonymous ? 'Permitidas' : 'No permitidas'}</dd></div>
