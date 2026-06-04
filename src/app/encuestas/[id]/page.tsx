@@ -14,14 +14,17 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
   const admin = createAdminSupabaseClient()
   const [{ data: survey }, { data: questions }, { data: responses }] = await Promise.all([
     admin.from('surveys').select('id, title, description, slug, is_active, allow_anonymous, creator_id, created_at, courses(name)').eq('id', id).single(),
-    admin.from('survey_questions').select('id, prompt, question_type, sort_order').eq('survey_id', id).order('sort_order'),
-    admin.from('survey_responses').select('id, respondent_name, respondent_email, registered_user_id, created_at, survey_answers(question_id, value_text, value_json, value_number)').eq('survey_id', id).order('created_at', { ascending: false }),
+    admin.from('survey_questions').select('id, prompt, question_type, sort_order, max_points').eq('survey_id', id).order('sort_order'),
+    admin.from('survey_responses').select('id, respondent_name, respondent_email, registered_user_id, created_at, earned_points, max_points, achievement_percent, grade, survey_answers(question_id, value_text, value_json, value_number, awarded_points)').eq('survey_id', id).order('created_at', { ascending: false }),
   ])
 
   if (!survey) redirect('/encuestas')
   const canEdit = actor.role === 'admin' || survey.creator_id === actor.id
   const questionMap = new Map((questions ?? []).map(question => [question.id, question]))
   const courseName = survey.courses?.[0]?.name ?? 'Sin curso'
+  const totalResponses = responses?.length ?? 0
+  const averageGrade = totalResponses > 0 ? (responses ?? []).reduce((total, response) => total + Number(response.grade ?? 1), 0) / totalResponses : 0
+  const averageAchievement = totalResponses > 0 ? (responses ?? []).reduce((total, response) => total + Number(response.achievement_percent ?? 0), 0) / totalResponses : 0
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -44,24 +47,35 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
             </div>
           </section>
 
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl shadow-sm p-5"><p className="text-sm text-gray-500">Respuestas</p><p className="text-2xl font-bold text-blue-900 mt-1">{totalResponses}</p></div>
+            <div className="bg-white rounded-xl shadow-sm p-5"><p className="text-sm text-gray-500">Promedio de logro</p><p className="text-2xl font-bold text-blue-900 mt-1">{averageAchievement.toFixed(1)}%</p></div>
+            <div className="bg-white rounded-xl shadow-sm p-5"><p className="text-sm text-gray-500">Promedio de notas</p><p className="text-2xl font-bold text-blue-900 mt-1">{totalResponses > 0 ? averageGrade.toFixed(1) : '—'}</p></div>
+          </div>
+
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
             <div className="xl:col-span-2 space-y-5">
               <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
                 <div className="flex flex-wrap justify-between gap-3 items-center mb-4">
-                  <div><h2 className="font-bold text-blue-900">🗳️ Respuestas recibidas</h2><p className="text-sm text-gray-500 mt-1">Solo visible para administración y docentes autorizados.</p></div>
-                  <span className="bg-blue-100 text-blue-700 rounded-full px-3 py-1 text-sm font-bold">{responses?.length ?? 0}</span>
+                  <div><h2 className="font-bold text-blue-900">🗳️ Respuestas evaluadas</h2><p className="text-sm text-gray-500 mt-1">Puntajes y notas visibles solo para administración y docentes autorizados.</p></div>
+                  <span className="bg-blue-100 text-blue-700 rounded-full px-3 py-1 text-sm font-bold">{totalResponses}</span>
                 </div>
                 {responses && responses.length > 0 ? <div className="space-y-3">{responses.map((response: any, index: number) => (
                   <details key={response.id} className="border border-gray-200 rounded-lg p-4 group">
-                    <summary className="cursor-pointer list-none flex flex-wrap justify-between gap-2 items-center">
+                    <summary className="cursor-pointer list-none flex flex-wrap justify-between gap-3 items-center">
                       <span className="font-semibold text-gray-700">Respuesta {responses.length - index} · {response.respondent_name || response.respondent_email || 'Anónima'}</span>
-                      <span className="text-xs text-gray-400">{new Date(response.created_at).toLocaleString('es-CL')}</span>
+                      <div className="flex flex-wrap gap-2 items-center text-xs">
+                        <span className="bg-gray-100 text-gray-700 rounded-full px-2.5 py-1">{Number(response.earned_points ?? 0).toFixed(1)}/{Number(response.max_points ?? 0).toFixed(1)} pts</span>
+                        <span className="bg-blue-100 text-blue-700 rounded-full px-2.5 py-1">{Number(response.achievement_percent ?? 0).toFixed(1)}%</span>
+                        <span className={`rounded-full px-2.5 py-1 font-bold ${Number(response.grade ?? 1) >= 4 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>Nota {Number(response.grade ?? 1).toFixed(1)}</span>
+                        <span className="text-gray-400">{new Date(response.created_at).toLocaleString('es-CL')}</span>
+                      </div>
                     </summary>
                     <div className="mt-4 space-y-3">
                       {(response.survey_answers ?? []).map((answer: any) => {
                         const question = questionMap.get(answer.question_id)
                         const value = answer.value_json ? answer.value_json.join(', ') : answer.value_number ?? answer.value_text ?? '—'
-                        return <div key={answer.question_id} className="bg-gray-50 rounded-lg p-3"><p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{question?.prompt ?? 'Pregunta'}</p><p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{String(value)}</p></div>
+                        return <div key={answer.question_id} className="bg-gray-50 rounded-lg p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{question?.prompt ?? 'Pregunta'}</p><span className="text-xs font-bold text-blue-700">{Number(answer.awarded_points ?? 0).toFixed(1)}/{Number(question?.max_points ?? 0).toFixed(1)} pts</span></div><p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{String(value)}</p></div>
                       })}
                     </div>
                   </details>
@@ -76,8 +90,9 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
                 <dl className="space-y-2 text-sm">
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Curso</dt><dd className="font-medium text-gray-700 text-right">{courseName}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Ítems</dt><dd className="font-medium text-gray-700">{questions?.length ?? 0}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Respuestas</dt><dd className="font-medium text-gray-700">{responses?.length ?? 0}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Anónimas</dt><dd className="font-medium text-gray-700">{survey.allow_anonymous ? 'Permitidas' : 'No permitidas'}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Respuestas</dt><dd className="font-medium text-gray-700">{totalResponses}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Exigencia</dt><dd className="font-medium text-gray-700">60% = 4,0</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Escala</dt><dd className="font-medium text-gray-700">1,0 a 7,0</dd></div>
                 </dl>
               </section>
             </aside>
