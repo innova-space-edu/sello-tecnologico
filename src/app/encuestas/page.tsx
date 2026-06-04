@@ -54,7 +54,7 @@ export default async function EncuestasPage() {
                   <span className={`text-xs rounded-full px-2.5 py-1 font-semibold ${survey.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{survey.is_active ? 'Activa' : 'Cerrada'}</span>
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-gray-400 mt-4">
-                  <span>📚 {survey.courses?.name ?? 'Sin curso'}</span>
+                  <span>📚 {survey.courses?.[0]?.name ?? 'Sin curso'}</span>
                   <span>🗳️ {survey.survey_responses?.[0]?.count ?? 0} respuestas</span>
                   <span>🔗 /formularios/{survey.slug}</span>
                 </div>
