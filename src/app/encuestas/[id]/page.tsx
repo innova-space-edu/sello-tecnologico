@@ -1,5 +1,6 @@
 import Sidebar from '@/components/Sidebar'
 import CompartirFormulario from '@/components/encuestas/CompartirFormulario'
+import FeedbackEncuesta from '@/components/encuestas/FeedbackEncuesta'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
@@ -43,7 +44,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
   const [{ data: survey }, { data: questions }, { data: responses }] = await Promise.all([
     admin.from('surveys').select('id, title, description, slug, is_active, allow_anonymous, creator_id, created_at, courses(name)').eq('id', id).single(),
     admin.from('survey_questions').select('id, prompt, question_type, sort_order, max_points, options, option_scores').eq('survey_id', id).order('sort_order'),
-    admin.from('survey_responses').select('id, respondent_name, respondent_email, registered_user_id, created_at, earned_points, max_points, achievement_percent, grade, survey_answers(question_id, value_text, value_json, value_number, awarded_points)').eq('survey_id', id).order('created_at', { ascending: false }),
+    admin.from('survey_responses').select('id, respondent_name, respondent_email, registered_user_id, created_at, earned_points, max_points, achievement_percent, grade, feedback, feedback_updated_at, survey_answers(question_id, value_text, value_json, value_number, awarded_points)').eq('survey_id', id).order('created_at', { ascending: false }),
   ])
 
   if (!survey) redirect('/encuestas')
@@ -102,7 +103,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
             <div className="xl:col-span-2 space-y-5">
               <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
                 <div className="flex flex-wrap justify-between gap-3 items-center mb-4">
-                  <div><h2 className="font-bold text-blue-900">🗳️ Respuestas evaluadas</h2><p className="text-sm text-gray-500 mt-1">Puntajes y notas visibles solo para administración y docentes autorizados.</p></div>
+                  <div><h2 className="font-bold text-blue-900">🗳️ Respuestas evaluadas</h2><p className="text-sm text-gray-500 mt-1">Puntajes, notas y retroalimentaciones visibles solo para administración y docentes autorizados.</p></div>
                   <span className="bg-blue-100 text-blue-700 rounded-full px-3 py-1 text-sm font-bold">{totalResponses}</span>
                 </div>
                 {normalizedResponses.length > 0 ? <div className="space-y-3">{normalizedResponses.map((response: any, index: number) => (
@@ -122,6 +123,7 @@ export default async function EncuestaDetallePage({ params }: { params: Promise<
                         const value = answer.value_json ? answer.value_json.join(', ') : answer.value_number ?? answer.value_text ?? '—'
                         return <div key={answer.question_id} className="bg-gray-50 rounded-lg p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{question?.prompt ?? 'Pregunta'}</p><span className="text-xs font-bold text-blue-700">{Number(answer.awarded_points ?? 0).toFixed(1)}/{Number(question?.max_points ?? 0).toFixed(1)} pts</span></div><p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{String(value)}</p></div>
                       })}
+                      <FeedbackEncuesta responseId={response.id} initialFeedback={response.feedback} />
                     </div>
                   </details>
                 ))}</div> : <div className="p-8 text-center text-gray-400">Todavía no hay respuestas.</div>}
