@@ -2,20 +2,20 @@
 
 ## Qué incorpora
 
-- Menú lateral **Encuestas** para cuentas con rol `docente` o `admin`.
+- Menú interno **Encuestas** para cuentas con rol `docente` o `admin`.
 - Creación y edición visual de encuestas por curso.
-- Curso predeterminado cuando el usuario ya tiene membresía o curso registrado.
-- Ítems editables: alternativa única, selección múltiple, respuesta abierta y evaluación apreciativa de 1 a 5.
-- Puntaje máximo configurable para cada pregunta.
-- Pauta de corrección para preguntas cerradas.
-- Cálculo automático de puntaje obtenido, porcentaje de logro y nota chilena de 1,0 a 7,0.
-- Exigencia del 60% para alcanzar nota 4,0.
-- Panel plegable para seleccionar docentes y administradores autorizados a revisar resultados.
 - Página pública compartible mediante enlace y código QR.
-- Respuestas anónimas opcionales.
-- Panel interno con respuestas detalladas, puntajes y notas, restringido a docentes autorizados y administración.
-- Bloqueo automático de la pauta cuando ya existen respuestas, para preservar la validez de las calificaciones.
-- Después de recibir respuestas todavía se puede cerrar o reabrir la encuesta y ajustar revisores autorizados.
+- Respuestas públicas para usuarios externos o anónimos.
+- Selección de estudiantes registrados por curso mediante `survey_students`.
+- Pantalla **Mis encuestas** para estudiantes asignados.
+- Pantalla **Mis avisos** con notificaciones personales y contador en tiempo real.
+- Puntaje independiente configurable para cada alternativa.
+- Cálculo automático de puntaje, porcentaje y nota chilena de 1,0 a 7,0.
+- Exigencia del 60% para alcanzar nota 4,0.
+- Panel interno con respuestas detalladas, tendencias por alternativa y retroalimentación docente.
+- Resultado estudiantil completo: puntaje total, porcentaje, nota, retroalimentación y desglose por pregunta.
+- Avisos automáticos al asignar encuestas o seguimientos y cuando se actualizan resultados o retroalimentaciones.
+- Bloqueo automático de la pauta cuando existen respuestas, para preservar la validez de las calificaciones.
 
 ## Cálculo de la nota
 
@@ -27,52 +27,61 @@ La nota se calcula por tramos:
 
 Entre esos puntos se usa interpolación lineal y la nota se redondea a un decimal.
 
-## Rutas
+## Puntaje por alternativa
+
+En preguntas de alternativa única, el puntaje máximo del ítem corresponde al mayor valor configurado. Ejemplo:
+
+- Logrado → 3 puntos
+- Medianamente logrado → 2 puntos
+- No logrado → 1 punto
+
+En preguntas de selección múltiple, el puntaje máximo corresponde a la suma de los valores positivos configurados.
+
+## Rutas principales
 
 - Panel interno: `/encuestas`
 - Nueva encuesta: `/encuestas/nuevo`
-- Detalle y resultados: `/encuestas/[id]`
+- Detalle y resultados docentes: `/encuestas/[id]`
+- Gestión de estudiantes: `/encuestas/estudiantes/[id]`
 - Edición: `/encuestas/[id]/editar`
 - Formulario público: `/formularios/[slug]`
+- Sesión estudiantil: `/mis-encuestas`
+- Detalle estudiantil: `/mis-encuestas/[id]`
+- Bandeja personal: `/mis-notificaciones`
 
 ## Activación obligatoria en Supabase
 
-Antes de probar el módulo en producción, ejecutar en **Supabase SQL Editor** estos archivos en el siguiente orden:
+Ejecutar en **Supabase SQL Editor** estos archivos en orden:
 
 1. `supabase/migrations/20260604_surveys.sql`
 2. `supabase/migrations/20260604_surveys_scoring.sql`
 3. `supabase/migrations/20260604_surveys_teacher_admin_only.sql`
+4. `supabase/migrations/20260604_surveys_students.sql`
+5. `supabase/migrations/20260604_surveys_option_scores.sql`
+6. `supabase/migrations/20260604_user_notifications.sql`
 
-La primera migración crea las tablas:
+Las migraciones crean las tablas del módulo, los puntajes por alternativa, las calificaciones automáticas, la asignación de estudiantes y la tabla `user_notifications` protegida con RLS.
 
-- `surveys`
-- `survey_questions`
-- `survey_course_staff`
-- `survey_responses`
-- `survey_answers`
+La última migración agrega triggers para:
 
-La segunda migración agrega:
+- Avisar cuando un estudiante es asignado a una encuesta.
+- Avisar cuando un estudiante es asignado a un seguimiento.
+- Avisar cuando cambia el estado, puntaje o retroalimentación de un seguimiento.
+- Avisar cuando se actualiza una calificación o retroalimentación de encuesta.
 
-- `max_points` y `correct_answers` en preguntas.
-- `awarded_points` en respuestas individuales.
-- `earned_points`, `max_points`, `achievement_percent` y `grade` en cada respuesta completa.
-- Triggers para calcular puntaje y nota automáticamente en la base de datos.
-- Resguardos para impedir que una persona envíe una nota manipulada desde el navegador.
+## Consideración sobre respuestas públicas
 
-La tercera migración restringe la lectura de resultados exclusivamente a cuentas con rol `docente` o `admin`. Un docente accede a encuestas creadas por él o donde haya sido autorizado; una cuenta administradora puede revisar todas.
-
-También se habilitan políticas RLS y permisos por columna para permitir responder públicamente sin exponer resultados ni pautas correctas.
+El enlace `/formularios/[slug]` permanece público. Una respuesta externa o anónima aparece en el panel docente, pero solamente se asocia automáticamente a la sesión privada de un estudiante cuando la persona responde con su cuenta iniciada y queda registrado `registered_user_id`.
 
 ## Prueba recomendada
 
-1. Ejecutar las tres migraciones SQL en orden.
-2. Desplegar la rama `feature/encuestas` en Vercel.
-3. Entrar como docente o administrador.
-4. Abrir **Encuestas** y crear una encuesta asociada a un curso.
-5. Agregar al menos un ítem de alternativa con respuesta correcta y uno apreciativo.
-6. Definir puntaje máximo para cada ítem.
-7. Copiar el enlace público o abrir el QR.
-8. Responder el formulario sin iniciar sesión.
-9. Confirmar que el panel interno muestre puntaje, porcentaje y nota.
-10. Entrar como estudiante y comprobar que no aparece el menú interno de Encuestas.
-11. Confirmar que coordinación y UTP tampoco pueden abrir el panel interno de resultados.
+1. Desplegar la rama `feature/encuestas` en Vercel.
+2. Entrar como docente o administrador.
+3. Crear una encuesta, seleccionar un curso y asignar estudiantes registrados.
+4. Iniciar sesión con una cuenta estudiantil seleccionada.
+5. Confirmar que aparecen **Mis avisos** y **Mis encuestas**.
+6. Abrir la encuesta pendiente y responderla con la cuenta iniciada.
+7. Confirmar que aparecen puntaje, porcentaje, nota y desglose por pregunta.
+8. Entrar nuevamente como docente, abrir la respuesta y guardar una retroalimentación.
+9. Volver a la cuenta estudiantil y confirmar que llega un aviso nuevo y aparece el comentario.
+10. Crear o actualizar un seguimiento para el mismo estudiante y comprobar que el aviso abre `/seguimientos/[id]`.
