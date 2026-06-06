@@ -1,4 +1,5 @@
 import Sidebar from '@/components/Sidebar'
+import FollowupRealtimeRefresh from '@/components/seguimientos/FollowupRealtimeRefresh'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 
@@ -10,6 +11,7 @@ type SessionSummary = {
   ticket: string
   subject: string
   score?: number | null
+  iteration_number?: number | null
   courses?: { name?: string | null } | null
   projects?: { title?: string | null } | null
   teacher?: { full_name?: string | null } | null
@@ -84,6 +86,7 @@ export default async function SeguimientosPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
+      <FollowupRealtimeRefresh mode="list" />
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
@@ -133,6 +136,7 @@ export default async function SeguimientosPage() {
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColor[session.overall_status] ?? 'bg-gray-100 text-gray-600'}`}>
                           {session.overall_status}
                         </span>
+                        <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-purple-100 text-purple-700">Seguimiento {session.iteration_number ?? 1}</span>
                         <span className="text-xs text-gray-400">🎫 {session.ticket}</span>
                       </div>
                       <h3 className="font-semibold text-gray-800 truncate">{session.projects?.title ?? 'Proyecto sin título'}</h3>
