@@ -64,11 +64,8 @@ export default async function FollowupThreadPanel({ sessionId, seriesId, subject
           {history.map((entry) => {
             const active = entry.id === sessionId
             return (
-              <Link
-                key={entry.id}
-                href={`/seguimientos/${entry.id}`}
-                className={`border rounded-xl p-4 transition-colors ${active ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}
-              >
+              <Link key={entry.id} href={`/seguimientos/${entry.id}`}
+                className={`border rounded-xl p-4 transition-colors ${active ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                 <div className="flex justify-between gap-3 items-start">
                   <div>
                     <p className={`text-sm font-bold ${active ? 'text-blue-800' : 'text-gray-700'}`}>
@@ -90,15 +87,11 @@ export default async function FollowupThreadPanel({ sessionId, seriesId, subject
             )
           })}
         </div>
-      ) : (
-        <p className="text-sm text-gray-400">No fue posible cargar el historial.</p>
-      )}
+      ) : <p className="text-sm text-gray-400">No fue posible cargar el historial.</p>}
 
       {!isLatest && latest && (
         <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
-          <p className="text-sm text-yellow-800">
-            Este seguimiento tiene una evaluación posterior. Para continuar el hilo debes abrir el seguimiento más reciente.
-          </p>
+          <p className="text-sm text-yellow-800">Este seguimiento tiene una evaluación posterior. Para continuar el hilo debes abrir el seguimiento más reciente.</p>
           <Link href={`/seguimientos/${latest.id}`} className="inline-block text-sm font-semibold text-yellow-900 hover:underline mt-2">
             Abrir seguimiento {latest.iteration_number ?? 'más reciente'} →
           </Link>
