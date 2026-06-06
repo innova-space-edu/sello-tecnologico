@@ -1,4 +1,6 @@
 import Sidebar from '@/components/Sidebar'
+import FollowupThreadPanel from '@/components/seguimientos/FollowupThreadPanel'
+import FollowupRealtimeRefresh from '@/components/seguimientos/FollowupRealtimeRefresh'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 
@@ -59,11 +61,13 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
     supabase.from('followup_photos').select('*').eq('followup_id', id).order('created_at'),
   ])
 
-  const canEdit = session.teacher_id === user?.id || ['admin', 'coordinador', 'utp'].includes(profile?.role ?? '')
+  const seriesId = session.series_id ?? session.id
+  const canEdit = session.teacher_id === user?.id || ['admin', 'administrador', 'coordinador', 'utp'].includes(profile?.role ?? '')
 
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
+      <FollowupRealtimeRefresh mode="detail" followupId={session.id} seriesId={seriesId} />
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mb-5">
           <Link href="/seguimientos" className="text-blue-600 text-sm hover:underline">← Volver a Seguimiento</Link>
@@ -92,6 +96,8 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
               </div>
             </div>
           </section>
+
+          <FollowupThreadPanel sessionId={session.id} seriesId={seriesId} subject={session.subject} canEdit={canEdit} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <div className="lg:col-span-2 space-y-5">
@@ -206,6 +212,7 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
               <section className="bg-white rounded-xl shadow-sm p-5">
                 <h2 className="font-bold text-blue-900 mb-3">📌 Resumen</h2>
                 <dl className="space-y-2.5 text-sm">
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Seguimiento</dt><dd className="font-medium text-gray-700">{session.iteration_number ?? 1}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Ticket</dt><dd className="font-medium text-gray-700 text-right">{session.ticket}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Estado</dt><dd className="font-medium text-gray-700 text-right">{session.overall_status}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Criterios</dt><dd className="font-medium text-gray-700">{items?.length ?? 0}</dd></div>
