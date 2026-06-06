@@ -4,6 +4,7 @@ import MiraChat from '@/components/MiraChat'
 import NotificationBanner from '@/components/NotificationBanner'
 import ProviChat from '@/components/ProviChat'
 import AccessTracker from '@/components/AccessTracker'
+import FollowupRealtimeMount from '@/components/seguimientos/FollowupRealtimeMount'
 
 export const metadata: Metadata = {
   title: 'Sello Tecnológico – Colegio Providencia',
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <NotificationBanner />
         <AccessTracker />
+        <FollowupRealtimeMount />
         {children}
         <ProviChat />
         <MiraChat />
@@ -23,4 +25,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
-
