@@ -1,10 +1,14 @@
 'use client'
 
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 export default function CompartirFormulario({ slug }: { slug: string }) {
+  const pathname = usePathname()
   const [url, setUrl] = useState('')
   const [copied, setCopied] = useState(false)
+  const surveyId = pathname.split('/').filter(Boolean)[1] ?? ''
 
   useEffect(() => {
     setUrl(`${window.location.origin}/formularios/${slug}`)
@@ -27,6 +31,11 @@ export default function CompartirFormulario({ slug }: { slug: string }) {
         <input readOnly value={url} className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50" />
         <button type="button" onClick={copy} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">{copied ? 'Copiado ✓' : 'Copiar link'}</button>
       </div>
+      {surveyId && (
+        <Link href={`/encuestas/estudiantes/${surveyId}`} className="mt-4 block text-center bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+          👥 Gestionar estudiantes del curso
+        </Link>
+      )}
       {url && (
         <div className="mt-4 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
