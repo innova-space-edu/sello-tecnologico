@@ -2,7 +2,7 @@
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 const roleColor: Record<string, string> = {
   'admin': 'bg-purple-100 text-purple-700',
@@ -15,17 +15,29 @@ const roleIcon: Record<string, string> = {
   'admin': '👑', 'coordinador': '🎯', 'docente': '👨‍🏫', 'estudiante': '🎓',
 }
 
+type UserProfile = {
+  id: string
+  full_name: string | null
+  email: string
+  rut: string | null
+  curso: string | null
+  role: string
+  blocked?: boolean
+  blocked_reason?: string | null
+  created_at: string
+}
+
 export default function UsuariosPage() {
-  const supabase = createClient()
-  const [usuarios, setUsuarios] = useState<any[]>([])
+  const supabase = useMemo(() => createClient(), [])
+  const [usuarios, setUsuarios] = useState<UserProfile[]>([])
   const [rolActual, setRolActual] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
-  const fetchUsuarios = async () => {
+  const fetchUsuarios = useCallback(async () => {
     const { data } = await supabase
       .from('profiles').select('*').order('created_at', { ascending: false })
     setUsuarios(data ?? [])
-  }
+  }, [supabase])
 
   useEffect(() => {
     const init = async () => {
@@ -37,9 +49,9 @@ export default function UsuariosPage() {
       fetchUsuarios()
     }
     init()
-  }, [])
+  }, [fetchUsuarios, supabase])
 
-  const toggleBloqueo = async (u: any) => {
+  const toggleBloqueo = async (u: UserProfile) => {
     const accion = u.blocked ? 'desbloquear' : 'bloquear'
     if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${u.full_name ?? u.email}?`)) return
 
@@ -213,26 +225,30 @@ export default function UsuariosPage() {
                       {new Date(u.created_at).toLocaleDateString('es-CL')}
                     </td>
 
-                    {/* Botón solo para admin y no sobre sí mismo */}
+                    {/* Acciones exclusivas del administrador */}
                     {esAdmin && (
                       <td className="px-6 py-4">
-                        {u.role !== 'admin' ? (
-                          <button
-                            onClick={() => toggleBloqueo(u)}
-                            disabled={loadingId === u.id}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap ${
-                              u.blocked
-                                ? 'bg-green-500 hover:bg-green-600 text-white'
-                                : 'bg-red-500 hover:bg-red-600 text-white'
-                            }`}>
-                            {loadingId === u.id
-                              ? '...'
-                              : u.blocked ? '🔓 Desbloquear' : '🔒 Bloquear'
-                            }
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-300">—</span>
-                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Link href={`/usuarios/${u.id}`}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap bg-blue-100 hover:bg-blue-200 text-blue-700">
+                            ✏️ Editar
+                          </Link>
+                          {u.role !== 'admin' && (
+                            <button
+                              onClick={() => toggleBloqueo(u)}
+                              disabled={loadingId === u.id}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap ${
+                                u.blocked
+                                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                                  : 'bg-red-500 hover:bg-red-600 text-white'
+                              }`}>
+                              {loadingId === u.id
+                                ? '...'
+                                : u.blocked ? '🔓 Desbloquear' : '🔒 Bloquear'
+                              }
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -243,7 +259,7 @@ export default function UsuariosPage() {
             <div className="p-12 text-center text-gray-400">
               <div className="text-4xl mb-3">{busqueda ? '🔍' : '👥'}</div>
               {busqueda ? (
-                <p>No se encontraron usuarios para "{busqueda}"</p>
+                <p>No se encontraron usuarios para &quot;{busqueda}&quot;</p>
               ) : (
                 <p>No hay usuarios registrados aún</p>
               )}
