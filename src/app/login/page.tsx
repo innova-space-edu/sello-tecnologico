@@ -22,24 +22,6 @@ const CURSOS = [
 type Mode = 'login' | 'register'
 type Role = 'admin' | 'coordinador' | 'docente' | 'estudiante'
 
-// Normaliza el texto del curso a un nombre canónico: "1° Medio A", "4° Medio B", etc.
-function parseCurso(raw: string): string {
-  const s = raw.trim().toLowerCase().replace(/\s+/g, '')
-  // Detectar patrones como: 1ma, 1mA, 1°mA, primeromedioA, 4MB, etc.
-  const match = s.match(/^(\d+|primero|segundo|tercero|cuarto)(°|º|ero|do|ro)?[mb°º]?([abcde])?$/)
-  if (!match) return raw.trim()
-
-  const numMap: Record<string, string> = {
-    '1': '1°', 'primero': '1°',
-    '2': '2°', 'segundo': '2°',
-    '3': '3°', 'tercero': '3°',
-    '4': '4°', 'cuarto': '4°',
-  }
-  const num = numMap[match[1]] ?? `${match[1]}°`
-  const letra = (match[3] ?? 'A').toUpperCase()
-  return `${num} Medio ${letra}`
-}
-
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -47,6 +29,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   const [form, setForm] = useState({
     email: '', password: '', full_name: '', rut: '', curso: '',
@@ -60,7 +43,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setNotice('')
     const { error: loginError } = await supabase.auth.signInWithPassword({
       email: form.email.trim().toLowerCase(), password: form.password,
     })
@@ -76,7 +59,7 @@ export default function LoginPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setNotice('')
 
     const email = form.email.trim().toLowerCase()
     const role = detectRole(email)
@@ -94,7 +77,18 @@ export default function LoginPage() {
       setError('Los estudiantes deben indicar su curso (ej: 2° Medio A)'); setLoading(false); return
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password: form.password })
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password: form.password,
+      options: {
+        data: {
+          full_name: form.full_name.trim(),
+          rut,
+          curso: cursoNormalizado,
+          role,
+        },
+      },
+    })
     if (signUpError) {
       const msg = String(signUpError.message || '')
       setError(msg.includes('User already registered') ? 'Este correo ya está registrado' : 'Error al registrar. Intenta de nuevo.')
@@ -104,37 +98,18 @@ export default function LoginPage() {
       setError('No se pudo crear el usuario. Intenta nuevamente.'); setLoading(false); return
     }
 
-    // Guardar perfil
-    const { error: profileError } = await supabase.from('profiles').upsert({
-      id: data.user.id, email, full_name: form.full_name.trim(), rut,
-      curso: cursoNormalizado, role,
+    // Completar el perfil desde el servidor. Esto funciona incluso cuando
+    // Supabase todavía no entrega una sesión por confirmación de correo.
+    const profileResponse = await fetch('/api/register-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: data.user.id }),
     })
-    if (profileError) {
-      setError('La cuenta se creó, pero no se pudo guardar el perfil.'); setLoading(false); return
-    }
+    const profileResult = await profileResponse.json().catch(() => ({}))
 
-    // Auto-asignar al curso si es estudiante
-    if (role === 'estudiante' && cursoNormalizado) {
-      // Buscar si existe el curso por nombre normalizado
-      const { data: cursoExistente } = await supabase
-        .from('courses').select('id').eq('name', cursoNormalizado).single()
-
-      let courseId = cursoExistente?.id
-
-      // Si no existe, crearlo automáticamente
-      if (!courseId) {
-        const { data: nuevoCurso } = await supabase
-          .from('courses').insert({ name: cursoNormalizado, year: new Date().getFullYear(), area: 'Tecnología' })
-          .select('id').single()
-        courseId = nuevoCurso?.id
-      }
-
-      // Agregar al estudiante como miembro del curso
-      if (courseId) {
-        await supabase.from('course_members').upsert({
-          course_id: courseId, user_id: data.user.id,
-        }, { onConflict: 'course_id,user_id' })
-      }
+    if (!profileResponse.ok) {
+      setError(profileResult.error ?? 'La cuenta se creó, pero no se pudo completar el perfil. Solicita ayuda al administrador.')
+      setLoading(false); return
     }
 
     await fetch('/api/access-log', {
@@ -143,7 +118,13 @@ export default function LoginPage() {
       body: JSON.stringify({ event_type: 'register', pathname: '/login', metadata: { email, role, curso: cursoNormalizado } }),
     }).catch(() => {})
 
-    router.push('/dashboard')
+    if (data.session) {
+      router.push('/dashboard')
+    } else {
+      setMode('login')
+      setForm({ email, password: '', full_name: '', rut: '', curso: '' })
+      setNotice('✅ Cuenta creada correctamente. Revisa tu correo si debes confirmar el acceso y luego inicia sesión.')
+    }
     setLoading(false)
   }
 
@@ -166,7 +147,7 @@ export default function LoginPage() {
 
         <div className="flex mx-8 mb-6 bg-gray-100 rounded-xl p-1">
           {(['login', 'register'] as Mode[]).map(m => (
-            <button key={m} onClick={() => { setMode(m); setError('') }}
+            <button key={m} onClick={() => { setMode(m); setError(''); setNotice('') }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${mode === m ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500'}`}>
               {m === 'login' ? 'Ingresar' : 'Registrarse'}
             </button>
@@ -176,6 +157,9 @@ export default function LoginPage() {
         <div className="px-8 pb-8">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-4">{error}</div>
+          )}
+          {notice && (
+            <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 mb-4">{notice}</div>
           )}
 
           {mode === 'login' ? (
