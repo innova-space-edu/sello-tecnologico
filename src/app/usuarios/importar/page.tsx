@@ -1,14 +1,14 @@
 'use client'
 import Sidebar from '@/components/Sidebar'
-import { createClient } from '@/lib/supabase'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+type ImportRow = { full_name: string; rut: string; email: string; curso: string }
+
 export default function ImportarUsuariosPage() {
-  const supabase = createClient()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [preview, setPreview] = useState<any[]>([])
+  const [preview, setPreview] = useState<ImportRow[]>([])
   const [resultado, setResultado] = useState<{ok: number, errores: string[]}>()
   const [error, setError] = useState('')
 
@@ -52,54 +52,27 @@ export default function ImportarUsuariosPage() {
   const handleImport = async () => {
     if (!preview.length) return
     setLoading(true)
-    
-    const ok: number[] = []
-    const errores: string[] = []
+    setError('')
 
-    for (const alumno of preview) {
-      const role = alumno.email.endsWith('@colprovidencia.cl') ? 'docente' : 'estudiante'
-      
-      const { data: authData, error: authError } = await supabase.auth.admin?.createUser?.({
-        email: alumno.email,
-        password: alumno.rut.replace(/\./g, '').replace('-', ''),
-        email_confirm: true,
-      }) ?? {}
+    try {
+      const response = await fetch('/api/admin/import-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users: preview }),
+      })
+      const data = await response.json().catch(() => ({}))
 
-      if (authError || !authData?.user) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          email: alumno.email,
-          full_name: alumno.full_name,
-          rut: alumno.rut,
-          curso: alumno.curso,
-          role,
-        }, { onConflict: 'email' })
-
-        if (profileError) {
-          errores.push(`${alumno.email}: ${profileError.message}`)
-        } else {
-          ok.push(1)
-        }
-      } else {
-        await supabase.from('profiles').upsert({
-          id: authData.user.id,
-          email: alumno.email,
-          full_name: alumno.full_name,
-          rut: alumno.rut,
-          curso: alumno.curso,
-          role,
-        })
-        ok.push(1)
+      if (!response.ok) {
+        setError(data.error ?? 'No se pudo importar el archivo')
+        return
       }
+
+      setResultado({ ok: data.ok ?? 0, errores: data.errores ?? [] })
+    } catch {
+      setError('No se pudo conectar con el servidor para importar los usuarios')
+    } finally {
+      setLoading(false)
     }
-
-    await supabase.from('audit_log').insert({
-      action: 'importar',
-      entity: 'usuario',
-      entity_name: `${ok.length} usuarios importados`,
-    })
-
-    setResultado({ ok: ok.length, errores })
-    setLoading(false)
   }
 
   return (
