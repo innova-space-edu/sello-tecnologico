@@ -1,13 +1,39 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
-import CambiarRolForm from './CambiarRolForm'
 import CambiarPasswordAdmin from './CambiarPasswordAdmin'
+import EditarPerfilAdmin from './EditarPerfilAdmin'
 import EliminarUsuarioAdmin from './EliminarUsuarioAdmin'
 import Link from 'next/link'
+
+function AccesoRestringido() {
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      <Sidebar />
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+          <div className="text-4xl mb-3">🚫</div>
+          <h2 className="text-lg font-semibold text-red-700">Acceso restringido</h2>
+          <p className="text-red-500 mt-2">Solo los administradores pueden gestionar los datos de usuarios.</p>
+        </div>
+      </main>
+    </div>
+  )
+}
 
 export default async function UsuarioDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createServerSupabaseClient()
+
+  const { data: { user: currentUser } } = await supabase.auth.getUser()
+  if (!currentUser) return <AccesoRestringido />
+
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', currentUser.id)
+    .single()
+
+  if (currentProfile?.role !== 'admin') return <AccesoRestringido />
 
   const { data: usuario } = await supabase
     .from('profiles')
@@ -39,7 +65,7 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8">
+      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
         <div className="mb-6">
           <Link href="/usuarios" className="text-blue-600 text-sm hover:underline">← Volver a Usuarios</Link>
         </div>
@@ -51,7 +77,7 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
                 <div className="text-5xl mb-3">
                   {usuario.role === 'docente' ? '👨‍🏫' : usuario.role === 'admin' ? '👑' : '🎓'}
                 </div>
-                <h2 className="text-lg font-bold text-blue-900">{usuario.full_name ?? '—'}</h2>
+                <h2 className="text-lg font-bold text-blue-900">{usuario.full_name ?? 'Perfil incompleto'}</h2>
                 <p className="text-gray-500 text-sm">{usuario.email}</p>
               </div>
               <div className="space-y-2 text-sm border-t border-gray-100 pt-4">
@@ -78,9 +104,10 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="font-semibold text-blue-900 mb-4">Cambiar rol</h3>
-              <CambiarRolForm userId={usuario.id} currentRole={usuario.role} />
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-blue-100">
+              <h3 className="font-semibold text-blue-900 mb-1">Editar datos del usuario</h3>
+              <p className="text-xs text-gray-400 mb-4">Permite reparar perfiles incompletos y mantener sincronizado el correo de acceso.</p>
+              <EditarPerfilAdmin usuario={usuario} />
             </div>
 
             <div className="bg-white rounded-xl shadow-sm p-6">
@@ -96,32 +123,34 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
             </div>
           </div>
 
-          <div className="col-span-2 space-y-5">
+          <div className="lg:col-span-2 space-y-5">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-100">
                 <h3 className="font-semibold text-blue-900">Proyectos creados ({proyectos?.length ?? 0})</h3>
               </div>
               {proyectos && proyectos.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-6 py-3 text-gray-500 font-medium">Título</th>
-                      <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
-                      <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {proyectos.map((p: any, i: number) => (
-                      <tr key={i} className="hover:bg-blue-50">
-                        <td className="px-6 py-3 text-gray-800">{p.title}</td>
-                        <td className="px-6 py-3">
-                          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">{p.status}</span>
-                        </td>
-                        <td className="px-6 py-3 text-gray-400 text-xs">{new Date(p.created_at).toLocaleDateString('es-CL')}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-6 py-3 text-gray-500 font-medium">Título</th>
+                        <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
+                        <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {proyectos.map((p, i: number) => (
+                        <tr key={i} className="hover:bg-blue-50">
+                          <td className="px-6 py-3 text-gray-800">{p.title}</td>
+                          <td className="px-6 py-3">
+                            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">{p.status}</span>
+                          </td>
+                          <td className="px-6 py-3 text-gray-400 text-xs">{new Date(p.created_at).toLocaleDateString('es-CL')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <div className="p-8 text-center text-gray-400 text-sm">Sin proyectos aún</div>
               )}
@@ -132,24 +161,26 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
                 <h3 className="font-semibold text-blue-900">Evidencias subidas ({evidencias?.length ?? 0})</h3>
               </div>
               {evidencias && evidencias.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-6 py-3 text-gray-500 font-medium">Título</th>
-                      <th className="text-left px-6 py-3 text-gray-500 font-medium">Tipo</th>
-                      <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {evidencias.map((e: any, i: number) => (
-                      <tr key={i} className="hover:bg-blue-50">
-                        <td className="px-6 py-3 text-gray-800">{e.title}</td>
-                        <td className="px-6 py-3 text-gray-500">{e.type}</td>
-                        <td className="px-6 py-3 text-gray-400 text-xs">{new Date(e.created_at).toLocaleDateString('es-CL')}</td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-6 py-3 text-gray-500 font-medium">Título</th>
+                        <th className="text-left px-6 py-3 text-gray-500 font-medium">Tipo</th>
+                        <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {evidencias.map((e, i: number) => (
+                        <tr key={i} className="hover:bg-blue-50">
+                          <td className="px-6 py-3 text-gray-800">{e.title}</td>
+                          <td className="px-6 py-3 text-gray-500">{e.type}</td>
+                          <td className="px-6 py-3 text-gray-400 text-xs">{new Date(e.created_at).toLocaleDateString('es-CL')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <div className="p-8 text-center text-gray-400 text-sm">Sin evidencias aún</div>
               )}
