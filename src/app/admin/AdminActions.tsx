@@ -1,5 +1,6 @@
 'use client'
 import { createClient } from '@/lib/supabase'
+import Link from 'next/link'
 import { useState } from 'react'
 
 export default function AdminActions({ userId, userEmail }: { userId: string, userEmail: string }) {
@@ -20,6 +21,10 @@ export default function AdminActions({ userId, userEmail }: { userId: string, us
 
   return (
     <div className="flex items-center gap-1">
+      <Link href={`/usuarios/${userId}`} title="Editar usuario"
+        className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-2 py-1 rounded-lg transition-colors">
+        ✏️
+      </Link>
       <button
         onClick={handleResetPassword}
         disabled={loading}
