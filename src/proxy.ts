@@ -1,11 +1,11 @@
-import { createServerClient } from '@supabase/ssr'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
 
-  const publicPaths = ['/login', '/registro', '/bloqueado', '/formularios']
+  const publicPaths = ['/login', '/registro', '/bloqueado', '/formularios', '/auth/callback', '/api/register-profile']
   if (publicPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
     return response
   }
@@ -16,10 +16,10 @@ export async function proxy(request: NextRequest) {
     {
       cookies: {
         get(name: string) { return request.cookies.get(name)?.value },
-        set(name: string, value: string, options: any) {
+        set(name: string, value: string, options: CookieOptions) {
           response.cookies.set({ name, value, ...options })
         },
-        remove(name: string, options: any) {
+        remove(name: string, options: CookieOptions) {
           response.cookies.set({ name, value: '', ...options })
         },
       },
@@ -48,6 +48,7 @@ export async function proxy(request: NextRequest) {
     '/notificaciones',
     '/admin',
     '/historial',
+    '/usuarios',
   ]
 
   if (perfil?.role === 'estudiante') {
@@ -62,7 +63,7 @@ export async function proxy(request: NextRequest) {
     '/admin',
     '/historial',
     '/notificaciones',
-    '/usuarios/importar',
+    '/usuarios',
   ]
   if (rolesDocente.includes(perfil?.role ?? '')) {
     const restringida = rutasDocenteRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
