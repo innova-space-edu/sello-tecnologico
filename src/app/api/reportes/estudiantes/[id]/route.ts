@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
+import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getSurveyActor } from '@/lib/survey-auth'
-import { buildStudentReport } from '@/lib/student-report'
 
 type Params = {
   params: Promise<{ id: string }>
@@ -13,11 +13,24 @@ export async function GET(_request: Request, { params }: Params) {
   }
 
   if (!['admin', 'docente', 'coordinador', 'utp'].includes(actor.role)) {
-    return NextResponse.json({ error: 'No tienes permiso para descargar este reporte.' }, { status: 403 })
+    return NextResponse.json({ error: 'No tienes permiso para ver este reporte.' }, { status: 403 })
   }
 
   const { id } = await params
-  const report = await buildStudentReport(id)
+  const admin = createAdminSupabaseClient()
+  const { data: profile, error } = await admin
+    .from('profiles')
+    .select('id, full_name, email, curso, role')
+    .eq('id', id)
+    .single()
 
-  return NextResponse.json(report)
+  if (error || !profile) {
+    return NextResponse.json({ error: 'Estudiante no encontrado.' }, { status: 404 })
+  }
+
+  return NextResponse.json({
+    profile,
+    status: 'basic_report_ready',
+    note: 'Reporte básico activo. El reporte integral se reactivará después de validar relaciones de tablas.',
+  })
 }
