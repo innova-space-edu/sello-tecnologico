@@ -37,18 +37,17 @@ export default async function ReporteEstudiantePage({ params }: Params) {
               {profile?.email ?? 'Sin correo'} · {profile?.curso ?? 'Sin curso'} · {profile?.role ?? 'Sin rol'}
             </p>
             <p className="text-sm text-slate-500 mt-4">
-              Esta vista queda lista para conectar proyectos, evidencias, seguimientos, encuestas, portafolio, mensajes y alertas en una ficha integral.
+              Vista base del informe integral. La exportación completa se activará después de validar todas las relaciones de tablas.
             </p>
           </section>
 
           <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <a
-              href={`/api/reportes/estudiante/${id}`}
-              target="_blank"
+            <Link
+              href="/reportes"
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-4 text-sm font-semibold text-center"
             >
-              Descargar datos JSON del estudiante
-            </a>
+              Volver al reporte general
+            </Link>
             <Link
               href="/admin/moderacion"
               className="bg-white hover:bg-blue-50 border border-blue-100 text-blue-700 rounded-xl px-5 py-4 text-sm font-semibold text-center"
