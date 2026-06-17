@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getSurveyActor } from '@/lib/survey-auth'
-import { analyzeMessageContent, moderationEngineVersion } from '@/lib/moderation-engine'
+import { analyzeMessageContent } from '@/lib/moderation-engine'
 
 type SendMessageBody = {
   receiver_id?: unknown
@@ -16,23 +16,16 @@ async function insertFlag(params: {
   senderId: string
   receiverId: string
   content: string
-  messageId?: string | null
   moderation: ReturnType<typeof analyzeMessageContent>
 }) {
   const admin = createAdminSupabaseClient()
 
   await admin.from('flagged_messages').insert({
-    message_id: params.messageId ?? null,
     sender_id: params.senderId,
     receiver_id: params.receiverId,
     content: params.content,
     category: params.moderation.category,
     matched_words: params.moderation.matchedWords,
-    severity: params.moderation.severity,
-    confidence: params.moderation.confidence,
-    action: params.moderation.action,
-    engine_version: moderationEngineVersion(),
-    moderation_payload: params.moderation,
     reviewed: false,
   })
 }
@@ -99,20 +92,11 @@ export async function POST(request: Request) {
   const moderation = analyzeMessageContent(content)
 
   if (moderation.action === 'block_user') {
-    await insertFlag({
-      senderId: actor.id,
-      receiverId,
-      content,
-      moderation,
-    })
+    await insertFlag({ senderId: actor.id, receiverId, content, moderation })
 
     await admin
       .from('profiles')
-      .update({
-        blocked: true,
-        blocked_reason: `Moderación automática: ${moderation.category}`,
-        blocked_at: new Date().toISOString(),
-      })
+      .update({ blocked: true })
       .eq('id', actor.id)
 
     await admin.from('blocked_pairs').upsert({
@@ -124,23 +108,16 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       status: 'blocked',
-      warning: moderation.warning,
-      moderation,
+      warning: moderation.warning ?? 'Mensaje bloqueado por seguridad escolar.',
     }, { status: 403 })
   }
 
   if (moderation.action === 'hold_for_review') {
-    await insertFlag({
-      senderId: actor.id,
-      receiverId,
-      content,
-      moderation,
-    })
+    await insertFlag({ senderId: actor.id, receiverId, content, moderation })
 
     return NextResponse.json({
       status: 'held_for_review',
-      warning: moderation.warning,
-      moderation,
+      warning: moderation.warning ?? 'Mensaje retenido para revisión.',
     }, { status: 202 })
   }
 
@@ -159,19 +136,12 @@ export async function POST(request: Request) {
   }
 
   if (moderation.action === 'flag_and_send') {
-    await insertFlag({
-      senderId: actor.id,
-      receiverId,
-      content,
-      messageId: message.id,
-      moderation,
-    })
+    await insertFlag({ senderId: actor.id, receiverId, content, moderation })
   }
 
   return NextResponse.json({
     status: moderation.action === 'flag_and_send' ? 'sent_flagged' : 'sent',
     id: message.id,
     warning: moderation.warning,
-    moderation,
   }, { status: 201 })
 }
