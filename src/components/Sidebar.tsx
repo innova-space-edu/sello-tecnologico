@@ -24,6 +24,7 @@ const menu = [
   { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
   { href: '/calendario', label: 'Calendario', icon: '📅' },
   { href: '/mensajes', label: 'Mensajes', icon: '💬' },
+  { href: '/mensajes/broadcast', label: 'Mensaje grupal', icon: '📢' },
   { href: '/portafolio', label: 'Portafolio', icon: '📋' },
   { href: '/reportes', label: 'Reportes', icon: '📈' },
   { href: '/historial', label: 'Historial', icon: '🕐' },
@@ -116,6 +117,15 @@ export default function Sidebar() {
           onClick={() => setOpen(false)} />
       )}
 
+      {pathname === '/mensajes' && ['admin', 'docente'].includes(rol) && (
+        <Link
+          href="/mensajes/broadcast"
+          className="hidden sm:inline-flex fixed top-4 right-4 z-50 items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow-lg"
+        >
+          📢 Enviar mensaje grupal
+        </Link>
+      )}
+
       <aside className={`
         fixed left-0 top-0 h-full bg-blue-900 text-white flex flex-col z-40 transition-transform duration-300
         w-64
@@ -143,6 +153,7 @@ export default function Sidebar() {
             if (item.href === '/reportes' && esEstudianteRol) return null
             if (item.href === '/encuestas' && !['admin', 'docente'].includes(rol)) return null
             if (item.href === '/autoevaluacion/respuestas' && !['admin', 'docente'].includes(rol)) return null
+            if (item.href === '/mensajes/broadcast' && !['admin', 'docente'].includes(rol)) return null
 
             const active = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href))
