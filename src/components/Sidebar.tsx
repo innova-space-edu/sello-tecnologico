@@ -15,6 +15,8 @@ const menu = [
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/seguimientos', label: 'Seguimiento', icon: '🧭' },
+  { href: '/autoevaluacion', label: 'Autoevaluación', icon: '🌱' },
+  { href: '/autoevaluacion/respuestas', label: 'Respuestas autoevaluación', icon: '📝' },
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/admin/plantillas', label: 'Plantillas', icon: '🧩' },
   { href: '/documentos', label: 'Documentos', icon: '📄' },
@@ -140,6 +142,7 @@ export default function Sidebar() {
             if (item.href === '/usuarios' && esEstudianteRol) return null
             if (item.href === '/reportes' && esEstudianteRol) return null
             if (item.href === '/encuestas' && !['admin', 'docente'].includes(rol)) return null
+            if (item.href === '/autoevaluacion/respuestas' && !['admin', 'docente'].includes(rol)) return null
 
             const active = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href))
