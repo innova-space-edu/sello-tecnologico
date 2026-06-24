@@ -36,7 +36,7 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
       *,
       courses(name),
       projects(title),
-      teacher:profiles!project_followups_teacher_id_fkey(full_name, email)
+      teacher:profiles!project_followups_teacher_id_fkey(full_name, email, role)
     `)
     .eq('id', id)
     .single()
@@ -62,7 +62,10 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
   ])
 
   const seriesId = session.series_id ?? session.id
-  const canEdit = session.teacher_id === user?.id || ['admin', 'administrador', 'coordinador', 'utp'].includes(profile?.role ?? '')
+  const staffRoles = ['admin', 'administrador', 'docente', 'coordinador', 'utp']
+  const isStaff = staffRoles.includes(profile?.role ?? '')
+  const isStudentCreated = session.teacher?.role === 'estudiante'
+  const canEdit = isStaff || (session.teacher_id === user?.id && !isStudentCreated)
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -80,6 +83,9 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
                 <div className="flex flex-wrap gap-2 items-center mb-2">
                   <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColor[session.overall_status] ?? 'bg-gray-100 text-gray-700'}`}>
                     {session.overall_status}
+                  </span>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${isStudentCreated ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                    {isStudentCreated ? 'Creado por estudiante' : 'Seguimiento docente'}
                   </span>
                   <span className="text-xs text-gray-400">🎫 {session.ticket}</span>
                 </div>
@@ -109,19 +115,19 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
                     <p className="text-gray-700 mt-1">{new Date(`${session.followup_date}T12:00:00`).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">Docente responsable</p>
+                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">{isStudentCreated ? 'Enviado por estudiante' : 'Docente responsable'}</p>
                     <p className="text-gray-700 mt-1">{session.teacher?.full_name ?? session.teacher?.email ?? '—'}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold mb-1">Observaciones</p>
+                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold mb-1">{isStudentCreated ? 'Avance reportado por el equipo' : 'Observaciones'}</p>
                     <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap">
                       {session.observations || 'Sin observaciones registradas.'}
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold mb-1">Retroalimentación</p>
+                    <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold mb-1">Retroalimentación docente</p>
                     <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-900 whitespace-pre-wrap">
                       {session.feedback || 'Todavía no se ha registrado retroalimentación.'}
                     </div>
@@ -212,6 +218,7 @@ export default async function SeguimientoDetallePage({ params }: { params: Promi
               <section className="bg-white rounded-xl shadow-sm p-5">
                 <h2 className="font-bold text-blue-900 mb-3">📌 Resumen</h2>
                 <dl className="space-y-2.5 text-sm">
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Modalidad</dt><dd className="font-medium text-gray-700 text-right">{isStudentCreated ? 'Estudiante' : 'Docente'}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Seguimiento</dt><dd className="font-medium text-gray-700">{session.iteration_number ?? 1}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Ticket</dt><dd className="font-medium text-gray-700 text-right">{session.ticket}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Estado</dt><dd className="font-medium text-gray-700 text-right">{session.overall_status}</dd></div>
