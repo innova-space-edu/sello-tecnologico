@@ -14,7 +14,7 @@ type SessionSummary = {
   iteration_number?: number | null
   courses?: { name?: string | null } | null
   projects?: { title?: string | null } | null
-  teacher?: { full_name?: string | null } | null
+  teacher?: { full_name?: string | null; role?: string | null } | null
   followup_participants?: { id: string }[] | null
   followup_items?: { id: string }[] | null
   followup_photos?: { id: string }[] | null
@@ -29,6 +29,16 @@ const statusColor: Record<string, string> = {
   'Requiere apoyo': 'bg-orange-100 text-orange-700',
 }
 
+function modeLabel(session: SessionSummary) {
+  return session.teacher?.role === 'estudiante' ? 'Creado por estudiante' : 'Seguimiento docente'
+}
+
+function modeClass(session: SessionSummary) {
+  return session.teacher?.role === 'estudiante'
+    ? 'bg-sky-100 text-sky-700'
+    : 'bg-indigo-100 text-indigo-700'
+}
+
 export default async function SeguimientosPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -39,16 +49,18 @@ export default async function SeguimientosPage() {
     .single()
 
   const role = profile?.role ?? ''
-  const canCreate = ['docente', 'admin', 'coordinador', 'utp'].includes(role)
+  const canCreateTeacher = ['docente', 'admin', 'coordinador', 'utp'].includes(role)
+  const canCreateStudent = role === 'estudiante'
 
   let sessions: SessionSummary[] = []
-  if (canCreate) {
+  if (canCreateTeacher) {
     const { data } = await supabase
       .from('project_followups')
       .select(`
         *,
         courses(name),
         projects(title),
+        teacher:profiles!project_followups_teacher_id_fkey(full_name, role),
         followup_participants(id, user_id, profiles(full_name, email, curso)),
         followup_items(id),
         followup_photos(id)
@@ -65,7 +77,7 @@ export default async function SeguimientosPage() {
           *,
           courses(name),
           projects(title),
-          teacher:profiles!project_followups_teacher_id_fkey(full_name),
+          teacher:profiles!project_followups_teacher_id_fkey(full_name, role),
           followup_participants(id, user_id, profiles(full_name, email, curso)),
           followup_items(id),
           followup_photos(id)
@@ -82,6 +94,7 @@ export default async function SeguimientosPage() {
   const totalSessions = sessions.length
   const pending = sessions.filter(session => session.overall_status === 'Pendiente' || session.overall_status === 'En proceso').length
   const withPhotos = sessions.filter(session => (session.followup_photos?.length ?? 0) > 0).length
+  const studentCreated = sessions.filter(session => session.teacher?.role === 'estudiante').length
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -92,24 +105,39 @@ export default async function SeguimientosPage() {
           <div>
             <h1 className="text-2xl font-bold text-blue-900">Seguimiento de proyectos</h1>
             <p className="text-gray-500 mt-1">
-              {canCreate
-                ? 'Registra sesiones, evalúa avances y entrega retroalimentación a tus estudiantes.'
-                : 'Revisa las evaluaciones y retroalimentaciones asociadas a tus proyectos.'}
+              {canCreateTeacher
+                ? 'Registra seguimientos docentes y revisa los seguimientos enviados por estudiantes.'
+                : 'Revisa tus evaluaciones y crea seguimientos de avance de tu proyecto.'}
             </p>
           </div>
-          {canCreate && (
-            <Link href="/seguimientos/nuevo"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm">
-              + Nueva sesión
-            </Link>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {canCreateTeacher && (
+              <>
+                <Link href="/seguimientos/nuevo?modo=teacher"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm">
+                  + Seguimiento docente
+                </Link>
+                <Link href="/seguimientos/nuevo?modo=student"
+                  className="bg-white hover:bg-sky-50 text-sky-700 border border-sky-100 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm">
+                  Vista estudiante
+                </Link>
+              </>
+            )}
+            {canCreateStudent && (
+              <Link href="/seguimientos/nuevo?modo=student"
+                className="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm">
+                + Nuevo seguimiento estudiante
+              </Link>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Sesiones registradas', value: totalSessions, icon: '🧭', color: 'bg-blue-100 text-blue-700' },
             { label: 'Pendientes o en proceso', value: pending, icon: '🕐', color: 'bg-yellow-100 text-yellow-700' },
             { label: 'Con fotografías', value: withPhotos, icon: '📷', color: 'bg-green-100 text-green-700' },
+            { label: 'Creados por estudiantes', value: studentCreated, icon: '🧑‍🎓', color: 'bg-sky-100 text-sky-700' },
           ].map(card => (
             <div key={card.label} className="bg-white rounded-xl shadow-sm p-5 flex gap-4 items-center">
               <div className={`text-2xl p-3 rounded-lg ${card.color}`}>{card.icon}</div>
@@ -123,7 +151,9 @@ export default async function SeguimientosPage() {
 
         <section className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 lg:px-6 py-4 border-b border-gray-100">
-            <h2 className="font-bold text-blue-900">{canCreate ? 'Historial docente' : 'Mis evaluaciones recibidas'}</h2>
+            <h2 className="font-bold text-blue-900">
+              {canCreateTeacher ? 'Historial y envíos de estudiantes' : 'Mis seguimientos y evaluaciones'}
+            </h2>
           </div>
           {sessions.length > 0 ? (
             <div className="divide-y divide-gray-100">
@@ -136,6 +166,9 @@ export default async function SeguimientosPage() {
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusColor[session.overall_status] ?? 'bg-gray-100 text-gray-600'}`}>
                           {session.overall_status}
                         </span>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${modeClass(session)}`}>
+                          {modeLabel(session)}
+                        </span>
                         <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-purple-100 text-purple-700">Seguimiento {session.iteration_number ?? 1}</span>
                         <span className="text-xs text-gray-400">🎫 {session.ticket}</span>
                       </div>
@@ -143,8 +176,10 @@ export default async function SeguimientosPage() {
                       <p className="text-sm text-gray-500 mt-0.5">
                         {session.courses?.name ?? 'Sin curso'} · {session.subject}
                       </p>
-                      {!canCreate && session.teacher?.full_name && (
-                        <p className="text-xs text-gray-400 mt-1">Docente: {session.teacher.full_name}</p>
+                      {session.teacher?.full_name && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {session.teacher?.role === 'estudiante' ? 'Enviado por: ' : 'Docente: '}{session.teacher.full_name}
+                        </p>
                       )}
                     </div>
                     <div className="text-right shrink-0">
@@ -165,10 +200,15 @@ export default async function SeguimientosPage() {
           ) : (
             <div className="p-12 text-center text-gray-400">
               <div className="text-4xl mb-3">🧭</div>
-              <p>{canCreate ? 'Todavía no has registrado sesiones de seguimiento.' : 'Todavía no tienes evaluaciones de seguimiento asignadas.'}</p>
-              {canCreate && (
-                <Link href="/seguimientos/nuevo" className="inline-block mt-3 text-blue-600 hover:underline text-sm">
-                  Crear la primera sesión →
+              <p>{canCreateTeacher ? 'Todavía no hay sesiones de seguimiento.' : 'Todavía no tienes seguimientos asociados.'}</p>
+              {canCreateTeacher && (
+                <Link href="/seguimientos/nuevo?modo=teacher" className="inline-block mt-3 text-blue-600 hover:underline text-sm">
+                  Crear seguimiento docente →
+                </Link>
+              )}
+              {canCreateStudent && (
+                <Link href="/seguimientos/nuevo?modo=student" className="inline-block mt-3 text-sky-600 hover:underline text-sm">
+                  Crear seguimiento estudiante →
                 </Link>
               )}
             </div>
