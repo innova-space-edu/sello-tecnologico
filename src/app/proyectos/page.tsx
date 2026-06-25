@@ -4,10 +4,13 @@ import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
+const ESTADOS = ['Borrador', 'En progreso', 'En revisión', 'Revisado', 'Aprobado', 'Cerrado']
+
 const statusColor: Record<string, string> = {
   'Borrador': 'bg-gray-100 text-gray-600',
   'En progreso': 'bg-blue-100 text-blue-700',
   'En revisión': 'bg-yellow-100 text-yellow-700',
+  'Revisado': 'bg-emerald-100 text-emerald-700',
   'Aprobado': 'bg-green-100 text-green-700',
   'Cerrado': 'bg-red-100 text-red-600',
 }
@@ -22,6 +25,7 @@ export default function ProyectosPage() {
   const [filtroEstado, setFiltroEstado] = useState('Todos')
   const [cursoFiltro, setCursoFiltro] = useState('')
   const [cursosAbiertos, setCursosAbiertos] = useState<Record<string, boolean>>({})
+  const [actualizandoId, setActualizandoId] = useState<string | null>(null)
   const rolRef = useRef('')
   const userIdRef = useRef('')
 
@@ -58,9 +62,10 @@ export default function ProyectosPage() {
     const init = async () => {
       const params = new URLSearchParams(window.location.search)
       const curso = params.get('curso') ?? ''
-      const estado = params.get('estado') ?? 'Todos'
+      const estado = params.get('estado') ?? params.get('filtro') ?? 'Todos'
       if (curso) setCursoFiltro(decodeURIComponent(curso))
-      if (estado) setFiltroEstado(estado)
+      if (estado && ESTADOS.includes(estado)) setFiltroEstado(estado)
+      if (estado === 'en-revision') setFiltroEstado('En revisión')
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -86,9 +91,26 @@ export default function ProyectosPage() {
     fetchProyectos(rol, userId)
   }
 
+  const marcarRevisado = async (p: any) => {
+    if (!confirm(`¿Marcar como revisado el proyecto "${p.title}"?`)) return
+    setActualizandoId(p.id)
+    await supabase.from('projects').update({ status: 'Revisado', updated_at: new Date().toISOString() }).eq('id', p.id)
+    await fetchProyectos(rol, userId)
+    setActualizandoId(null)
+  }
+
+  const volverARevision = async (p: any) => {
+    if (!confirm(`¿Volver a dejar "${p.title}" en revisión?`)) return
+    setActualizandoId(p.id)
+    await supabase.from('projects').update({ status: 'En revisión', updated_at: new Date().toISOString() }).eq('id', p.id)
+    await fetchProyectos(rol, userId)
+    setActualizandoId(null)
+  }
+
   const toggleCurso = (key: string) => setCursosAbiertos(prev => ({ ...prev, [key]: !prev[key] }))
   const esEstudiante = rol === 'estudiante'
-  const puedeEliminar = rol === 'admin' || rol === 'docente' || rol === 'coordinador'
+  const puedeGestionar = ['admin', 'docente', 'coordinador', 'utp'].includes(rol)
+  const puedeEliminar = ['admin', 'docente', 'coordinador'].includes(rol)
   const cursoFiltroLower = cursoFiltro.toLowerCase()
 
   const proyectosFiltrados = proyectos.filter(p => {
@@ -101,6 +123,10 @@ export default function ProyectosPage() {
     const matchCurso = !cursoFiltro || p.course_id === cursoFiltro || p.courses?.name?.toLowerCase().includes(cursoFiltroLower)
     return matchBusqueda && matchEstado && matchCurso
   })
+
+  const revisadosCount = proyectos.filter(p => p.status === 'Revisado').length
+  const revisionCount = proyectos.filter(p => p.status === 'En revisión').length
+  const atrasadosCount = proyectos.filter(p => p.end_date && p.end_date < new Date().toISOString().split('T')[0] && !['Revisado', 'Aprobado', 'Cerrado'].includes(p.status)).length
 
   const grupos = proyectosFiltrados.reduce((acc: Record<string, { nombre: string; proyectos: any[] }>, p) => {
     const key = p.course_id ?? '__sin_curso__'
@@ -145,6 +171,21 @@ export default function ProyectosPage() {
           <Link href="/proyectos/nuevo" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">+ Nuevo proyecto</Link>
         </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+          <button onClick={() => setFiltroEstado(filtroEstado === 'En revisión' ? 'Todos' : 'En revisión')} className={`rounded-2xl border p-4 text-left transition ${filtroEstado === 'En revisión' ? 'bg-amber-100 border-amber-300' : 'bg-white border-amber-100 hover:bg-amber-50'}`}>
+            <p className="text-xs font-semibold text-amber-700">⏳ En revisión</p>
+            <p className="text-2xl font-black text-amber-800">{revisionCount}</p>
+          </button>
+          <button onClick={() => setFiltroEstado(filtroEstado === 'Revisado' ? 'Todos' : 'Revisado')} className={`rounded-2xl border p-4 text-left transition ${filtroEstado === 'Revisado' ? 'bg-emerald-100 border-emerald-300' : 'bg-white border-emerald-100 hover:bg-emerald-50'}`}>
+            <p className="text-xs font-semibold text-emerald-700">✅ Revisados</p>
+            <p className="text-2xl font-black text-emerald-800">{revisadosCount}</p>
+          </button>
+          <button onClick={() => setFiltroEstado('Todos')} className="rounded-2xl border border-rose-100 bg-white p-4 text-left hover:bg-rose-50 transition">
+            <p className="text-xs font-semibold text-rose-700">⚠️ Atrasados abiertos</p>
+            <p className="text-2xl font-black text-rose-800">{atrasadosCount}</p>
+          </button>
+        </div>
+
         {cursoFiltro && (
           <div className="bg-blue-50 border border-blue-100 text-blue-800 rounded-xl px-4 py-3 mb-4 flex flex-wrap justify-between gap-3 items-center text-sm">
             <span>Filtro activo: proyectos del curso seleccionado.</span>
@@ -159,7 +200,7 @@ export default function ProyectosPage() {
           </div>
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
             <option value="Todos">Todos los estados</option>
-            {['Borrador', 'En progreso', 'En revisión', 'Aprobado', 'Cerrado'].map(s => <option key={s}>{s}</option>)}
+            {ESTADOS.map(s => <option key={s}>{s}</option>)}
           </select>
           {(busqueda || filtroEstado !== 'Todos') && <button onClick={() => { setBusqueda(''); setFiltroEstado('Todos') }} className="text-xs text-gray-400 hover:text-gray-600 px-2">✕ Limpiar</button>}
           <div className="flex items-center gap-2 ml-auto">
@@ -196,7 +237,7 @@ export default function ProyectosPage() {
                               {!esEstudiante && <td className="px-5 py-3.5 text-gray-500 text-xs">{p.profiles?.full_name ?? '—'}</td>}
                               <td className="px-5 py-3.5"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>{p.status}</span></td>
                               <td className="px-5 py-3.5 text-gray-400 text-xs">{p.last_autosave_at ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : (p.start_date ?? '—')}</td>
-                              <td className="px-5 py-3.5"><div className="flex items-center gap-1.5"><Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
+                              <td className="px-5 py-3.5"><div className="flex flex-wrap items-center gap-1.5"><Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{puedeGestionar && p.status === 'En revisión' && <button disabled={actualizandoId === p.id} onClick={() => marcarRevisado(p)} className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-semibold border border-emerald-200 disabled:opacity-60">✅ Revisado</button>}{puedeGestionar && p.status === 'Revisado' && <button disabled={actualizandoId === p.id} onClick={() => volverARevision(p)} className="text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-semibold border border-amber-200 disabled:opacity-60">↩ Revisión</button>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
                             </tr>
                           ))}
                         </tbody>
