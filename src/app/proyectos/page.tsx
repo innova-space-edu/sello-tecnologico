@@ -116,14 +116,6 @@ export default function ProyectosPage() {
     return a.nombre.localeCompare(b.nombre, 'es')
   })
 
-  useEffect(() => {
-    if (gruposOrdenados.length > 0 && Object.keys(cursosAbiertos).length === 0) {
-      const init: Record<string, boolean> = {}
-      gruposOrdenados.forEach(([k]) => { init[k] = true })
-      setCursosAbiertos(init)
-    }
-  }, [gruposOrdenados.length])
-
   const expandAll = () => {
     const s: Record<string, boolean> = {}
     gruposOrdenados.forEach(([k]) => { s[k] = true })
@@ -184,7 +176,7 @@ export default function ProyectosPage() {
         ) : (
           <div className="space-y-3">
             {gruposOrdenados.map(([cursoKey, grupo]) => {
-              const abierto = cursosAbiertos[cursoKey] ?? true
+              const abierto = cursosAbiertos[cursoKey] ?? false
               const esSinCurso = cursoKey === '__sin_curso__'
               return (
                 <div key={cursoKey} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
