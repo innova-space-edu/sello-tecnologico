@@ -20,9 +20,15 @@ type PublicPage = {
   description?: string | null
   theme_color?: string | null
   accent_color?: string | null
+  background_color?: string | null
+  text_color?: string | null
+  card_color?: string | null
   layout_style?: string | null
   background_style?: string | null
   font_style?: string | null
+  surface_style?: string | null
+  button_style?: string | null
+  header_style?: string | null
   hero_badge?: string | null
   call_to_action_label?: string | null
   call_to_action_url?: string | null
@@ -105,6 +111,14 @@ const DEFAULT_BLOCKS: Block[] = [
   },
 ]
 
+const COLOR_PRESETS = [
+  { name: 'Podcast morado', theme: '#111827', accent: '#d946ef', background: '#fbf5ff', text: '#0f172a', card: '#ffffff' },
+  { name: 'Medio ambiente', theme: '#166534', accent: '#22c55e', background: '#f0fdf4', text: '#052e16', card: '#ffffff' },
+  { name: 'Calma azul', theme: '#1d4ed8', accent: '#38bdf8', background: '#eff6ff', text: '#0f172a', card: '#ffffff' },
+  { name: 'Energía naranja', theme: '#9a3412', accent: '#fb923c', background: '#fff7ed', text: '#1f2937', card: '#ffffff' },
+  { name: 'Elegante oscuro', theme: '#7c3aed', accent: '#d946ef', background: '#020617', text: '#f8fafc', card: '#111827' },
+]
+
 function slugify(value: string) {
   return value
     .normalize('NFD')
@@ -147,15 +161,22 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
   const [page, setPage] = useState<PublicPage | null>(null)
   const [assets, setAssets] = useState<Asset[]>([])
   const [blocks, setBlocks] = useState<Block[]>(DEFAULT_BLOCKS)
+  const [copied, setCopied] = useState(false)
   const [form, setForm] = useState({
     title: '',
     slug: '',
     description: '',
     theme_color: '#111827',
     accent_color: '#7c3aed',
+    background_color: '#f8fafc',
+    text_color: '#0f172a',
+    card_color: '#ffffff',
     layout_style: 'magazine',
     background_style: 'soft_gradient',
     font_style: 'modern',
+    surface_style: 'glass',
+    button_style: 'gradient',
+    header_style: 'large',
     hero_badge: '',
     call_to_action_label: '',
     call_to_action_url: '',
@@ -208,9 +229,15 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           description: currentPage.description ?? '',
           theme_color: currentPage.theme_color ?? '#111827',
           accent_color: currentPage.accent_color ?? '#7c3aed',
+          background_color: currentPage.background_color ?? '#f8fafc',
+          text_color: currentPage.text_color ?? '#0f172a',
+          card_color: currentPage.card_color ?? '#ffffff',
           layout_style: currentPage.layout_style ?? 'magazine',
           background_style: currentPage.background_style ?? 'soft_gradient',
           font_style: currentPage.font_style ?? 'modern',
+          surface_style: currentPage.surface_style ?? 'glass',
+          button_style: currentPage.button_style ?? 'gradient',
+          header_style: currentPage.header_style ?? 'large',
           hero_badge: currentPage.hero_badge ?? '',
           call_to_action_label: currentPage.call_to_action_label ?? '',
           call_to_action_url: currentPage.call_to_action_url ?? '',
@@ -233,9 +260,8 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           : DEFAULT_BLOCKS)
         setAssets((currentAssets ?? []) as Asset[])
       } else if (proyecto) {
-        const baseTitle = proyecto.title
         const baseSlug = `${slugify(proyecto.title)}-${Math.random().toString(36).slice(2, 7)}`
-        setForm(prev => ({ ...prev, title: baseTitle, slug: baseSlug, hero_badge: proyecto.courses?.name ?? '' }))
+        setForm(prev => ({ ...prev, title: proyecto.title, slug: baseSlug, hero_badge: proyecto.courses?.name ?? '' }))
       }
 
       setLoading(false)
@@ -259,9 +285,15 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       description: form.description.trim() || null,
       theme_color: form.theme_color || '#111827',
       accent_color: form.accent_color || '#7c3aed',
+      background_color: form.background_color || '#f8fafc',
+      text_color: form.text_color || '#0f172a',
+      card_color: form.card_color || '#ffffff',
       layout_style: form.layout_style,
       background_style: form.background_style,
       font_style: form.font_style,
+      surface_style: form.surface_style,
+      button_style: form.button_style,
+      header_style: form.header_style,
       hero_badge: form.hero_badge.trim() || null,
       call_to_action_label: form.call_to_action_label.trim() || null,
       call_to_action_url: form.call_to_action_url.trim() || null,
@@ -435,6 +467,25 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     }
   }
 
+  const applyPreset = (preset: typeof COLOR_PRESETS[number]) => {
+    setForm(prev => ({
+      ...prev,
+      theme_color: preset.theme,
+      accent_color: preset.accent,
+      background_color: preset.background,
+      text_color: preset.text,
+      card_color: preset.card,
+      background_style: preset.name === 'Elegante oscuro' ? 'dark' : prev.background_style,
+    }))
+  }
+
+  const copyPublicUrl = async () => {
+    if (!publicUrl) return
+    await navigator.clipboard.writeText(publicUrl).catch(() => null)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
+  }
+
   const updateBlock = (index: number, patch: Partial<Block>) => {
     setBlocks(prev => prev.map((block, currentIndex) => currentIndex === index ? { ...block, ...patch } : block))
   }
@@ -503,24 +554,90 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
             </select>
           </label>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-5">
+      <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
+        <div className="mb-4">
+          <h2 className="font-bold text-blue-900">🎨 Diseño, colores y estilo público</h2>
+          <p className="text-sm text-gray-500">Ajusta la apariencia para que el link público se vea más profesional y compartible.</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-5">
+          {COLOR_PRESETS.map(preset => (
+            <button key={preset.name} type="button" onClick={() => applyPreset(preset)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-gray-50 flex items-center gap-2">
+              <span className="h-4 w-4 rounded-full" style={{ background: `linear-gradient(135deg, ${preset.theme}, ${preset.accent})` }} />
+              {preset.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <label className="text-sm font-medium text-gray-700">
-            Color principal
+            Principal
             <input type="color" value={form.theme_color} onChange={event => setForm({ ...form, theme_color: event.target.value })}
               className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
           </label>
           <label className="text-sm font-medium text-gray-700">
-            Color secundario
+            Secundario
             <input type="color" value={form.accent_color} onChange={event => setForm({ ...form, accent_color: event.target.value })}
               className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
           </label>
           <label className="text-sm font-medium text-gray-700">
             Fondo
+            <input type="color" value={form.background_color} onChange={event => setForm({ ...form, background_color: event.target.value })}
+              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Texto
+            <input type="color" value={form.text_color} onChange={event => setForm({ ...form, text_color: event.target.value })}
+              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Tarjetas
+            <input type="color" value={form.card_color} onChange={event => setForm({ ...form, card_color: event.target.value })}
+              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-5">
+          <label className="text-sm font-medium text-gray-700">
+            Fondo visual
             <select value={form.background_style} onChange={event => setForm({ ...form, background_style: event.target.value })}
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
               <option value="soft_gradient">Gradiente suave</option>
-              <option value="solid">Limpio blanco</option>
+              <option value="solid">Limpio blanco/color</option>
+              <option value="aurora">Aurora moderna</option>
+              <option value="diagonal">Diagonal editorial</option>
+              <option value="paper">Papel suave</option>
+              <option value="dark">Oscuro elegante</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Tarjetas
+            <select value={form.surface_style} onChange={event => setForm({ ...form, surface_style: event.target.value })}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="glass">Cristal suave</option>
+              <option value="floating">Flotante</option>
+              <option value="bordered">Borde marcado</option>
+              <option value="flat">Plano simple</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Botones
+            <select value={form.button_style} onChange={event => setForm({ ...form, button_style: event.target.value })}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="gradient">Gradiente</option>
+              <option value="solid">Color sólido</option>
+              <option value="soft">Suave</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Encabezado
+            <select value={form.header_style} onChange={event => setForm({ ...form, header_style: event.target.value })}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="large">Grande</option>
+              <option value="compact">Compacto</option>
+              <option value="cover">Portada amplia</option>
             </select>
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -528,7 +645,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
             <select value={form.layout_style} onChange={event => setForm({ ...form, layout_style: event.target.value })}
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
               <option value="magazine">Revista / podcast</option>
-              <option value="gallery">Galería</option>
+              <option value="gallery">Galería en tarjetas</option>
               <option value="campaign">Campaña</option>
             </select>
           </label>
@@ -556,20 +673,27 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           </label>
           <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
             <input type="checkbox" checked={form.show_trending} onChange={event => setForm({ ...form, show_trending: event.target.checked })} />
-            Mostrar panel trending/comentarios
+            Mostrar panel general de interacciones
           </label>
         </div>
 
-        <div className="mt-5 rounded-2xl p-5 border" style={{ background: `linear-gradient(135deg, ${form.theme_color}18, ${form.accent_color}24)`, borderColor: `${form.accent_color}33` }}>
+        <div className="mt-5 rounded-2xl p-5 border" style={{ background: `linear-gradient(135deg, ${form.theme_color}18, ${form.accent_color}24), ${form.background_color}`, borderColor: `${form.accent_color}33` }}>
           <p className="text-xs font-bold uppercase tracking-widest" style={{ color: form.accent_color }}>Vista previa rápida</p>
-          <h3 className="text-3xl font-black mt-2" style={{ color: form.theme_color }}>{form.title || 'Título de la página'}</h3>
-          <p className="text-sm text-gray-600 mt-2">Aquí se aplican el color principal y secundario seleccionados.</p>
+          <div className="mt-3 rounded-2xl border p-4" style={{ background: form.card_color, color: form.text_color }}>
+            <h3 className="text-3xl font-black" style={{ color: form.theme_color }}>{form.title || 'Título de la página'}</h3>
+            <p className="text-sm mt-2">Así se verán los colores de fondo, texto y tarjeta en la publicación pública.</p>
+          </div>
         </div>
 
         {publicUrl && (
-          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900">
-            <p className="font-semibold">Link público:</p>
-            <a href={publicUrl} target="_blank" rel="noreferrer" className="underline break-all">{publicUrl}</a>
+          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900 flex flex-wrap gap-3 items-center justify-between">
+            <div>
+              <p className="font-semibold">Link público:</p>
+              <a href={publicUrl} target="_blank" rel="noreferrer" className="underline break-all">{publicUrl}</a>
+            </div>
+            <button type="button" onClick={copyPublicUrl} className="px-3 py-2 rounded-lg bg-white border border-blue-200 text-blue-700 font-semibold">
+              {copied ? 'Copiado' : 'Copiar link'}
+            </button>
           </div>
         )}
       </section>
@@ -577,8 +701,8 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
         <div className="flex flex-wrap justify-between gap-3 items-center mb-4">
           <div>
-            <h2 className="font-bold text-blue-900">🧩 Herramientas y secciones</h2>
-            <p className="text-sm text-gray-500">Agrega bloques rápidos para armar la versión publicable.</p>
+            <h2 className="font-bold text-blue-900">🧩 Publicaciones y secciones</h2>
+            <p className="text-sm text-gray-500">Cada bloque tendrá sus propios me gusta, comentarios y botón de compartir.</p>
           </div>
           <button type="button" onClick={() => addBlock()} className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold">
             + Bloque vacío
