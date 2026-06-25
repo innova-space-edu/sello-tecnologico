@@ -1,16 +1,29 @@
 import Sidebar from '@/components/Sidebar'
 import ProjectPublicPageEditor from '@/components/vitrinas/ProjectPublicPageEditor'
+import PublicShareButtons from '@/components/vitrinas/PublicShareButtons'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 
 export default async function ProyectoPaginaPublicaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createServerSupabaseClient()
-  const { data: proyecto } = await supabase
-    .from('projects')
-    .select('id, title, courses(name)')
-    .eq('id', id)
-    .single()
+  const [{ data: proyecto }, { data: paginaPublica }] = await Promise.all([
+    supabase
+      .from('projects')
+      .select('id, title, courses(name)')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('project_public_pages')
+      .select('id, title, slug, description, is_public, status, theme_color, accent_color')
+      .eq('project_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const publicUrl = paginaPublica?.slug ? `/p/${paginaPublica.slug}` : ''
+  const isPublished = Boolean(paginaPublica?.is_public && paginaPublica?.status === 'published')
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -26,6 +39,24 @@ export default async function ProyectoPaginaPublicaPage({ params }: { params: Pr
             </p>
           </div>
         </div>
+
+        {publicUrl && (
+          <div className="max-w-6xl mb-5">
+            <PublicShareButtons
+              url={publicUrl}
+              title={String(paginaPublica?.title ?? proyecto?.title ?? 'Página pública Sello Tecnológico').replace(/^Vitrina:\s*/i, '')}
+              description={isPublished ? paginaPublica?.description : 'Guarda y publica la página para compartir el enlace con la comunidad.'}
+              theme={paginaPublica?.theme_color ?? '#2563eb'}
+              accent={paginaPublica?.accent_color ?? '#0ea5e9'}
+            />
+            {!isPublished && (
+              <p className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                La página existe, pero aún está como borrador u oculta. Publícala para que el enlace se pueda abrir públicamente.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="max-w-6xl">
           <ProjectPublicPageEditor projectId={id} />
         </div>
