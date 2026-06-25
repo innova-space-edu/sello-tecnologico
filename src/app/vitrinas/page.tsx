@@ -68,8 +68,8 @@ export default async function VitrinasPage() {
             <h1 className="text-2xl font-bold text-blue-900 mt-1">Páginas públicas</h1>
             <p className="text-gray-500 mt-1">Crea páginas con podcast, videos, imágenes y materiales para compartir con un link público.</p>
           </div>
-          <Link href="/proyectos" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-            Elegir proyecto
+          <Link href="/vitrinas/nueva" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
+            + Crear vitrina
           </Link>
         </div>
 
@@ -131,7 +131,7 @@ export default async function VitrinasPage() {
             <div className="p-12 text-center text-gray-400">
               <div className="text-4xl mb-3">🌐</div>
               <p>Todavía no hay vitrinas creadas.</p>
-              <Link href="/proyectos" className="inline-block mt-3 text-blue-600 hover:underline text-sm">
+              <Link href="/vitrinas/nueva" className="inline-block mt-3 text-blue-600 hover:underline text-sm">
                 Elegir un proyecto para crear vitrina →
               </Link>
             </div>
