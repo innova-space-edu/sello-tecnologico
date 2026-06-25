@@ -18,6 +18,8 @@ type SocialData = {
   liked?: boolean
 }
 
+const QUICK_EMOJIS = ['😍', '👏', '🔥', '❤️', '😂', '🙌', '⭐', '🌱', '🎧', '💡']
+
 function getVisitorKey() {
   const key = 'sello_vitrina_visitor_key'
   const existing = window.localStorage.getItem(key)
@@ -58,7 +60,6 @@ export default function VitrinaInlineInteraction({
   const [visitorKey, setVisitorKey] = useState('')
   const [visitorName, setVisitorName] = useState('')
   const [comment, setComment] = useState('')
-  const [showComments, setShowComments] = useState(false)
   const [sending, setSending] = useState(false)
   const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState('')
@@ -138,17 +139,20 @@ export default function VitrinaInlineInteraction({
 
     if (response.ok) {
       setComment('')
-      setShowComments(true)
-      setNotice('Comentario publicado correctamente.')
+      setNotice('Publicado')
       await refresh()
       notifySocialUpdate()
-      window.setTimeout(() => setNotice(''), 2400)
+      window.setTimeout(() => setNotice(''), 1800)
     } else {
       const result = await response.json().catch(() => ({}))
-      setNotice(result?.error ?? 'No se pudo publicar el comentario.')
+      setNotice(result?.error ?? 'No se pudo publicar.')
     }
 
     setSending(false)
+  }
+
+  const addEmoji = (emoji: string) => {
+    setComment(prev => `${prev}${prev.endsWith(' ') || prev.length === 0 ? '' : ' '}${emoji} `)
   }
 
   const sharePublication = async () => {
@@ -166,101 +170,98 @@ export default function VitrinaInlineInteraction({
   }
 
   return (
-    <div className="mt-5 rounded-3xl border border-slate-100 bg-slate-50/80 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span className="rounded-full bg-white px-3 py-1 font-bold">❤️ {data.stats.likes} me gusta</span>
-          <span className="rounded-full bg-white px-3 py-1 font-bold">💬 {data.stats.comments} comentarios</span>
-          <span className="rounded-full bg-white px-3 py-1 font-bold">👁️ {data.stats.views} vistas</span>
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-4 font-bold text-slate-600">
+          <span>❤️ {data.stats.likes}</span>
+          <span>💬 {data.stats.comments}</span>
+          <span>👁️ {data.stats.views}</span>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3 text-sm font-black">
           <button
             type="button"
             disabled={sending}
             onClick={toggleLike}
-            className="rounded-full px-4 py-2 text-xs font-black text-white shadow-sm disabled:opacity-60"
-            style={{ background: data.liked ? `linear-gradient(135deg, ${theme}, ${accent})` : theme }}
+            className="transition hover:opacity-75 disabled:opacity-60"
+            style={{ color: data.liked ? accent : theme }}
           >
             {data.liked ? '💜 Te gusta' : '🤍 Me gusta'}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowComments(prev => !prev)}
-            className="rounded-full bg-white px-4 py-2 text-xs font-black text-slate-700 border border-slate-200"
-          >
-            💬 {showComments ? 'Ocultar' : 'Comentar'}
-          </button>
-          <button
-            type="button"
-            onClick={sharePublication}
-            className="rounded-full bg-white px-4 py-2 text-xs font-black text-slate-700 border border-slate-200"
-          >
+          <button type="button" onClick={sharePublication} className="text-slate-600 transition hover:text-slate-900">
             {copied ? '✅ Copiado' : '🔗 Compartir'}
           </button>
         </div>
       </div>
 
-      {showComments && (
-        <div className="mt-4 rounded-3xl border border-slate-100 bg-white p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-black text-slate-900">Comentarios de esta publicación</h3>
-              <p className="text-xs text-slate-400">Los comentarios quedan guardados solo en este bloque.</p>
-            </div>
-            <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-bold text-slate-500">{data.stats.comments} total</span>
-          </div>
+      <form onSubmit={sendComment} className="mt-4 space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK_EMOJIS.map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => addEmoji(emoji)}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-base transition hover:bg-slate-100"
+              aria-label={`Agregar ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
 
-          <form onSubmit={sendComment} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[220px_1fr]">
-              <input
-                value={visitorName}
-                onChange={event => setVisitorName(event.target.value)}
-                placeholder="Tu nombre"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-              <textarea
-                value={comment}
-                onChange={event => setComment(event.target.value)}
-                placeholder="Escribe un comentario claro sobre esta publicación..."
-                rows={2}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-              />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-slate-400">Mínimo 2 caracteres. Evita escribir solo “like” como comentario.</p>
-              <button
-                type="submit"
-                disabled={sending || !comment.trim()}
-                className="rounded-full px-5 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                style={comment.trim() ? { background: `linear-gradient(135deg, ${theme}, ${accent})` } : undefined}
-              >
-                {sending ? 'Publicando…' : 'Publicar comentario'}
-              </button>
-            </div>
-            {notice && <p className="mt-2 text-xs font-semibold text-slate-500">{notice}</p>}
-          </form>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {data.comments.length > 0 ? data.comments.map(item => (
-              <div key={item.id} className="rounded-2xl bg-slate-50 p-4 border border-slate-100">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black text-white" style={{ background: theme }}>
-                      {(item.profiles?.full_name ?? item.visitor_name ?? 'V')[0].toUpperCase()}
-                    </div>
-                    <p className="truncate text-sm font-black text-slate-800">{item.profiles?.full_name ?? item.visitor_name ?? 'Visitante'}</p>
-                  </div>
-                  <p className="shrink-0 text-[11px] text-slate-400">{formatDate(item.created_at)}</p>
-                </div>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{item.content}</p>
-              </div>
-            )) : (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-400 md:col-span-2">Aún no hay comentarios en esta publicación.</p>
-            )}
+        <div className="flex flex-col gap-2 md:flex-row md:items-start">
+          <input
+            value={visitorName}
+            onChange={event => setVisitorName(event.target.value)}
+            placeholder="Nombre"
+            className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 md:w-44"
+          />
+          <div className="flex flex-1 items-start gap-2 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-2.5 focus-within:ring-2 focus-within:ring-blue-300">
+            <textarea
+              value={comment}
+              onChange={event => setComment(event.target.value)}
+              placeholder="Agrega un comentario..."
+              rows={1}
+              className="min-h-7 flex-1 resize-none border-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
+            <button
+              type="submit"
+              disabled={sending || !comment.trim()}
+              className="shrink-0 rounded-full px-4 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+              style={comment.trim() ? { background: `linear-gradient(135deg, ${theme}, ${accent})` } : undefined}
+            >
+              {sending ? '...' : 'Publicar'}
+            </button>
           </div>
         </div>
-      )}
+        {notice && <p className="text-xs font-semibold text-slate-500">{notice}</p>}
+      </form>
+
+      <div className="mt-4 space-y-3">
+        {data.comments.length > 0 ? data.comments.map(item => {
+          const name = item.profiles?.full_name ?? item.visitor_name ?? 'Visitante'
+          return (
+            <div key={item.id} className="flex gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-black text-white" style={{ background: theme }}>
+                {name[0].toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-slate-800">
+                  <span className="font-black">{name}</span>{' '}
+                  <span className="whitespace-pre-wrap leading-relaxed">{item.content}</span>
+                </p>
+                <div className="mt-1 flex gap-4 text-xs font-bold text-slate-400">
+                  <span>{formatDate(item.created_at)}</span>
+                  <button type="button" className="hover:text-slate-600">Me gusta</button>
+                  <button type="button" className="hover:text-slate-600">Responder</button>
+                </div>
+              </div>
+            </div>
+          )
+        }) : (
+          <p className="text-sm text-slate-400">Aún no hay comentarios. Sé el primero en comentar.</p>
+        )}
+      </div>
     </div>
   )
 }
