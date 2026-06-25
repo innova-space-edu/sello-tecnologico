@@ -4,11 +4,9 @@ import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import PersonalNotificationCount from '@/components/PersonalNotificationCount'
 
 const menu = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/mis-notificaciones', label: 'Mis avisos', icon: '🔔' },
   { href: '/mis-encuestas', label: 'Mis encuestas', icon: '🗳️' },
   { href: '/admin', label: 'Panel Admin', icon: '👑' },
   { href: '/cursos', label: 'Cursos', icon: '📚' },
@@ -161,7 +159,6 @@ export default function Sidebar() {
 
             const esMod = item.href === '/admin/moderacion'
             const esMensajes = item.href === '/mensajes'
-            const esMisAvisos = item.href === '/mis-notificaciones'
 
             return (
               <Link key={item.href} href={item.href}
@@ -171,7 +168,6 @@ export default function Sidebar() {
                 }`}>
                 <span className="text-base">{item.icon}</span>
                 <span>{item.label}</span>
-                {esMisAvisos && <PersonalNotificationCount />}
                 {esMod && alertasMod > 0 && (
                   <span className="ml-auto flex items-center justify-center bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 font-bold">
                     {alertasMod > 9 ? '9+' : alertasMod}
