@@ -121,19 +121,20 @@ export default async function ReportesPage() {
   const incidenciasPendientes = flagged.filter((f: any) => !f.reviewed).length
   const mensajesNoLeidos = mensajes.filter((m: any) => !m.read).length
   const proyectosActivos = (estados['En progreso'] ?? 0) + (estados['En revisión'] ?? 0)
+  const proyectosRevisados = estados['Revisado'] ?? 0
   const ingresosRegistrados = accessLogs.filter((log: any) => log.event_type === 'login').length
   const visitasEduAI = accessLogs.filter((log: any) => log.event_type === 'eduai_open' || log.pathname === '/eduai').length
 
   const stats = [
     { label: 'Usuarios', value: usuarios.length, icon: '👥', color: 'bg-indigo-50 text-indigo-700 ring-indigo-100' },
     { label: 'Proyectos', value: proyectos.length, icon: '🗂️', color: 'bg-blue-50 text-blue-700 ring-blue-100' },
+    { label: 'Revisados', value: proyectosRevisados, icon: '✅', color: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
     { label: 'Evidencias', value: evidencias.length, icon: '📎', color: 'bg-sky-50 text-sky-700 ring-sky-100' },
-    { label: 'Cursos', value: cursosRes.count ?? 0, icon: '📚', color: 'bg-emerald-50 text-emerald-700 ring-emerald-100' },
+    { label: 'Cursos', value: cursosRes.count ?? 0, icon: '📚', color: 'bg-violet-50 text-violet-700 ring-violet-100' },
     { label: 'Mensajes', value: mensajesCountRes.count ?? 0, icon: '💬', color: 'bg-violet-50 text-violet-700 ring-violet-100', admin: true },
     { label: 'Incidencias', value: flagged.length, icon: '🚨', color: 'bg-red-50 text-red-700 ring-red-100', admin: true },
     { label: 'Portafolios', value: portfolios.length, icon: '📋', color: 'bg-amber-50 text-amber-700 ring-amber-100', admin: true },
     { label: 'Bloqueados', value: usuariosBloqueados, icon: '🔒', color: 'bg-rose-50 text-rose-700 ring-rose-100', admin: true },
-    { label: 'Ingresos', value: ingresosRegistrados, icon: '🛂', color: 'bg-cyan-50 text-cyan-700 ring-cyan-100', admin: true },
     { label: 'PDF', value: reportDownloads.length, icon: '📄', color: 'bg-lime-50 text-lime-700 ring-lime-100', admin: true },
   ].filter(s => isAdmin || !s.admin)
 
@@ -148,13 +149,14 @@ export default async function ReportesPage() {
             </div>
             <h1 className="mt-3 text-2xl font-bold text-slate-950">Reportes y análisis de datos</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Estadísticas, incidencias, actividad y exportación PDF para seguimiento del Sello Tecnológico.
+              Estadísticas sincronizadas con proyectos, evidencias, estados, revisados, incidencias y exportación PDF.
             </p>
           </div>
           <ExportPDF data={{
             isAdmin,
             cursos: cursosRes.count ?? 0,
             proyectos: proyectos.length,
+            proyectosRevisados,
             evidencias: evidencias.length,
             usuarios: usuarios.length,
             mensajes: mensajesCountRes.count ?? 0,
@@ -189,48 +191,26 @@ export default async function ReportesPage() {
           }} />
         </div>
 
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        <div className="mb-6 flex flex-wrap gap-3">
           {stats.map(s => (
-            <div key={s.label} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70">
-              <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl text-xl ring-1 ${s.color}`}>{s.icon}</div>
-              <div className="text-2xl font-bold text-slate-900">{s.value}</div>
-              <div className="mt-1 text-xs font-medium text-slate-500">{s.label}</div>
+            <div key={s.label} className="flex min-w-[160px] flex-1 items-center gap-3 rounded-full bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200/70">
+              <div className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl ring-1 ${s.color}`}>{s.icon}</div>
+              <div>
+                <div className="text-xl font-black text-slate-900 leading-none">{s.value}</div>
+                <div className="mt-1 text-xs font-medium text-slate-500">{s.label}</div>
+              </div>
             </div>
           ))}
         </div>
 
         {isAdmin && (
           <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-600">Riesgo actual</p>
-              <p className="mt-2 text-2xl font-bold text-red-700">{incidenciasPendientes}</p>
-              <p className="text-xs text-red-600">incidencias pendientes de revisión</p>
-            </div>
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Actividad</p>
-              <p className="mt-2 text-2xl font-bold text-blue-700">{mensajesNoLeidos}</p>
-              <p className="text-xs text-blue-600">mensajes no leídos detectados</p>
-            </div>
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Proyectos</p>
-              <p className="mt-2 text-2xl font-bold text-amber-700">{proyectosActivos}</p>
-              <p className="text-xs text-amber-600">activos o en revisión</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Historial</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">{audit.length}</p>
-              <p className="text-xs text-slate-500">registros cargados para análisis</p>
-            </div>
-            <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-cyan-600">Accesos</p>
-              <p className="mt-2 text-2xl font-bold text-cyan-700">{accessLogs.length}</p>
-              <p className="text-xs text-cyan-600">eventos de navegación registrados</p>
-            </div>
-            <div className="rounded-2xl border border-lime-100 bg-lime-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-lime-600">Exportaciones</p>
-              <p className="mt-2 text-2xl font-bold text-lime-700">{reportDownloads.length}</p>
-              <p className="text-xs text-lime-600">descargas PDF registradas</p>
-            </div>
+            <div className="rounded-2xl border border-red-100 bg-red-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-red-600">Riesgo actual</p><p className="mt-2 text-2xl font-bold text-red-700">{incidenciasPendientes}</p><p className="text-xs text-red-600">incidencias pendientes de revisión</p></div>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Actividad</p><p className="mt-2 text-2xl font-bold text-blue-700">{mensajesNoLeidos}</p><p className="text-xs text-blue-600">mensajes no leídos detectados</p></div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-amber-600">En proceso</p><p className="mt-2 text-2xl font-bold text-amber-700">{proyectosActivos}</p><p className="text-xs text-amber-600">activos o en revisión</p></div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Revisados</p><p className="mt-2 text-2xl font-bold text-emerald-700">{proyectosRevisados}</p><p className="text-xs text-emerald-600">cerrados como revisados</p></div>
+            <div className="rounded-2xl border border-cyan-100 bg-cyan-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-cyan-600">Accesos</p><p className="mt-2 text-2xl font-bold text-cyan-700">{accessLogs.length}</p><p className="text-xs text-cyan-600">eventos registrados</p></div>
+            <div className="rounded-2xl border border-lime-100 bg-lime-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-lime-600">Exportaciones</p><p className="mt-2 text-2xl font-bold text-lime-700">{reportDownloads.length}</p><p className="text-xs text-lime-600">descargas PDF registradas</p></div>
           </div>
         )}
 
