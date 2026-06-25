@@ -33,6 +33,10 @@ const statusLabel: Record<string, string> = {
   archived: 'Archivado',
 }
 
+function cleanTitle(title: string) {
+  return title.replace(/^Vitrina:\s*/i, '').trim()
+}
+
 export default async function VitrinasPage() {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -69,13 +73,13 @@ export default async function VitrinasPage() {
             <p className="text-gray-500 mt-1">Crea páginas con podcast, videos, imágenes y materiales para compartir con un link público.</p>
           </div>
           <Link href="/vitrinas/nueva" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-            + Crear vitrina
+            + Crear página
           </Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           {[
-            { label: 'Total vitrinas', value: pages.length, icon: '🌐', color: 'bg-blue-100 text-blue-700' },
+            { label: 'Total páginas', value: pages.length, icon: '🌐', color: 'bg-blue-100 text-blue-700' },
             { label: 'Publicadas', value: published, icon: '✅', color: 'bg-green-100 text-green-700' },
             { label: 'Borradores', value: drafts, icon: '📝', color: 'bg-yellow-100 text-yellow-700' },
           ].map(card => (
@@ -91,7 +95,7 @@ export default async function VitrinasPage() {
 
         <section className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 lg:px-6 py-4 border-b border-gray-100">
-            <h2 className="font-bold text-blue-900">Historial de vitrinas</h2>
+            <h2 className="font-bold text-blue-900">Historial de páginas publicables</h2>
           </div>
           {pages.length > 0 ? (
             <div className="divide-y divide-gray-100">
@@ -105,7 +109,7 @@ export default async function VitrinasPage() {
                         </span>
                         <span className="text-xs text-gray-400">/p/{page.slug}</span>
                       </div>
-                      <h3 className="font-semibold text-gray-800 truncate">{page.title}</h3>
+                      <h3 className="font-semibold text-gray-800 truncate">{cleanTitle(page.title)}</h3>
                       <p className="text-sm text-gray-500 mt-0.5">
                         {page.projects?.title ?? 'Proyecto sin título'} · {page.courses?.name ?? 'Sin curso'}
                       </p>
@@ -130,9 +134,9 @@ export default async function VitrinasPage() {
           ) : (
             <div className="p-12 text-center text-gray-400">
               <div className="text-4xl mb-3">🌐</div>
-              <p>Todavía no hay vitrinas creadas.</p>
+              <p>Todavía no hay páginas creadas.</p>
               <Link href="/vitrinas/nueva" className="inline-block mt-3 text-blue-600 hover:underline text-sm">
-                Elegir un proyecto para crear vitrina →
+                Elegir un proyecto para crear página →
               </Link>
             </div>
           )}
