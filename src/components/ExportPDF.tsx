@@ -5,6 +5,7 @@ type ReportData = {
   isAdmin?: boolean
   cursos: number
   proyectos: number
+  proyectosRevisados?: number
   evidencias: number
   usuarios: number
   mensajes?: number
@@ -94,6 +95,7 @@ export default function ExportPDF({ data }: { data: ReportData }) {
         body: [
           ['Usuarios', data.usuarios, 'Cuentas registradas en la plataforma'],
           ['Proyectos', data.proyectos, 'Fichas y trabajos creados'],
+          ['Proyectos revisados', data.proyectosRevisados ?? data.porEstado?.Revisado ?? 0, 'Proyectos marcados como revisados desde la sección Proyectos'],
           ['Evidencias', data.evidencias, 'Archivos o registros subidos'],
           ['Cursos', data.cursos, 'Cursos disponibles'],
           ...(data.isAdmin ? [
@@ -141,89 +143,6 @@ export default function ExportPDF({ data }: { data: ReportData }) {
 
       if (data.isAdmin) {
         y = (doc as any).lastAutoTable.finalY + 10
-        if (y > 235) { doc.addPage(); y = 20 }
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(12)
-        doc.setTextColor(...BLUE)
-        doc.text('Detalle de incidencias recientes', 14, y)
-
-        const flagged = data.recientes?.flagged ?? []
-        autoTable(doc, {
-          startY: y + 5,
-          head: [['Categoría', 'Mensaje', 'Emisor', 'Receptor', 'Estado', 'Fecha']],
-          body: flagged.length ? flagged.map((f: any) => [
-            f.category ?? '—',
-            trunc(f.content, 70),
-            trunc(f.sender?.full_name ?? f.sender?.email, 28),
-            trunc(f.receiver?.full_name ?? f.receiver?.email, 28),
-            f.reviewed ? 'Revisado' : 'Pendiente',
-            f.created_at ? new Date(f.created_at).toLocaleDateString('es-CL') : '—',
-          ]) : [['Sin incidencias recientes', '—', '—', '—', '—', '—']],
-          headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [254, 242, 242] },
-          styles: { fontSize: 7.8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
-          columnStyles: { 1: { cellWidth: 55 } },
-        })
-
-        y = (doc as any).lastAutoTable.finalY + 10
-        if (y > 235) { doc.addPage(); y = 20 }
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(12)
-        doc.setTextColor(...BLUE)
-        doc.text('Actividad administrativa reciente', 14, y)
-
-        const audit = data.recientes?.audit ?? []
-        autoTable(doc, {
-          startY: y + 5,
-          head: [['Acción', 'Entidad', 'Detalle', 'Usuario', 'Fecha']],
-          body: audit.length ? audit.map((a: any) => [
-            a.action ?? '—',
-            a.entity ?? '—',
-            trunc(a.entity_name, 44),
-            trunc(a.user_email, 35),
-            a.created_at ? new Date(a.created_at).toLocaleString('es-CL') : '—',
-          ]) : [['Sin actividad reciente', '—', '—', '—', '—']],
-          headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
-          styles: { fontSize: 8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
-        })
-
-        y = (doc as any).lastAutoTable.finalY + 10
-        if (y > 235) { doc.addPage(); y = 20 }
-        doc.setFont('helvetica', 'bold')
-        doc.setFontSize(12)
-        doc.setTextColor(...BLUE)
-        doc.text('Ingresos y descargas recientes', 14, y)
-
-        const accessLogs = data.recientes?.accessLogs ?? []
-        const reportDownloads = data.recientes?.reportDownloads ?? []
-        const activityRows = [
-          ...accessLogs.slice(0, 18).map((l: any) => [
-            'Acceso',
-            l.event_type ?? '—',
-            trunc(l.pathname, 40),
-            trunc(l.profiles?.full_name ?? l.profiles?.email, 34),
-            l.created_at ? new Date(l.created_at).toLocaleString('es-CL') : '—',
-          ]),
-          ...reportDownloads.slice(0, 12).map((d: any) => [
-            'PDF',
-            d.report_type ?? '—',
-            'Descarga de reporte',
-            trunc(d.profiles?.full_name ?? d.profiles?.email, 34),
-            d.created_at ? new Date(d.created_at).toLocaleString('es-CL') : '—',
-          ]),
-        ].sort((a: any, b: any) => String(b[4]).localeCompare(String(a[4])))
-
-        autoTable(doc, {
-          startY: y + 5,
-          head: [['Tipo', 'Evento', 'Detalle', 'Usuario', 'Fecha']],
-          body: activityRows.length ? activityRows : [['Sin registros recientes', '—', '—', '—', '—']],
-          headStyles: { fillColor: [8, 145, 178], textColor: 255, fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [236, 254, 255] },
-          styles: { fontSize: 8, cellPadding: 2.2, overflow: 'linebreak', textColor: TEXT },
-        })
-
-        y = (doc as any).lastAutoTable.finalY + 10
         if (y > 230) { doc.addPage(); y = 20 }
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(12)
@@ -261,17 +180,10 @@ export default function ExportPDF({ data }: { data: ReportData }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          report_type: data.isAdmin ? 'reporte-admin-completo' : 'reporte-general',
-          filters: { generated_from: 'reportes-page' },
-          summary: {
-            usuarios: data.usuarios,
-            proyectos: data.proyectos,
-            evidencias: data.evidencias,
-            incidencias: data.incidencias ?? 0,
-            accesos: Object.values(data.accessEvents ?? {}).reduce((a, b) => a + b, 0),
-          },
+          report_type: data.isAdmin ? 'admin_full' : 'general',
+          summary: { proyectos: data.proyectos, proyectosRevisados: data.proyectosRevisados ?? data.porEstado?.Revisado ?? 0, usuarios: data.usuarios, evidencias: data.evidencias },
         }),
-      }).catch(() => {})
+      }).catch(() => null)
 
       doc.save(`reporte-sello-tecnologico-${fileDate}.pdf`)
     } finally {
@@ -280,9 +192,13 @@ export default function ExportPDF({ data }: { data: ReportData }) {
   }
 
   return (
-    <button onClick={handleExport} disabled={loading}
-      className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50">
-      {loading ? '⏳ Generando PDF...' : '📄 Descargar reporte PDF'}
+    <button
+      type="button"
+      onClick={handleExport}
+      disabled={loading}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {loading ? 'Generando PDF…' : '📄 Exportar PDF'}
     </button>
   )
 }
