@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useCallback, useState } from 'react'
 import Link from 'next/link'
 
 type TrendingPage = {
@@ -25,19 +25,25 @@ export default function VitrinaSocialPanel({ slug, theme, accent }: { slug: stri
   const [data, setData] = useState<SocialData>({ trending: [] })
   const apiUrl = useMemo(() => `/api/vitrinas/social/${slug}`, [slug])
 
-  useEffect(() => {
-    const refresh = async () => {
-      setLoading(true)
-      const response = await fetch(apiUrl, { cache: 'no-store' })
-      if (response.ok) {
-        const nextData = await response.json()
-        setData({ trending: nextData.trending ?? [] })
-      }
-      setLoading(false)
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    const response = await fetch(apiUrl, { cache: 'no-store' })
+    if (response.ok) {
+      const nextData = await response.json()
+      setData({ trending: nextData.trending ?? [] })
     }
-
-    refresh()
+    if (!silent) setLoading(false)
   }, [apiUrl])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    const handleUpdate = () => refresh(true)
+    window.addEventListener('vitrina-social-updated', handleUpdate)
+    return () => window.removeEventListener('vitrina-social-updated', handleUpdate)
+  }, [refresh])
 
   return (
     <aside className="space-y-4 lg:sticky lg:top-6 self-start">
