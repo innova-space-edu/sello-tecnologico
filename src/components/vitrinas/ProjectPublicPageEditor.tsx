@@ -20,6 +20,14 @@ type PublicPage = {
   description?: string | null
   theme_color?: string | null
   accent_color?: string | null
+  layout_style?: string | null
+  background_style?: string | null
+  font_style?: string | null
+  hero_badge?: string | null
+  call_to_action_label?: string | null
+  call_to_action_url?: string | null
+  show_author?: boolean | null
+  show_trending?: boolean | null
   status: string
   is_public: boolean
   published_at?: string | null
@@ -51,12 +59,40 @@ const BLOCK_TYPES = [
   { value: 'audio', label: 'Bloque de audio' },
   { value: 'video', label: 'Bloque de video' },
   { value: 'gallery', label: 'Galería' },
+  { value: 'call_to_action', label: 'Botón / enlace' },
   { value: 'credits', label: 'Créditos' },
 ]
 
+const QUICK_BLOCKS: Record<string, Block> = {
+  podcast: {
+    type: 'podcast_episode',
+    title: 'Nuevo episodio del podcast',
+    content: 'Resumen del episodio, participantes, tema principal y conclusiones de la conversación.',
+    sort_order: 0,
+  },
+  post: {
+    type: 'post',
+    title: 'Nueva publicación del equipo',
+    content: 'Cuenta qué realizaron, qué aprendieron y qué evidencia agregaron.',
+    sort_order: 0,
+  },
+  gallery: {
+    type: 'gallery',
+    title: 'Galería del proceso',
+    content: 'Describe las imágenes o evidencias visuales que están compartiendo.',
+    sort_order: 0,
+  },
+  cta: {
+    type: 'call_to_action',
+    title: 'Visita nuestro recurso',
+    content: 'https://',
+    sort_order: 0,
+  },
+}
+
 const DEFAULT_BLOCKS: Block[] = [
   {
-    type: 'text',
+    type: 'post',
     title: 'Sobre nuestro proyecto',
     content: 'Describe brevemente el objetivo del proyecto, el problema que aborda y por qué es importante para la comunidad escolar.',
     sort_order: 0,
@@ -77,6 +113,10 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 70)
+}
+
+function cleanTitle(value: string) {
+  return value.replace(/^Vitrina:\s*/i, '').trim()
 }
 
 function assetType(file: File) {
@@ -111,15 +151,21 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     title: '',
     slug: '',
     description: '',
-    theme_color: '#2563eb',
-    accent_color: '#0ea5e9',
+    theme_color: '#111827',
+    accent_color: '#7c3aed',
+    layout_style: 'magazine',
+    background_style: 'soft_gradient',
+    font_style: 'modern',
+    hero_badge: '',
+    call_to_action_label: '',
+    call_to_action_url: '',
+    show_author: true,
+    show_trending: true,
   })
 
   const publicUrl = page?.slug && typeof window !== 'undefined'
     ? `${window.location.origin}/p/${page.slug}`
-    : page?.slug
-      ? `/p/${page.slug}`
-      : ''
+    : page?.slug ? `/p/${page.slug}` : ''
 
   const isStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(role)
   const canPublish = isStaff || role === 'estudiante'
@@ -131,7 +177,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        setError('Debes iniciar sesión para editar la vitrina del proyecto.')
+        setError('Debes iniciar sesión para editar la página pública del proyecto.')
         setLoading(false)
         return
       }
@@ -157,11 +203,19 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         const currentPage = existingPage as PublicPage
         setPage(currentPage)
         setForm({
-          title: currentPage.title ?? '',
+          title: cleanTitle(currentPage.title ?? ''),
           slug: currentPage.slug ?? '',
           description: currentPage.description ?? '',
-          theme_color: currentPage.theme_color ?? '#2563eb',
-          accent_color: currentPage.accent_color ?? '#0ea5e9',
+          theme_color: currentPage.theme_color ?? '#111827',
+          accent_color: currentPage.accent_color ?? '#7c3aed',
+          layout_style: currentPage.layout_style ?? 'magazine',
+          background_style: currentPage.background_style ?? 'soft_gradient',
+          font_style: currentPage.font_style ?? 'modern',
+          hero_badge: currentPage.hero_badge ?? '',
+          call_to_action_label: currentPage.call_to_action_label ?? '',
+          call_to_action_url: currentPage.call_to_action_url ?? '',
+          show_author: currentPage.show_author !== false,
+          show_trending: currentPage.show_trending !== false,
         })
 
         const [{ data: currentBlocks }, { data: currentAssets }] = await Promise.all([
@@ -179,9 +233,9 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           : DEFAULT_BLOCKS)
         setAssets((currentAssets ?? []) as Asset[])
       } else if (proyecto) {
-        const baseTitle = `Vitrina: ${proyecto.title}`
+        const baseTitle = proyecto.title
         const baseSlug = `${slugify(proyecto.title)}-${Math.random().toString(36).slice(2, 7)}`
-        setForm(prev => ({ ...prev, title: baseTitle, slug: baseSlug }))
+        setForm(prev => ({ ...prev, title: baseTitle, slug: baseSlug, hero_badge: proyecto.courses?.name ?? '' }))
       }
 
       setLoading(false)
@@ -192,19 +246,27 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
 
   const ensurePage = async () => {
     if (!userId || !project) throw new Error('No hay usuario o proyecto válido.')
-    const cleanTitle = form.title.trim()
+    const cleanPageTitle = cleanTitle(form.title)
     const cleanSlug = slugify(form.slug || form.title)
-    if (!cleanTitle || !cleanSlug) throw new Error('Completa título y enlace público.')
+    if (!cleanPageTitle || !cleanSlug) throw new Error('Completa título y enlace público.')
 
     const payload = {
       project_id: project.id,
       course_id: project.course_id ?? null,
       created_by: page?.created_by ?? userId,
-      title: cleanTitle,
+      title: cleanPageTitle,
       slug: cleanSlug,
       description: form.description.trim() || null,
-      theme_color: form.theme_color || '#2563eb',
-      accent_color: form.accent_color || '#0ea5e9',
+      theme_color: form.theme_color || '#111827',
+      accent_color: form.accent_color || '#7c3aed',
+      layout_style: form.layout_style,
+      background_style: form.background_style,
+      font_style: form.font_style,
+      hero_badge: form.hero_badge.trim() || null,
+      call_to_action_label: form.call_to_action_label.trim() || null,
+      call_to_action_url: form.call_to_action_url.trim() || null,
+      show_author: form.show_author,
+      show_trending: form.show_trending,
       status: page?.status ?? 'draft',
       is_public: page?.is_public ?? false,
       updated_at: new Date().toISOString(),
@@ -217,10 +279,10 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         .eq('id', page.id)
         .select('*')
         .single()
-      if (updateError || !data) throw updateError ?? new Error('No se pudo actualizar la vitrina.')
+      if (updateError || !data) throw updateError ?? new Error('No se pudo actualizar la página.')
       const updated = data as PublicPage
       setPage(updated)
-      setForm(prev => ({ ...prev, slug: updated.slug }))
+      setForm(prev => ({ ...prev, title: cleanTitle(updated.title), slug: updated.slug }))
       return updated
     }
 
@@ -229,10 +291,10 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       .insert(payload)
       .select('*')
       .single()
-    if (insertError || !data) throw insertError ?? new Error('No se pudo crear la vitrina.')
+    if (insertError || !data) throw insertError ?? new Error('No se pudo crear la página.')
     const created = data as PublicPage
     setPage(created)
-    setForm(prev => ({ ...prev, slug: created.slug }))
+    setForm(prev => ({ ...prev, title: cleanTitle(created.title), slug: created.slug }))
     return created
   }
 
@@ -272,9 +334,11 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         content: block.content ?? '',
         sort_order: block.sort_order ?? index,
       })))
-      setMessage('Vitrina guardada correctamente.')
+      setMessage('Página guardada correctamente.')
+      return currentPage
     } catch (err: any) {
-      setError(err?.message ?? 'No fue posible guardar la vitrina.')
+      setError(err?.message ?? 'No fue posible guardar la página.')
+      return null
     } finally {
       setSaving(false)
     }
@@ -286,8 +350,8 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     setMessage('')
     setError('')
     try {
-      const currentPage = await ensurePage()
-      await guardar()
+      const currentPage = await guardar()
+      if (!currentPage) return
       const { data, error: publishError } = await supabase
         .from('project_public_pages')
         .update({ status: 'published', is_public: true, published_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -296,9 +360,9 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         .single()
       if (publishError || !data) throw publishError ?? new Error('No se pudo publicar.')
       setPage(data as PublicPage)
-      setMessage('Vitrina publicada. Ya puedes compartir el link público.')
+      setMessage('Página publicada. Ya puedes compartir el link público.')
     } catch (err: any) {
-      setError(err?.message ?? 'No fue posible publicar la vitrina.')
+      setError(err?.message ?? 'No fue posible publicar la página.')
     } finally {
       setSaving(false)
     }
@@ -317,7 +381,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         .single()
       if (unpublishError || !data) throw unpublishError ?? new Error('No se pudo despublicar.')
       setPage(data as PublicPage)
-      setMessage('Vitrina despublicada. El link público queda oculto.')
+      setMessage('Página despublicada. El link público queda oculto.')
     } catch (err: any) {
       setError(err?.message ?? 'No fue posible despublicar.')
     } finally {
@@ -375,8 +439,8 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     setBlocks(prev => prev.map((block, currentIndex) => currentIndex === index ? { ...block, ...patch } : block))
   }
 
-  const addBlock = () => {
-    setBlocks(prev => [...prev, { type: 'text', title: '', content: '', sort_order: prev.length }])
+  const addBlock = (template?: keyof typeof QUICK_BLOCKS) => {
+    setBlocks(prev => [...prev, { ...(template ? QUICK_BLOCKS[template] : { type: 'text', title: '', content: '', sort_order: 0 }), sort_order: prev.length }])
   }
 
   const removeBlock = (index: number) => {
@@ -384,7 +448,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
   }
 
   if (loading) {
-    return <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">Cargando editor de vitrina…</div>
+    return <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">Cargando editor de página pública…</div>
   }
 
   return (
@@ -395,9 +459,9 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
         <div className="flex flex-wrap justify-between gap-3 items-start mb-5">
           <div>
-            <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">Vitrina pública</p>
+            <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">Página pública</p>
             <h2 className="text-xl font-bold text-blue-900 mt-1">{project?.title ?? 'Proyecto'}</h2>
-            <p className="text-sm text-gray-500 mt-1">Crea una página pública con podcast, videos, imágenes, posts y materiales del proyecto.</p>
+            <p className="text-sm text-gray-500 mt-1">Diseña una página pública con podcast, videos, imágenes, posts, comentarios, likes y trending.</p>
           </div>
           <span className={`text-xs px-3 py-1 rounded-full font-semibold ${page?.is_public ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
             {page?.is_public ? 'Publicado' : 'Borrador'}
@@ -406,8 +470,8 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label className="text-sm font-medium text-gray-700">
-            Título de la página *
-            <input value={form.title} onChange={event => setForm({ ...form, title: event.target.value })}
+            Título público *
+            <input value={form.title} onChange={event => setForm({ ...form, title: cleanTitle(event.target.value) })}
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </label>
           <label className="text-sm font-medium text-gray-700">
@@ -425,15 +489,81 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </label>
           <label className="text-sm font-medium text-gray-700">
+            Etiqueta superior opcional
+            <input value={form.hero_badge} onChange={event => setForm({ ...form, hero_badge: event.target.value })}
+              placeholder="Ej: Podcast medioambiental"
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Fuente
+            <select value={form.font_style} onChange={event => setForm({ ...form, font_style: event.target.value })}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="modern">Moderna</option>
+              <option value="classic">Clásica</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-5">
+          <label className="text-sm font-medium text-gray-700">
             Color principal
             <input type="color" value={form.theme_color} onChange={event => setForm({ ...form, theme_color: event.target.value })}
-              className="mt-1 h-11 w-full border border-gray-300 rounded-lg px-2 py-1" />
+              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
           </label>
           <label className="text-sm font-medium text-gray-700">
             Color secundario
             <input type="color" value={form.accent_color} onChange={event => setForm({ ...form, accent_color: event.target.value })}
-              className="mt-1 h-11 w-full border border-gray-300 rounded-lg px-2 py-1" />
+              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
           </label>
+          <label className="text-sm font-medium text-gray-700">
+            Fondo
+            <select value={form.background_style} onChange={event => setForm({ ...form, background_style: event.target.value })}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="soft_gradient">Gradiente suave</option>
+              <option value="solid">Limpio blanco</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            Diseño
+            <select value={form.layout_style} onChange={event => setForm({ ...form, layout_style: event.target.value })}
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="magazine">Revista / podcast</option>
+              <option value="gallery">Galería</option>
+              <option value="campaign">Campaña</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+          <label className="text-sm font-medium text-gray-700">
+            Botón principal opcional
+            <input value={form.call_to_action_label} onChange={event => setForm({ ...form, call_to_action_label: event.target.value })}
+              placeholder="Ej: Ver informe completo"
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            URL del botón
+            <input value={form.call_to_action_url} onChange={event => setForm({ ...form, call_to_action_url: event.target.value })}
+              placeholder="https://"
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap gap-3 mt-5">
+          <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <input type="checkbox" checked={form.show_author} onChange={event => setForm({ ...form, show_author: event.target.checked })} />
+            Mostrar creador
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <input type="checkbox" checked={form.show_trending} onChange={event => setForm({ ...form, show_trending: event.target.checked })} />
+            Mostrar panel trending/comentarios
+          </label>
+        </div>
+
+        <div className="mt-5 rounded-2xl p-5 border" style={{ background: `linear-gradient(135deg, ${form.theme_color}18, ${form.accent_color}24)`, borderColor: `${form.accent_color}33` }}>
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: form.accent_color }}>Vista previa rápida</p>
+          <h3 className="text-3xl font-black mt-2" style={{ color: form.theme_color }}>{form.title || 'Título de la página'}</h3>
+          <p className="text-sm text-gray-600 mt-2">Aquí se aplican el color principal y secundario seleccionados.</p>
         </div>
 
         {publicUrl && (
@@ -447,18 +577,25 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
         <div className="flex flex-wrap justify-between gap-3 items-center mb-4">
           <div>
-            <h2 className="font-bold text-blue-900">🧩 Secciones de la página</h2>
-            <p className="text-sm text-gray-500">Agrega bloques tipo podcast, post, texto, galería o créditos.</p>
+            <h2 className="font-bold text-blue-900">🧩 Herramientas y secciones</h2>
+            <p className="text-sm text-gray-500">Agrega bloques rápidos para armar la versión publicable.</p>
           </div>
-          <button type="button" onClick={addBlock} className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold">
-            + Agregar bloque
+          <button type="button" onClick={() => addBlock()} className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-semibold">
+            + Bloque vacío
           </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-5">
+          <button type="button" onClick={() => addBlock('podcast')} className="px-3 py-2 rounded-lg bg-purple-50 text-purple-700 text-sm font-semibold">+ Episodio podcast</button>
+          <button type="button" onClick={() => addBlock('post')} className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-semibold">+ Post</button>
+          <button type="button" onClick={() => addBlock('gallery')} className="px-3 py-2 rounded-lg bg-green-50 text-green-700 text-sm font-semibold">+ Galería</button>
+          <button type="button" onClick={() => addBlock('cta')} className="px-3 py-2 rounded-lg bg-orange-50 text-orange-700 text-sm font-semibold">+ Botón/enlace</button>
         </div>
 
         <div className="space-y-3">
           {blocks.map((block, index) => (
             <div key={`${block.id ?? 'new'}-${index}`} className="border border-gray-200 rounded-xl p-4 bg-gray-50">
-              <div className="grid grid-cols-1 md:grid-cols-[180px_1fr_auto] gap-3 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-[190px_1fr_auto] gap-3 items-start">
                 <select value={block.type} onChange={event => updateBlock(index, { type: event.target.value })}
                   className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white">
                   {BLOCK_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
@@ -471,7 +608,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
                 </button>
               </div>
               <textarea value={block.content} onChange={event => updateBlock(index, { content: event.target.value })}
-                placeholder="Contenido, resumen, guion, descripción del episodio o mensaje para visitantes."
+                placeholder="Contenido, resumen, guion, descripción del episodio, URL o mensaje para visitantes."
                 rows={4}
                 className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
@@ -526,6 +663,11 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           <button type="button" onClick={despublicar} disabled={saving} className="px-5 py-2.5 rounded-xl border border-orange-200 text-orange-700 text-sm font-semibold disabled:opacity-60">
             Ocultar página
           </button>
+        )}
+        {publicUrl && (
+          <a href={publicUrl} target="_blank" rel="noreferrer" className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold">
+            Vista pública
+          </a>
         )}
         <button type="button" onClick={publicar} disabled={saving || uploading} className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-60">
           {saving ? 'Publicando…' : 'Publicar y generar link'}
