@@ -36,6 +36,10 @@ function formatDate(date: string) {
   })
 }
 
+function notifySocialUpdate() {
+  window.dispatchEvent(new CustomEvent('vitrina-social-updated'))
+}
+
 export default function VitrinaInlineInteraction({
   slug,
   targetType,
@@ -97,6 +101,7 @@ export default function VitrinaInlineInteraction({
         body: JSON.stringify({ action: 'view', visitorKey, targetType, targetId }),
       }).catch(() => null)
       await refresh()
+      notifySocialUpdate()
     }
 
     init()
@@ -111,7 +116,10 @@ export default function VitrinaInlineInteraction({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'like', visitorKey, targetType, targetId }),
     })
-    if (response.ok) await refresh()
+    if (response.ok) {
+      await refresh()
+      notifySocialUpdate()
+    }
     setSending(false)
   }
 
@@ -133,6 +141,7 @@ export default function VitrinaInlineInteraction({
       setShowComments(true)
       setNotice('Comentario publicado correctamente.')
       await refresh()
+      notifySocialUpdate()
       window.setTimeout(() => setNotice(''), 2400)
     } else {
       const result = await response.json().catch(() => ({}))
