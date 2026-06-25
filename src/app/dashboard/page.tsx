@@ -2,394 +2,486 @@ import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 
+const STATUS_ORDER = ['Borrador', 'En progreso', 'En revisión', 'Aprobado', 'Cerrado']
+
+const statusColor: Record<string, string> = {
+  'Borrador': 'bg-slate-100 text-slate-600 ring-slate-200',
+  'En progreso': 'bg-blue-100 text-blue-700 ring-blue-200',
+  'En revisión': 'bg-amber-100 text-amber-700 ring-amber-200',
+  'Aprobado': 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+  'Cerrado': 'bg-rose-100 text-rose-700 ring-rose-200',
+}
+
+const typeIcon: Record<string, string> = {
+  documento: '📄',
+  foto: '🖼️',
+  video: '🎥',
+  enlace: '🔗',
+  presentación: '📊',
+  código: '💻',
+}
+
+function formatDate(date?: string | null) {
+  if (!date) return '—'
+  return new Date(date).toLocaleDateString('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  })
+}
+
+function formatDateTime(date?: string | null) {
+  if (!date) return '—'
+  return new Date(date).toLocaleDateString('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function lastActivity(project: any) {
+  return project.last_autosave_at ?? project.updated_at ?? project.created_at ?? ''
+}
+
+function percent(value: number, total: number) {
+  if (!total) return 0
+  return Math.round((value / total) * 100)
+}
+
+function uniqueById(items: any[]) {
+  return Array.from(new Map(items.filter(Boolean).map((item: any) => [item.id, item])).values())
+}
+
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen bg-slate-50">
+        <Sidebar />
+        <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
+          <div className="rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-sm">
+            <div className="mb-3 text-5xl">🔐</div>
+            <h1 className="text-xl font-bold text-slate-900">Sesión no disponible</h1>
+            <p className="mt-2 text-sm text-slate-500">Inicia sesión nuevamente para ver tu panel.</p>
+            <Link href="/login" className="mt-5 inline-flex rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700">
+              Ir al login
+            </Link>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   const { data: perfil } = await supabase
     .from('profiles')
-    .select('*')
-    .eq('id', user?.id ?? '')
+    .select('id, role, full_name, email, curso')
+    .eq('id', user.id)
     .single()
 
   const role = perfil?.role ?? ''
+  const isStudent = role === 'estudiante'
+  const isStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(role)
   const isAdmin = role === 'admin'
-  const isDocente = role === 'docente'
-  const isAdminOrDocente = isAdmin || isDocente
+  const today = new Date().toISOString().split('T')[0]
 
-  const { count: cursosCount } = await supabase
-    .from('courses')
+  let proyectos: any[] = []
+  let evidencias: any[] = []
+  let paginasPublicas: any[] = []
+  let cursosCount = 0
+  let usuariosCount = 0
+  let invitacionesPendientes: any[] = []
+
+  const { count: unreadMessages } = await supabase
+    .from('messages')
     .select('*', { count: 'exact', head: true })
+    .eq('receiver_id', user.id)
+    .eq('read', false)
 
-  const { count: proyectosCount } = await supabase
-    .from('projects')
-    .select('*', { count: 'exact', head: true })
+  if (isStudent) {
+    const [{ data: propios }, { data: colaboraciones }, { data: invitaciones }] = await Promise.all([
+      supabase
+        .from('projects')
+        .select('id, title, status, owner_id, course_id, created_at, updated_at, last_autosave_at, start_date, end_date, is_draft, courses(name), profiles!projects_owner_id_fkey(full_name)')
+        .eq('owner_id', user.id)
+        .order('updated_at', { ascending: false }),
+      supabase
+        .from('project_collaborators')
+        .select('project_id')
+        .eq('user_id', user.id)
+        .eq('status', 'accepted'),
+      supabase
+        .from('project_invitations')
+        .select('id, created_at, projects(title), courses(name), profiles!project_invitations_enviado_por_fkey(full_name)')
+        .eq('estudiante_id', user.id)
+        .eq('estado', 'pendiente')
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ])
 
-  const { count: evidenciasCount } = await supabase
-    .from('evidences')
-    .select('*', { count: 'exact', head: true })
+    const sharedIds = Array.from(new Set((colaboraciones ?? []).map((item: any) => item.project_id).filter(Boolean)))
+    let compartidos: any[] = []
+    if (sharedIds.length > 0) {
+      const { data } = await supabase
+        .from('projects')
+        .select('id, title, status, owner_id, course_id, created_at, updated_at, last_autosave_at, start_date, end_date, is_draft, courses(name), profiles!projects_owner_id_fkey(full_name)')
+        .in('id', sharedIds)
+        .order('updated_at', { ascending: false })
+      compartidos = data ?? []
+    }
 
-  const { count: usuariosCount } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
+    proyectos = uniqueById([...(propios ?? []), ...compartidos])
+      .sort((a: any, b: any) => new Date(lastActivity(b)).getTime() - new Date(lastActivity(a)).getTime())
 
-  const hoy = new Date().toISOString().split('T')[0]
+    invitacionesPendientes = invitaciones ?? []
+    const projectIds = proyectos.map((p: any) => p.id).filter(Boolean)
+    cursosCount = new Set(proyectos.map((p: any) => p.course_id).filter(Boolean)).size
 
-  const { data: invitacionesPendientes } = await supabase
-    .from('project_invitations')
-    .select(
-      'id, projects(title), courses(name), profiles!project_invitations_enviado_por_fkey(full_name), created_at'
-    )
-    .eq('estudiante_id', user?.id ?? '')
-    .eq('estado', 'pendiente')
-    .order('created_at', { ascending: false })
+    if (projectIds.length > 0) {
+      const [{ data: ev }, { data: pages }] = await Promise.all([
+        supabase
+          .from('evidences')
+          .select('id, title, type, evidencia_tipo, created_at, project_id, profiles(full_name), projects(title)')
+          .in('project_id', projectIds)
+          .order('created_at', { ascending: false })
+          .limit(8),
+        supabase
+          .from('project_public_pages')
+          .select('id, title, slug, status, is_public, updated_at, project_id')
+          .in('project_id', projectIds)
+          .order('updated_at', { ascending: false })
+          .limit(8),
+      ])
+      evidencias = ev ?? []
+      paginasPublicas = pages ?? []
+    }
+  } else {
+    const [coursesRes, usersRes, projectsRes, evidencesRes, pagesRes] = await Promise.all([
+      supabase.from('courses').select('*', { count: 'exact', head: true }),
+      isStaff
+        ? supabase.from('profiles').select('*', { count: 'exact', head: true })
+        : Promise.resolve({ count: 0 }),
+      supabase
+        .from('projects')
+        .select('id, title, status, owner_id, course_id, created_at, updated_at, last_autosave_at, start_date, end_date, is_draft, courses(name), profiles!projects_owner_id_fkey(full_name)')
+        .order('updated_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('evidences')
+        .select('id, title, type, evidencia_tipo, created_at, project_id, profiles(full_name), projects(title)')
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase
+        .from('project_public_pages')
+        .select('id, title, slug, status, is_public, updated_at, project_id')
+        .order('updated_at', { ascending: false })
+        .limit(10),
+    ])
 
-  const { data: atrasados } = await supabase
-    .from('projects')
-    .select('id, title, end_date, status, courses(name)')
-    .lt('end_date', hoy)
-    .not('status', 'in', '("Aprobado","Cerrado")')
-    .order('end_date', { ascending: true })
-
-  const { data: enRevision } = await supabase
-    .from('projects')
-    .select('id, title, courses(name)')
-    .eq('status', 'En revisión')
-
-  const { data: ultimasEvidencias } = await supabase
-    .from('evidences')
-    .select('id, title, type, created_at, profiles(full_name)')
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  const stats = [
-    {
-      label: 'Cursos',
-      value: cursosCount ?? 0,
-      icon: '📚',
-      color: 'bg-blue-100 text-blue-700',
-      href: '/cursos',
-      visible: true,
-    },
-    {
-      label: 'Proyectos',
-      value: proyectosCount ?? 0,
-      icon: '🗂️',
-      color: 'bg-indigo-100 text-indigo-700',
-      href: '/proyectos',
-      visible: true,
-    },
-    {
-      label: 'Evidencias',
-      value: evidenciasCount ?? 0,
-      icon: '📎',
-      color: 'bg-sky-100 text-sky-700',
-      href: '/evidencias',
-      visible: true,
-    },
-    {
-      label: 'Usuarios',
-      value: usuariosCount ?? 0,
-      icon: '👥',
-      color: 'bg-purple-100 text-purple-700',
-      href: '/usuarios',
-      visible: isAdminOrDocente,
-    },
-  ].filter((s) => s.visible)
-
-  const accesosRapidos = [
-    { href: '/cursos/nuevo', label: 'Nuevo curso', icon: '📚', visible: isAdminOrDocente },
-    { href: '/proyectos/nuevo', label: 'Nuevo proyecto', icon: '🗂️', visible: true },
-    { href: '/evidencias/nueva', label: 'Nueva evidencia', icon: '📎', visible: true },
-    { href: '/portafolio', label: 'Ver portafolio', icon: '📝', visible: true },
-    { href: '/reportes', label: 'Ver reportes', icon: '📈', visible: isAdminOrDocente },
-    { href: '/usuarios', label: 'Gestionar usuarios', icon: '👥', visible: isAdmin },
-  ].filter((item) => item.visible)
-
-  const typeIcon: Record<string, string> = {
-    documento: '📄',
-    foto: '🖼️',
-    video: '🎥',
-    enlace: '🔗',
-    presentación: '📊',
-    código: '💻',
+    cursosCount = coursesRes.count ?? 0
+    usuariosCount = usersRes.count ?? 0
+    proyectos = projectsRes.data ?? []
+    evidencias = evidencesRes.data ?? []
+    paginasPublicas = pagesRes.data ?? []
   }
 
-  const totalAtrasados = atrasados?.length ?? 0
-  const totalRevision = enRevision?.length ?? 0
-  const totalInvitaciones = invitacionesPendientes?.length ?? 0
+  const totalProyectos = proyectos.length
+  const estados = STATUS_ORDER.map(status => ({
+    status,
+    count: proyectos.filter((p: any) => p.status === status).length,
+  }))
+  const proyectosActivos = proyectos.filter((p: any) => ['En progreso', 'En revisión'].includes(p.status)).length
+  const enRevision = proyectos.filter((p: any) => p.status === 'En revisión')
+  const borradores = proyectos.filter((p: any) => p.status === 'Borrador' || p.is_draft)
+  const aprobados = proyectos.filter((p: any) => p.status === 'Aprobado' || p.status === 'Cerrado').length
+  const atrasados = proyectos.filter((p: any) => p.end_date && p.end_date < today && !['Aprobado', 'Cerrado'].includes(p.status))
+  const publicadas = paginasPublicas.filter((p: any) => p.is_public && p.status === 'published').length
+  const paginasBorrador = paginasPublicas.filter((p: any) => !p.is_public || p.status !== 'published').length
+  const proyectosConEvidencia = new Set(evidencias.map((ev: any) => ev.project_id).filter(Boolean))
+  const proyectosSinEvidencia = proyectos.filter((p: any) => !proyectosConEvidencia.has(p.id))
+
+  const courseMap = new Map<string, any>()
+  proyectos.forEach((p: any) => {
+    const key = p.course_id ?? '__sin_curso__'
+    const nombre = p.courses?.name ?? 'Sin curso asignado'
+    const item = courseMap.get(key) ?? { key, nombre, total: 0, activos: 0, revision: 0, atrasados: 0 }
+    item.total += 1
+    if (['En progreso', 'En revisión'].includes(p.status)) item.activos += 1
+    if (p.status === 'En revisión') item.revision += 1
+    if (p.end_date && p.end_date < today && !['Aprobado', 'Cerrado'].includes(p.status)) item.atrasados += 1
+    courseMap.set(key, item)
+  })
+  const cursosMovimiento = Array.from(courseMap.values()).sort((a, b) => b.total - a.total).slice(0, 6)
+
+  const recentProjects = proyectos.slice(0, 6)
+  const recentEvidence = evidencias.slice(0, 6)
+  const recentPages = paginasPublicas.slice(0, 5)
+  const avanceGeneral = percent(aprobados, totalProyectos)
+
+  const statCards = [
+    { label: isStudent ? 'Mis proyectos' : 'Proyectos', value: totalProyectos, icon: '🗂️', color: 'bg-blue-50 text-blue-700 ring-blue-100', href: '/proyectos' },
+    { label: 'Activos', value: proyectosActivos, icon: '🚀', color: 'bg-indigo-50 text-indigo-700 ring-indigo-100', href: '/proyectos?estado=En%20progreso' },
+    { label: 'En revisión', value: enRevision.length, icon: '⏳', color: 'bg-amber-50 text-amber-700 ring-amber-100', href: '/proyectos?estado=En%20revisión' },
+    { label: 'Evidencias', value: evidencias.length, icon: '📎', color: 'bg-sky-50 text-sky-700 ring-sky-100', href: '/evidencias' },
+    { label: 'Páginas públicas', value: publicadas, icon: '🌐', color: 'bg-emerald-50 text-emerald-700 ring-emerald-100', href: '/vitrinas' },
+    { label: isStudent ? 'Cursos vinculados' : 'Cursos', value: cursosCount, icon: '📚', color: 'bg-violet-50 text-violet-700 ring-violet-100', href: '/cursos' },
+    { label: 'Mensajes sin leer', value: unreadMessages ?? 0, icon: '💬', color: 'bg-rose-50 text-rose-700 ring-rose-100', href: '/mensajes' },
+    { label: 'Usuarios', value: usuariosCount, icon: '👥', color: 'bg-purple-50 text-purple-700 ring-purple-100', href: '/usuarios', visible: isStaff },
+  ].filter(card => card.visible !== false)
+
+  const priorities = isStudent
+    ? [
+        { title: 'Invitaciones pendientes', value: invitacionesPendientes.length, detail: 'Acepta o revisa invitaciones de proyectos compartidos.', icon: '📨', href: '/proyectos/aceptar', tone: 'blue', show: invitacionesPendientes.length > 0 },
+        { title: 'Proyectos activos', value: proyectosActivos, detail: 'Continúa los proyectos que están en progreso o revisión.', icon: '🚀', href: '/proyectos', tone: 'indigo', show: proyectosActivos > 0 },
+        { title: 'Sin evidencia registrada', value: proyectosSinEvidencia.length, detail: 'Agrega fotografías, archivos o enlaces para respaldar avances.', icon: '📎', href: '/evidencias/nueva', tone: 'sky', show: proyectosSinEvidencia.length > 0 },
+        { title: 'Páginas por publicar', value: paginasBorrador, detail: 'Revisa páginas públicas antes de compartir el enlace.', icon: '🌐', href: '/vitrinas', tone: 'emerald', show: paginasBorrador > 0 },
+      ].filter(item => item.show)
+    : [
+        { title: 'Pendientes de revisión', value: enRevision.length, detail: 'Proyectos esperando retroalimentación o aprobación.', icon: '⏳', href: '/proyectos?estado=En%20revisión', tone: 'amber', show: enRevision.length > 0 },
+        { title: 'Proyectos atrasados', value: atrasados.length, detail: 'Tienen fecha de término vencida y siguen abiertos.', icon: '⚠️', href: '/proyectos', tone: 'rose', show: atrasados.length > 0 },
+        { title: 'Borradores abiertos', value: borradores.length, detail: 'Proyectos creados que aún no avanzan a ejecución.', icon: '📋', href: '/proyectos?estado=Borrador', tone: 'slate', show: borradores.length > 0 },
+        { title: 'Páginas sin publicar', value: paginasBorrador, detail: 'Vitrinas listas para revisar antes de compartir.', icon: '🌐', href: '/vitrinas', tone: 'emerald', show: paginasBorrador > 0 },
+      ].filter(item => item.show)
+
+  const quickActions = [
+    { href: '/proyectos/nuevo', label: 'Crear proyecto', icon: '🗂️', visible: true },
+    { href: '/evidencias/nueva', label: 'Subir evidencia', icon: '📎', visible: true },
+    { href: '/vitrinas', label: 'Crear página pública', icon: '🌐', visible: true },
+    { href: '/proyectos', label: 'Ver proyectos', icon: '🔎', visible: true },
+    { href: '/usuarios', label: 'Usuarios', icon: '👥', visible: isStaff },
+    { href: '/reportes', label: 'Reportes', icon: '📈', visible: isStaff },
+    { href: '/mensajes', label: 'Mensajes', icon: '💬', visible: true },
+    { href: '/portafolio', label: 'Portafolio', icon: '📋', visible: true },
+  ].filter(action => action.visible)
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
       <Sidebar />
 
       <main className="lg:ml-64 flex-1 min-w-0 p-4 lg:p-8 pt-16 lg:pt-8">
-        <div className="mb-6">
-          <h1 className="text-xl lg:text-2xl font-bold text-blue-900">Dashboard</h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Bienvenido, <span className="font-medium">{perfil?.full_name ?? user?.email}</span>
-            {perfil?.role && (
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                {perfil.role}
-              </span>
-            )}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-          {isAdminOrDocente && (
-            <div className="bg-white rounded-xl border border-yellow-200 shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="text-xl bg-yellow-100 text-yellow-700 rounded-lg px-3 py-2">⚠️</div>
-                <div className="min-w-0">
-                  <p className="text-sm text-gray-500">Proyectos atrasados</p>
-                  <p className="text-xl font-bold text-yellow-700">{totalAtrasados}</p>
-                </div>
+        <section className="mb-6 overflow-hidden rounded-3xl bg-gradient-to-br from-blue-900 via-blue-700 to-sky-500 p-6 text-white shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="mb-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">
+                Panel actualizado · Sello Tecnológico
               </div>
-              <div className="mt-3">
-                <Link
-                  href="/proyectos?filtro=atrasados"
-                  className="inline-flex items-center text-xs font-semibold text-yellow-700 hover:text-yellow-800"
-                >
-                  Ver detalles →
-                </Link>
+              <h1 className="text-2xl lg:text-4xl font-black leading-tight">
+                Hola, {perfil?.full_name ?? user.email}
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm text-blue-50">
+                {isStudent
+                  ? 'Aquí puedes ver tus proyectos, invitaciones, evidencias y páginas públicas en un solo lugar.'
+                  : 'Resumen de gestión para revisar proyectos, cursos, evidencias, páginas públicas y acciones pendientes.'}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Rol: {role || 'sin rol'}</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Avance general: {avanceGeneral}%</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Actualizado: {new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>
-          )}
 
-          {isAdminOrDocente && (
-            <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-4">
-              <div className="flex items-center gap-3">
-                <div className="text-xl bg-amber-100 text-amber-700 rounded-lg px-3 py-2">⏳</div>
-                <div className="min-w-0">
-                  <p className="text-sm text-gray-500">Pendientes de revisión</p>
-                  <p className="text-xl font-bold text-amber-700">{totalRevision}</p>
-                </div>
+            <div className="rounded-2xl bg-white/15 p-4 ring-1 ring-white/20 backdrop-blur min-w-[220px]">
+              <p className="text-xs font-bold uppercase tracking-widest text-blue-100">Progreso</p>
+              <div className="mt-3 h-3 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full rounded-full bg-white" style={{ width: `${avanceGeneral}%` }} />
               </div>
-              <div className="mt-3">
-                <Link
-                  href="/proyectos?filtro=en-revision"
-                  className="inline-flex items-center text-xs font-semibold text-amber-700 hover:text-amber-800"
-                >
-                  Revisar ahora →
-                </Link>
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white rounded-xl border border-blue-200 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="text-xl bg-blue-100 text-blue-700 rounded-lg px-3 py-2">📨</div>
-              <div className="min-w-0">
-                <p className="text-sm text-gray-500">Invitaciones pendientes</p>
-                <p className="text-xl font-bold text-blue-700">{totalInvitaciones}</p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <Link
-                href="/proyectos/aceptar"
-                className="inline-flex items-center text-xs font-semibold text-blue-700 hover:text-blue-800"
-              >
-                Ver invitaciones →
-              </Link>
+              <p className="mt-2 text-xs text-blue-50">{aprobados} de {totalProyectos} proyectos aprobados o cerrados.</p>
             </div>
           </div>
-        </div>
+        </section>
 
-        {invitacionesPendientes && invitacionesPendientes.length > 0 && (
-          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg">📨</span>
-              <h2 className="font-semibold text-blue-700 text-sm">
-                Invitaciones de proyecto ({invitacionesPendientes.length})
-              </h2>
-            </div>
-
-            <div className="space-y-2">
-              {invitacionesPendientes.slice(0, 3).map((inv: any) => (
-                <div
-                  key={inv.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white rounded-lg px-3 py-2.5 border border-blue-100 gap-2"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-blue-800 text-sm truncate">
-                      {inv.projects?.title}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {inv.profiles?.full_name ?? 'Tu docente'} · {inv.courses?.name}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/proyectos/aceptar?inv=${inv.id}`}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
-                  >
-                    Ver invitación →
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isAdminOrDocente && atrasados && atrasados.length > 0 && (
-          <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-yellow-600 text-xl">⚠️</span>
-              <div>
-                <p className="font-semibold text-yellow-800 text-sm">
-                  Tienes {atrasados.length} proyectos atrasados
-                </p>
-                <p className="text-xs text-yellow-700">
-                  Revisa y gestiona los proyectos pendientes sin mostrar toda la lista aquí.
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/proyectos?filtro=atrasados"
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-xs font-semibold text-center"
-            >
-              Ver detalles
-            </Link>
-          </div>
-        )}
-
-        {isAdminOrDocente && enRevision && enRevision.length > 0 && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-amber-600 text-xl">⏳</span>
-              <div>
-                <p className="font-semibold text-amber-800 text-sm">
-                  Tienes {enRevision.length} proyectos pendientes de revisión
-                </p>
-                <p className="text-xs text-amber-700">
-                  Accede al listado completo para revisarlos con más comodidad.
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/proyectos?filtro=en-revision"
-              className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-xs font-semibold text-center"
-            >
-              Ir a revisión
-            </Link>
-          </div>
-        )}
-
-        <div className={`grid ${stats.length === 4 ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-3'} gap-3 lg:gap-5 mb-6`}>
-          {stats.map((s) => (
-            <Link
-              key={s.label}
-              href={s.href}
-              className="bg-white rounded-xl shadow-sm p-3 lg:p-4 flex items-center gap-2 lg:gap-3 hover:shadow-md transition-shadow min-w-0"
-            >
-              <div className={`text-base lg:text-xl p-2 lg:p-2.5 rounded-lg shrink-0 ${s.color}`}>
-                {s.icon}
-              </div>
-              <div className="min-w-0">
-                <div className="text-lg lg:text-xl font-bold text-gray-800 leading-tight">
-                  {s.value}
-                </div>
-                <div className="text-gray-500 text-xs truncate">{s.label}</div>
-              </div>
+        <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+          {statCards.map(card => (
+            <Link key={card.label} href={card.href} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md">
+              <div className={`mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl text-xl ring-1 ${card.color}`}>{card.icon}</div>
+              <div className="text-2xl font-black text-slate-950">{card.value}</div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">{card.label}</div>
             </Link>
           ))}
-        </div>
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm p-4 lg:p-5">
-            <div className="flex items-center justify-between mb-4 gap-3">
-              <h2 className="text-base font-semibold text-blue-900">Accesos rápidos</h2>
-              <span className="text-xs text-gray-400">
-                {isAdminOrDocente ? 'Administración y gestión' : 'Acciones disponibles'}
-              </span>
+        <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-black text-blue-950">Prioridades</h2>
+                <p className="text-xs text-slate-500">Lo más importante para revisar ahora.</p>
+              </div>
+              <Link href="/proyectos" className="text-xs font-bold text-blue-700 hover:underline">Ver proyectos →</Link>
             </div>
 
+            {priorities.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {priorities.map(item => (
+                  <Link key={item.title} href={item.href} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:bg-blue-50 hover:border-blue-200">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{item.icon}</span>
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{item.title}</p>
+                          <p className="mt-1 text-xs leading-relaxed text-slate-500">{item.detail}</p>
+                        </div>
+                      </div>
+                      <span className="rounded-xl bg-white px-3 py-1 text-lg font-black text-blue-800 ring-1 ring-slate-200">{item.value}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-sm text-emerald-700">
+                ✅ Todo se ve ordenado por ahora. No hay revisiones urgentes pendientes.
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+            <h2 className="font-black text-blue-950">Accesos rápidos</h2>
+            <p className="mb-4 text-xs text-slate-500">Herramientas más usadas.</p>
             <div className="grid grid-cols-2 gap-3">
-              {accesosRapidos.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                >
-                  <span className="text-lg shrink-0">{item.icon}</span>
-                  <span className="text-xs font-medium text-gray-700 leading-tight">
-                    {item.label}
-                  </span>
+              {quickActions.map(action => (
+                <Link key={action.href} href={action.href} className="rounded-2xl border border-slate-200 p-3 text-sm font-bold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800">
+                  <span className="mr-2">{action.icon}</span>{action.label}
                 </Link>
               ))}
             </div>
           </div>
+        </section>
 
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-4 lg:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
-              <h2 className="font-semibold text-blue-900 text-base">Últimas evidencias</h2>
-              <Link
-                href="/evidencias"
-                className="text-xs font-semibold text-blue-700 hover:text-blue-800"
-              >
-                Ver todas →
-              </Link>
+        <section className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70">
+            <h2 className="mb-4 font-black text-blue-950">Estado de proyectos</h2>
+            <div className="space-y-3">
+              {estados.map(item => (
+                <div key={item.status}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-600">{item.status}</span>
+                    <span className="text-slate-400">{item.count}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-blue-600" style={{ width: `${percent(item.count, totalProyectos)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200/70 xl:col-span-2">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-black text-blue-950">Cursos con movimiento</h2>
+                <p className="text-xs text-slate-500">Cursos agrupados por cantidad de proyectos.</p>
+              </div>
+              <Link href="/proyectos" className="text-xs font-bold text-blue-700 hover:underline">Abrir listado →</Link>
             </div>
 
-            {ultimasEvidencias && ultimasEvidencias.length > 0 ? (
-              <div className="divide-y divide-gray-100">
-                {ultimasEvidencias.map((ev: any) => (
-                  <div key={ev.id} className="px-4 lg:px-5 py-3 flex items-center gap-3">
-                    <span className="text-xl shrink-0">{typeIcon[ev.type] ?? '📎'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">{ev.title}</p>
-                      <p className="text-xs text-gray-400 truncate">
-                        {ev.profiles?.full_name ?? '—'}
-                      </p>
+            {cursosMovimiento.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {cursosMovimiento.map(curso => (
+                  <div key={curso.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-800">{curso.nombre}</p>
+                        <p className="text-xs text-slate-500">{curso.total} proyecto{curso.total !== 1 ? 's' : ''}</p>
+                      </div>
+                      <Link href={`/proyectos?curso=${encodeURIComponent(curso.nombre)}`} className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-blue-700 ring-1 ring-blue-100">Ver</Link>
                     </div>
-                    <span className="text-xs text-gray-400 shrink-0">
-                      {new Date(ev.created_at).toLocaleDateString('es-CL')}
-                    </span>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
+                      <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">{curso.activos} activos</span>
+                      <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">{curso.revision} revisión</span>
+                      {curso.atrasados > 0 && <span className="rounded-full bg-rose-100 px-2 py-1 text-rose-700">{curso.atrasados} atrasados</span>}
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="p-8 text-center text-gray-400 text-sm">Sin evidencias aún</div>
+              <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">No hay proyectos agrupados por curso todavía.</div>
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 lg:p-5">
-          <h2 className="text-base font-semibold text-blue-900 mb-4">Resumen del panel</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-              <p className="text-xs text-gray-500 mb-1">Estado general</p>
-              <p className="text-sm font-semibold text-gray-800">
-                {isAdminOrDocente
-                  ? 'Panel listo para gestión de cursos, proyectos y revisión.'
-                  : 'Panel listo para seguir tus proyectos, invitaciones y evidencias.'}
-              </p>
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+            <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+              <h2 className="font-black text-blue-950">Proyectos recientes</h2>
+              <Link href="/proyectos" className="text-xs font-bold text-blue-700 hover:underline">Todos →</Link>
             </div>
-
-            <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-              <p className="text-xs text-gray-500 mb-1">Recomendación</p>
-              <p className="text-sm font-semibold text-gray-800">
-                {isAdminOrDocente
-                  ? 'Usa “Ver detalles” para administrar atrasos sin saturar el dashboard.'
-                  : 'Revisa tus invitaciones pendientes y completa evidencias recientes.'}
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-              <p className="text-xs text-gray-500 mb-1">Siguiente paso</p>
-              <p className="text-sm font-semibold text-gray-800">
-                {isAdminOrDocente
-                  ? 'Organiza proyectos compartidos y revisa portafolios.'
-                  : 'Continúa tu trabajo en proyectos y mantén tu portafolio actualizado.'}
-              </p>
-            </div>
+            {recentProjects.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {recentProjects.map((project: any) => (
+                  <Link key={project.id} href={`/proyectos/${project.id}`} className="block px-5 py-4 transition hover:bg-blue-50/60">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-800">{project.title}</p>
+                        <p className="mt-1 truncate text-xs text-slate-400">{project.courses?.name ?? 'Sin curso'} · {project.profiles?.full_name ?? '—'}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${statusColor[project.status] ?? 'bg-slate-100 text-slate-600 ring-slate-200'}`}>{project.status}</span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">Última actividad: {formatDateTime(lastActivity(project))}</p>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-sm text-slate-400">Sin proyectos todavía.</div>
+            )}
           </div>
-        </div>
+
+          <div className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+            <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+              <h2 className="font-black text-blue-950">Últimas evidencias</h2>
+              <Link href="/evidencias" className="text-xs font-bold text-blue-700 hover:underline">Todas →</Link>
+            </div>
+            {recentEvidence.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {recentEvidence.map((ev: any) => (
+                  <div key={ev.id} className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{typeIcon[ev.type] ?? '📎'}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-slate-800">{ev.title}</p>
+                        <p className="truncate text-xs text-slate-400">{ev.projects?.title ?? ev.profiles?.full_name ?? '—'}</p>
+                      </div>
+                      <span className="shrink-0 text-[11px] text-slate-400">{formatDate(ev.created_at)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-sm text-slate-400">Sin evidencias recientes.</div>
+            )}
+          </div>
+
+          <div className="rounded-3xl bg-white shadow-sm ring-1 ring-slate-200/70 overflow-hidden">
+            <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+              <h2 className="font-black text-blue-950">Páginas públicas</h2>
+              <Link href="/vitrinas" className="text-xs font-bold text-blue-700 hover:underline">Gestionar →</Link>
+            </div>
+            {recentPages.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {recentPages.map((page: any) => (
+                  <div key={page.id} className="px-5 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-slate-800">{String(page.title ?? '').replace(/^Vitrina:\s*/i, '')}</p>
+                        <p className="text-xs text-slate-400">Actualizada: {formatDate(page.updated_at)}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${page.is_public && page.status === 'published' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {page.is_public && page.status === 'published' ? 'Publicada' : 'Borrador'}
+                      </span>
+                    </div>
+                    {page.is_public && page.status === 'published' && (
+                      <Link href={`/p/${page.slug}`} className="mt-2 inline-flex text-xs font-bold text-blue-700 hover:underline">Abrir página pública →</Link>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-sm text-slate-400">Aún no hay páginas públicas.</div>
+            )}
+          </div>
+        </section>
       </main>
     </div>
   )
