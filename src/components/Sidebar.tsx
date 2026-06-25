@@ -13,7 +13,7 @@ const menu = [
   { href: '/admin', label: 'Panel Admin', icon: '👑' },
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
-  { href: '/vitrinas', label: 'Vitrinas', icon: '🌐' },
+  { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/seguimientos', label: 'Seguimiento', icon: '🧭' },
   { href: '/autoevaluacion', label: 'Autoevaluación', icon: '🌱' },
