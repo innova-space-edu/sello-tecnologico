@@ -27,43 +27,29 @@ function normalizeTarget(targetType?: string | null, targetId?: string | null) {
 }
 
 function withTarget(query: any, targetType: TargetType, targetId: string | null) {
-  if (targetType === 'block' && targetId) {
-    return query.eq('block_id', targetId).is('asset_id', null)
-  }
-
-  if (targetType === 'asset' && targetId) {
-    return query.eq('asset_id', targetId).is('block_id', null)
-  }
-
+  if (targetType === 'block' && targetId) return query.eq('block_id', targetId).is('asset_id', null)
+  if (targetType === 'asset' && targetId) return query.eq('asset_id', targetId).is('block_id', null)
   return query.is('block_id', null).is('asset_id', null)
+}
+
+function withReadTarget(query: any, targetType: TargetType, targetId: string | null) {
+  if (targetType === 'block' && targetId) return query.eq('block_id', targetId).is('asset_id', null)
+  if (targetType === 'asset' && targetId) return query.eq('asset_id', targetId).is('block_id', null)
+  return query
 }
 
 async function validateTarget(admin: ReturnType<typeof createAdminSupabaseClient>, pageId: string, targetType: TargetType, targetId: string | null) {
   if (targetType === 'page') return { block_id: null, asset_id: null, error: null }
 
-  if (!targetId) {
-    return { block_id: null, asset_id: null, error: 'Falta identificador de la publicación.' }
-  }
+  if (!targetId) return { block_id: null, asset_id: null, error: 'Falta identificador de la publicación.' }
 
   if (targetType === 'block') {
-    const { data } = await admin
-      .from('project_public_blocks')
-      .select('id')
-      .eq('id', targetId)
-      .eq('page_id', pageId)
-      .maybeSingle()
-
+    const { data } = await admin.from('project_public_blocks').select('id').eq('id', targetId).eq('page_id', pageId).maybeSingle()
     if (!data?.id) return { block_id: null, asset_id: null, error: 'La publicación no pertenece a esta página.' }
     return { block_id: targetId, asset_id: null, error: null }
   }
 
-  const { data } = await admin
-    .from('project_public_assets')
-    .select('id')
-    .eq('id', targetId)
-    .eq('page_id', pageId)
-    .maybeSingle()
-
+  const { data } = await admin.from('project_public_assets').select('id').eq('id', targetId).eq('page_id', pageId).maybeSingle()
   if (!data?.id) return { block_id: null, asset_id: null, error: 'El archivo no pertenece a esta página.' }
   return { block_id: null, asset_id: targetId, error: null }
 }
@@ -88,45 +74,36 @@ export async function GET(request: Request, { params }: Params) {
   const visitorKey = cleanText(url.searchParams.get('visitorKey'), 120)
   const { admin, page } = await getPublishedPage(slug)
 
-  if (!page) {
-    return NextResponse.json({ error: 'Página no publicada.' }, { status: 404 })
-  }
+  if (!page) return NextResponse.json({ error: 'Página no publicada.' }, { status: 404 })
 
   const target = await validateTarget(admin, page.id, targetType, targetId)
-  if (target.error) {
-    return NextResponse.json({ error: target.error }, { status: 400 })
-  }
+  if (target.error) return NextResponse.json({ error: target.error }, { status: 400 })
 
-  const likesQuery = withTarget(
+  const likesQuery = withReadTarget(
     admin.from('project_public_page_likes').select('id', { count: 'exact', head: true }).eq('page_id', page.id),
     targetType,
     targetId,
   )
-  const viewsQuery = withTarget(
+  const viewsQuery = withReadTarget(
     admin.from('project_public_page_views').select('id', { count: 'exact', head: true }).eq('page_id', page.id),
     targetType,
     targetId,
   )
-  const commentsQuery = withTarget(
+  const commentsQuery = withReadTarget(
     admin
       .from('project_public_page_comments')
       .select('id, visitor_name, content, created_at, profiles(full_name)', { count: 'exact' })
       .eq('page_id', page.id)
       .eq('is_hidden', false)
       .order('created_at', { ascending: false })
-      .limit(30),
+      .limit(targetType === 'page' ? 8 : 30),
     targetType,
     targetId,
   )
 
   const likedQuery = visitorKey
     ? withTarget(
-        admin
-          .from('project_public_page_likes')
-          .select('id')
-          .eq('page_id', page.id)
-          .eq('visitor_key', visitorKey)
-          .limit(1),
+        admin.from('project_public_page_likes').select('id').eq('page_id', page.id).eq('visitor_key', visitorKey).limit(1),
         targetType,
         targetId,
       )
@@ -139,12 +116,17 @@ export async function GET(request: Request, { params }: Params) {
     likedQuery ?? Promise.resolve({ data: [] }),
     admin
       .from('project_public_page_trending')
-      .select('id, title, slug, description, theme_color, accent_color, likes_count, views_count, comments_count, trend_score')
-      .neq('slug', slug)
+      .select('id, title, slug, description, theme_color, accent_color, likes_count, views_count, comments_count, trend_score, published_at')
       .order('trend_score', { ascending: false })
       .order('published_at', { ascending: false })
       .limit(8),
   ])
+
+  const trending = (trendingResult.data ?? []).sort((a: any, b: any) => {
+    if (a.slug === slug && b.slug !== slug && (trendingResult.data ?? []).length === 1) return -1
+    if (b.slug === slug && a.slug !== slug && (trendingResult.data ?? []).length === 1) return 1
+    return (b.trend_score ?? 0) - (a.trend_score ?? 0)
+  })
 
   return NextResponse.json({
     page,
@@ -156,7 +138,7 @@ export async function GET(request: Request, { params }: Params) {
     },
     liked: Boolean(likedResult?.data?.length),
     comments: commentsResult.data ?? [],
-    trending: trendingResult.data ?? [],
+    trending,
   })
 }
 
@@ -165,17 +147,13 @@ export async function POST(request: Request, { params }: Params) {
   const body = await request.json().catch(() => ({})) as SocialBody
   const { admin, page } = await getPublishedPage(slug)
 
-  if (!page) {
-    return NextResponse.json({ error: 'Página no publicada.' }, { status: 404 })
-  }
+  if (!page) return NextResponse.json({ error: 'Página no publicada.' }, { status: 404 })
 
   const visitorKey = cleanText(body.visitorKey, 120)
   const { type: targetType, id: targetId } = normalizeTarget(body.targetType, body.targetId)
   const target = await validateTarget(admin, page.id, targetType, targetId)
 
-  if (target.error) {
-    return NextResponse.json({ error: target.error }, { status: 400 })
-  }
+  if (target.error) return NextResponse.json({ error: target.error }, { status: 400 })
 
   if (body.action === 'view') {
     await admin.from('project_public_page_views').insert({
@@ -189,16 +167,10 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   if (body.action === 'like') {
-    if (!visitorKey) {
-      return NextResponse.json({ error: 'Falta identificador de visitante.' }, { status: 400 })
-    }
+    if (!visitorKey) return NextResponse.json({ error: 'Falta identificador de visitante.' }, { status: 400 })
 
     const { data: existing } = await withTarget(
-      admin
-        .from('project_public_page_likes')
-        .select('id')
-        .eq('page_id', page.id)
-        .eq('visitor_key', visitorKey),
+      admin.from('project_public_page_likes').select('id').eq('page_id', page.id).eq('visitor_key', visitorKey),
       targetType,
       targetId,
     ).maybeSingle()
@@ -223,9 +195,7 @@ export async function POST(request: Request, { params }: Params) {
     const content = cleanText(body.content, 600)
     const visitorName = cleanText(body.visitorName, 80) || 'Visitante'
 
-    if (!content || content.length < 2) {
-      return NextResponse.json({ error: 'Escribe un comentario válido.' }, { status: 400 })
-    }
+    if (!content || content.length < 2) return NextResponse.json({ error: 'Escribe un comentario válido.' }, { status: 400 })
 
     const { error } = await admin.from('project_public_page_comments').insert({
       page_id: page.id,
@@ -236,10 +206,7 @@ export async function POST(request: Request, { params }: Params) {
       is_hidden: false,
     })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true })
   }
 
