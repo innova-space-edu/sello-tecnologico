@@ -18,7 +18,7 @@ type SocialData = {
   liked?: boolean
 }
 
-const QUICK_EMOJIS = ['😍', '👏', '🔥', '❤️', '😂', '🙌', '⭐', '🌱', '🎧', '💡']
+const QUICK_EMOJIS = ['😍', '👏', '🔥', '❤️', '😂', '🙌', '⭐', '🌱', '🎧', '💡', '😮', '🥳', '👍', '💜', '✨']
 
 function getVisitorKey() {
   const key = 'sello_vitrina_visitor_key'
@@ -63,6 +63,9 @@ export default function VitrinaInlineInteraction({
   const [sending, setSending] = useState(false)
   const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState('')
+  const [showEmojis, setShowEmojis] = useState(false)
+  const [showShare, setShowShare] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
   const [data, setData] = useState<SocialData>({ stats: { likes: 0, views: 0, comments: 0 }, comments: [], liked: false })
 
   const params = useMemo(() => {
@@ -74,6 +77,8 @@ export default function VitrinaInlineInteraction({
   }, [targetType, targetId, visitorKey])
 
   const apiUrl = useMemo(() => `/api/vitrinas/social/${slug}`, [slug])
+  const encodedShareUrl = encodeURIComponent(shareUrl)
+  const encodedShareText = encodeURIComponent(`Te comparto esta publicación de Sello Tecnológico:\n${shareUrl}`)
 
   const refresh = async () => {
     const response = await fetch(`${apiUrl}?${params}`, { cache: 'no-store' })
@@ -91,6 +96,11 @@ export default function VitrinaInlineInteraction({
     setVisitorKey(key)
     setVisitorName(window.localStorage.getItem('sello_vitrina_visitor_name') ?? '')
   }, [])
+
+  useEffect(() => {
+    const baseUrl = window.location.href.split('#')[0]
+    setShareUrl(anchorId ? `${baseUrl}#${anchorId}` : baseUrl)
+  }, [anchorId])
 
   useEffect(() => {
     if (!visitorKey) return
@@ -153,20 +163,21 @@ export default function VitrinaInlineInteraction({
 
   const addEmoji = (emoji: string) => {
     setComment(prev => `${prev}${prev.endsWith(' ') || prev.length === 0 ? '' : ' '}${emoji} `)
+    setShowEmojis(false)
   }
 
-  const sharePublication = async () => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.href.split('#')[0] : ''
-    const shareUrl = anchorId ? `${baseUrl}#${anchorId}` : baseUrl
+  const copyShareUrl = async () => {
+    await navigator.clipboard.writeText(shareUrl).catch(() => null)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1800)
+  }
 
+  const nativeShare = async () => {
     if (navigator.share) {
       await navigator.share({ title: 'Publicación Sello Tecnológico', url: shareUrl }).catch(() => null)
       return
     }
-
-    await navigator.clipboard.writeText(shareUrl).catch(() => null)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1800)
+    await copyShareUrl()
   }
 
   return (
@@ -178,7 +189,7 @@ export default function VitrinaInlineInteraction({
           <span>👁️ {data.stats.views}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 text-sm font-black">
+        <div className="relative flex flex-wrap items-center gap-3 text-sm font-black">
           <button
             type="button"
             disabled={sending}
@@ -188,27 +199,34 @@ export default function VitrinaInlineInteraction({
           >
             {data.liked ? '💜 Te gusta' : '🤍 Me gusta'}
           </button>
-          <button type="button" onClick={sharePublication} className="text-slate-600 transition hover:text-slate-900">
-            {copied ? '✅ Copiado' : '🔗 Compartir'}
+
+          <button
+            type="button"
+            onClick={() => setShowShare(prev => !prev)}
+            className="text-slate-600 transition hover:text-slate-900"
+          >
+            🔗 Compartir
           </button>
+
+          {showShare && (
+            <div className="absolute right-0 top-8 z-20 w-64 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm font-black text-slate-900">Compartir</p>
+                <button type="button" onClick={() => setShowShare(false)} className="text-slate-400 hover:text-slate-700">✕</button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-sm">
+                <a href={`https://wa.me/?text=${encodedShareText}`} target="_blank" rel="noreferrer" className="rounded-xl bg-green-50 px-3 py-2 font-bold text-green-700 hover:bg-green-100">🟢 WhatsApp</a>
+                <a href={`mailto:?subject=${encodeURIComponent('Publicación Sello Tecnológico')}&body=${encodedShareText}`} className="rounded-xl bg-sky-50 px-3 py-2 font-bold text-sky-700 hover:bg-sky-100">✉️ Correo</a>
+                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedShareUrl}`} target="_blank" rel="noreferrer" className="rounded-xl bg-blue-50 px-3 py-2 font-bold text-blue-700 hover:bg-blue-100">🔵 Facebook</a>
+                <button type="button" onClick={copyShareUrl} className="rounded-xl bg-slate-50 px-3 py-2 text-left font-bold text-slate-700 hover:bg-slate-100">{copied ? '✅ Copiado' : '📋 Copiar enlace'}</button>
+                <button type="button" onClick={nativeShare} className="rounded-xl px-3 py-2 text-left font-bold text-white" style={{ background: `linear-gradient(135deg, ${theme}, ${accent})` }}>📲 Compartir del dispositivo</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <form onSubmit={sendComment} className="mt-4 space-y-2">
-        <div className="flex flex-wrap gap-1.5">
-          {QUICK_EMOJIS.map(emoji => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => addEmoji(emoji)}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 text-base transition hover:bg-slate-100"
-              aria-label={`Agregar ${emoji}`}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-
         <div className="flex flex-col gap-2 md:flex-row md:items-start">
           <input
             value={visitorName}
@@ -216,7 +234,34 @@ export default function VitrinaInlineInteraction({
             placeholder="Nombre"
             className="w-full rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 md:w-44"
           />
-          <div className="flex flex-1 items-start gap-2 rounded-[1.5rem] border border-slate-200 bg-white px-4 py-2.5 focus-within:ring-2 focus-within:ring-blue-300">
+          <div className="relative flex flex-1 items-start gap-2 rounded-[1.5rem] border border-slate-200 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-blue-300">
+            <button
+              type="button"
+              onClick={() => setShowEmojis(prev => !prev)}
+              className="mt-0.5 shrink-0 bg-transparent px-1 text-lg leading-none text-slate-500 transition hover:scale-110 hover:text-slate-800"
+              aria-label="Abrir emojis"
+            >
+              😊
+            </button>
+
+            {showEmojis && (
+              <div className="absolute bottom-12 left-2 z-20 w-64 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl">
+                <div className="grid grid-cols-5 gap-1">
+                  {QUICK_EMOJIS.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => addEmoji(emoji)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-transparent text-lg transition hover:bg-slate-100"
+                      aria-label={`Agregar ${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <textarea
               value={comment}
               onChange={event => setComment(event.target.value)}
