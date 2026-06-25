@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import VitrinaSocialPanel from '@/components/vitrinas/VitrinaSocialPanel'
 import VitrinaInlineInteraction from '@/components/vitrinas/VitrinaInlineInteraction'
+import PublicShareButtons from '@/components/vitrinas/PublicShareButtons'
 import Link from 'next/link'
 
 type PublicPage = {
@@ -152,6 +153,7 @@ export default async function PublicProjectPage({ params }: { params: Promise<{ 
   const textColor = currentPage.background_style === 'dark' ? '#f8fafc' : (currentPage.text_color ?? '#0f172a')
   const cardColor = currentPage.background_style === 'dark' ? '#111827' : (currentPage.card_color ?? '#ffffff')
   const title = cleanTitle(currentPage.title)
+  const publicUrl = `/p/${currentPage.slug}`
   const allAssets = (assets ?? []) as Asset[]
   const imageAssets = allAssets.filter(asset => asset.file_type === 'image')
   const audioAssets = allAssets.filter(asset => asset.file_type === 'audio')
@@ -186,8 +188,11 @@ export default async function PublicProjectPage({ params }: { params: Promise<{ 
             {currentPage.courses?.name && <span className="bg-white text-slate-700 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">📚 {currentPage.courses.name}</span>}
             {currentPage.show_author !== false && currentPage.profiles?.full_name && <span className="bg-white text-slate-700 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">👥 {currentPage.profiles.full_name}</span>}
           </div>
+          <div className="mt-7 max-w-3xl">
+            <PublicShareButtons url={publicUrl} title={title} description={currentPage.description} theme={theme} accent={accent} compact />
+          </div>
           {currentPage.call_to_action_label && currentPage.call_to_action_url && (
-            <a href={currentPage.call_to_action_url} target="_blank" rel="noreferrer" className="inline-flex mt-8 rounded-2xl px-6 py-3 text-white font-black shadow-lg" style={{ background: buttonBackground(theme, accent, currentPage.button_style) }}>
+            <a href={currentPage.call_to_action_url} target="_blank" rel="noreferrer" className="inline-flex mt-6 rounded-2xl px-6 py-3 text-white font-black shadow-lg" style={{ background: buttonBackground(theme, accent, currentPage.button_style) }}>
               {currentPage.call_to_action_label}
             </a>
           )}
