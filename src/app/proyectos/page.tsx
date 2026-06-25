@@ -91,18 +91,21 @@ export default function ProyectosPage() {
     fetchProyectos(rol, userId)
   }
 
-  const marcarRevisado = async (p: any) => {
-    if (!confirm(`¿Marcar como revisado el proyecto "${p.title}"?`)) return
-    setActualizandoId(p.id)
-    await supabase.from('projects').update({ status: 'Revisado', updated_at: new Date().toISOString() }).eq('id', p.id)
-    await fetchProyectos(rol, userId)
-    setActualizandoId(null)
-  }
+  const cambiarEstado = async (p: any, nuevoEstado: string) => {
+    if (!nuevoEstado || nuevoEstado === p.status) return
+    const ok = confirm(`¿Cambiar el estado de "${p.title}" de "${p.status}" a "${nuevoEstado}"?`)
+    if (!ok) return
 
-  const volverARevision = async (p: any) => {
-    if (!confirm(`¿Volver a dejar "${p.title}" en revisión?`)) return
     setActualizandoId(p.id)
-    await supabase.from('projects').update({ status: 'En revisión', updated_at: new Date().toISOString() }).eq('id', p.id)
+    const { error } = await supabase
+      .from('projects')
+      .update({ status: nuevoEstado, updated_at: new Date().toISOString() })
+      .eq('id', p.id)
+
+    if (error) {
+      alert(`No se pudo actualizar el estado.\n\n${error.message}`)
+    }
+
     await fetchProyectos(rol, userId)
     setActualizandoId(null)
   }
@@ -124,8 +127,10 @@ export default function ProyectosPage() {
     return matchBusqueda && matchEstado && matchCurso
   })
 
-  const revisadosCount = proyectos.filter(p => p.status === 'Revisado').length
   const revisionCount = proyectos.filter(p => p.status === 'En revisión').length
+  const revisadosCount = proyectos.filter(p => p.status === 'Revisado').length
+  const aprobadosCount = proyectos.filter(p => p.status === 'Aprobado').length
+  const cerradosCount = proyectos.filter(p => p.status === 'Cerrado').length
   const atrasadosCount = proyectos.filter(p => p.end_date && p.end_date < new Date().toISOString().split('T')[0] && !['Revisado', 'Aprobado', 'Cerrado'].includes(p.status)).length
 
   const grupos = proyectosFiltrados.reduce((acc: Record<string, { nombre: string; proyectos: any[] }>, p) => {
@@ -162,7 +167,7 @@ export default function ProyectosPage() {
           <div>
             <h1 className="text-2xl font-bold text-blue-900">Proyectos</h1>
             <p className="text-gray-500 mt-1 flex items-center gap-2 flex-wrap">
-              Agrupados por curso · Proyectos propios y compartidos · Sello Tecnológico
+              Agrupados por curso · Cambia estados desde la tabla · Sello Tecnológico
               <span className="text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
                 ⚡ Tiempo real · {ultimaActualizacion.toLocaleTimeString('es-CL')}
               </span>
@@ -171,7 +176,7 @@ export default function ProyectosPage() {
           <Link href="/proyectos/nuevo" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">+ Nuevo proyecto</Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           <button onClick={() => setFiltroEstado(filtroEstado === 'En revisión' ? 'Todos' : 'En revisión')} className={`rounded-2xl border p-4 text-left transition ${filtroEstado === 'En revisión' ? 'bg-amber-100 border-amber-300' : 'bg-white border-amber-100 hover:bg-amber-50'}`}>
             <p className="text-xs font-semibold text-amber-700">⏳ En revisión</p>
             <p className="text-2xl font-black text-amber-800">{revisionCount}</p>
@@ -180,11 +185,25 @@ export default function ProyectosPage() {
             <p className="text-xs font-semibold text-emerald-700">✅ Revisados</p>
             <p className="text-2xl font-black text-emerald-800">{revisadosCount}</p>
           </button>
+          <button onClick={() => setFiltroEstado(filtroEstado === 'Aprobado' ? 'Todos' : 'Aprobado')} className={`rounded-2xl border p-4 text-left transition ${filtroEstado === 'Aprobado' ? 'bg-green-100 border-green-300' : 'bg-white border-green-100 hover:bg-green-50'}`}>
+            <p className="text-xs font-semibold text-green-700">🏅 Aprobados</p>
+            <p className="text-2xl font-black text-green-800">{aprobadosCount}</p>
+          </button>
+          <button onClick={() => setFiltroEstado(filtroEstado === 'Cerrado' ? 'Todos' : 'Cerrado')} className={`rounded-2xl border p-4 text-left transition ${filtroEstado === 'Cerrado' ? 'bg-red-100 border-red-300' : 'bg-white border-red-100 hover:bg-red-50'}`}>
+            <p className="text-xs font-semibold text-red-700">🔒 Cerrados</p>
+            <p className="text-2xl font-black text-red-800">{cerradosCount}</p>
+          </button>
           <button onClick={() => setFiltroEstado('Todos')} className="rounded-2xl border border-rose-100 bg-white p-4 text-left hover:bg-rose-50 transition">
-            <p className="text-xs font-semibold text-rose-700">⚠️ Atrasados abiertos</p>
+            <p className="text-xs font-semibold text-rose-700">⚠️ Atrasados</p>
             <p className="text-2xl font-black text-rose-800">{atrasadosCount}</p>
           </button>
         </div>
+
+        {puedeGestionar && (
+          <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Para cambiar un proyecto, abre el curso y usa el selector de la columna <strong>Estado</strong>. Puedes dejarlo como Borrador, En progreso, En revisión, Revisado, Aprobado o Cerrado.
+          </div>
+        )}
 
         {cursoFiltro && (
           <div className="bg-blue-50 border border-blue-100 text-blue-800 rounded-xl px-4 py-3 mb-4 flex flex-wrap justify-between gap-3 items-center text-sm">
@@ -231,15 +250,34 @@ export default function ProyectosPage() {
                       <table className="w-full text-sm">
                         <thead className="border-b border-gray-100"><tr className="bg-gray-50/60"><th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Proyecto</th>{!esEstudiante && <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Alumno</th>}<th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Estado</th><th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Última edición</th><th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Acciones</th></tr></thead>
                         <tbody className="divide-y divide-gray-50">
-                          {grupo.proyectos.map(p => (
-                            <tr key={p.id} className="hover:bg-blue-50/50 transition-colors">
-                              <td className="px-5 py-3.5"><div className="flex flex-col gap-0.5"><Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline">{p.title}</Link>{p.is_draft && <span className="text-xs text-orange-500 font-medium">📋 Borrador sincronizado</span>}</div></td>
-                              {!esEstudiante && <td className="px-5 py-3.5 text-gray-500 text-xs">{p.profiles?.full_name ?? '—'}</td>}
-                              <td className="px-5 py-3.5"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>{p.status}</span></td>
-                              <td className="px-5 py-3.5 text-gray-400 text-xs">{p.last_autosave_at ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : (p.start_date ?? '—')}</td>
-                              <td className="px-5 py-3.5"><div className="flex flex-wrap items-center gap-1.5"><Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{puedeGestionar && p.status === 'En revisión' && <button disabled={actualizandoId === p.id} onClick={() => marcarRevisado(p)} className="text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-semibold border border-emerald-200 disabled:opacity-60">✅ Revisado</button>}{puedeGestionar && p.status === 'Revisado' && <button disabled={actualizandoId === p.id} onClick={() => volverARevision(p)} className="text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-semibold border border-amber-200 disabled:opacity-60">↩ Revisión</button>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
-                            </tr>
-                          ))}
+                          {grupo.proyectos.map(p => {
+                            const puedeCambiarEsteProyecto = puedeGestionar || p.owner_id === userId
+                            return (
+                              <tr key={p.id} className="hover:bg-blue-50/50 transition-colors">
+                                <td className="px-5 py-3.5"><div className="flex flex-col gap-0.5"><Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline">{p.title}</Link>{p.is_draft && <span className="text-xs text-orange-500 font-medium">📋 Borrador sincronizado</span>}</div></td>
+                                {!esEstudiante && <td className="px-5 py-3.5 text-gray-500 text-xs">{p.profiles?.full_name ?? '—'}</td>}
+                                <td className="px-5 py-3.5 min-w-[190px]">
+                                  {puedeCambiarEsteProyecto ? (
+                                    <div className="flex flex-col gap-1">
+                                      <select
+                                        value={ESTADOS.includes(p.status) ? p.status : 'Borrador'}
+                                        disabled={actualizandoId === p.id}
+                                        onChange={e => cambiarEstado(p, e.target.value)}
+                                        className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-60"
+                                      >
+                                        {ESTADOS.map(estado => <option key={estado} value={estado}>{estado}</option>)}
+                                      </select>
+                                      <span className={`w-fit px-2.5 py-1 rounded-full text-[11px] font-medium ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>{actualizandoId === p.id ? 'Actualizando...' : p.status}</span>
+                                    </div>
+                                  ) : (
+                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>{p.status}</span>
+                                  )}
+                                </td>
+                                <td className="px-5 py-3.5 text-gray-400 text-xs">{p.last_autosave_at ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : (p.start_date ?? '—')}</td>
+                                <td className="px-5 py-3.5"><div className="flex flex-wrap items-center gap-1.5"><Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
