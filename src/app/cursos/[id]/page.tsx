@@ -45,7 +45,6 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
     .select('*, profiles(full_name, email, role, rut)')
     .eq('course_id', id)
 
-  // Obtener estudiantes que NO están ya en el curso (solo para docentes/admin)
   let estudiantesDisponibles: any[] = []
   if (puedeAgregarMiembros) {
     const miembroIds = miembros?.map((m: any) => m.user_id) ?? []
@@ -66,12 +65,21 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
     </div>
   )
 
+  const proyectosCursoHref = `/proyectos?curso=${encodeURIComponent(curso.id)}`
+  const aprobadosCursoHref = `/proyectos?curso=${encodeURIComponent(curso.id)}&estado=${encodeURIComponent('Aprobado')}`
+  const usuariosCursoHref = `/usuarios?curso=${encodeURIComponent(curso.name ?? '')}`
+
+  const stats = [
+    { label: 'Proyectos', value: proyectos?.length ?? 0, icon: '🗂️', color: 'bg-blue-100 text-blue-700', href: proyectosCursoHref, hint: 'Ver proyectos de este curso' },
+    { label: 'Miembros', value: miembros?.length ?? 0, icon: '👥', color: 'bg-indigo-100 text-indigo-700', href: usuariosCursoHref, hint: 'Ver usuarios de este curso' },
+    { label: 'Aprobados', value: proyectos?.filter(p => p.status === 'Aprobado').length ?? 0, icon: '✅', color: 'bg-green-100 text-green-700', href: aprobadosCursoHref, hint: 'Ver aprobados de este curso' },
+  ]
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
 
-        {/* Header */}
         <div className="mb-6">
           <Link href="/cursos" className="text-blue-600 text-sm hover:underline">← Volver a Cursos</Link>
           <div className="flex justify-between items-start mt-3">
@@ -97,31 +105,34 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
           </div>
         </div>
 
-        {/* Stats del curso */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mb-6">
-          {[
-            { label: 'Proyectos', value: proyectos?.length ?? 0, icon: '🗂️', color: 'bg-blue-100 text-blue-700' },
-            { label: 'Miembros', value: miembros?.length ?? 0, icon: '👥', color: 'bg-indigo-100 text-indigo-700' },
-            { label: 'Aprobados', value: proyectos?.filter(p => p.status === 'Aprobado').length ?? 0, icon: '✅', color: 'bg-green-100 text-green-700' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
+          {stats.map(s => (
+            <Link
+              key={s.label}
+              href={s.href}
+              title={s.hint}
+              className="group bg-white rounded-xl shadow-sm p-5 flex items-center gap-4 border border-transparent hover:border-blue-300 hover:shadow-md transition-all"
+            >
               <div className={`text-2xl p-3 rounded-lg ${s.color}`}>{s.icon}</div>
-              <div>
+              <div className="flex-1">
                 <div className="text-2xl font-bold text-gray-800">{s.value}</div>
                 <div className="text-gray-500 text-sm">{s.label}</div>
               </div>
-            </div>
+              <span className="opacity-0 group-hover:opacity-100 text-blue-500 text-sm transition-opacity">Ir →</span>
+            </Link>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Proyectos */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-blue-900">Proyectos del curso</h2>
-              </div>
+              <Link href={proyectosCursoHref} className="block px-6 py-4 border-b border-gray-100 hover:bg-blue-50 transition-colors">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold text-blue-900">Proyectos del curso</h2>
+                  <span className="text-xs text-blue-500 opacity-70">Ver todos →</span>
+                </div>
+              </Link>
               {proyectos && proyectos.length > 0 ? (
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
@@ -129,6 +140,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
                       <th className="text-left px-6 py-3 text-gray-500 font-medium">Proyecto</th>
                       <th className="text-left px-6 py-3 text-gray-500 font-medium">Estado</th>
                       <th className="text-left px-6 py-3 text-gray-500 font-medium">Fecha</th>
+                      {puedeEditarCurso && <th className="text-left px-4 py-3 text-gray-500 font-medium">Acción</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -167,10 +179,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          {/* Miembros */}
           <div className="flex flex-col gap-4">
-
-            {/* Formulario agregar — solo docentes/admin */}
             {puedeAgregarMiembros && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-gray-100">
@@ -179,10 +188,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
                 </div>
                 <div className="p-5">
                   {estudiantesDisponibles.length > 0 ? (
-                    <AgregarMiembroForm
-                      cursoId={id}
-                      estudiantes={estudiantesDisponibles}
-                    />
+                    <AgregarMiembroForm cursoId={id} estudiantes={estudiantesDisponibles} />
                   ) : (
                     <p className="text-sm text-gray-400 text-center py-2">
                       Todos los estudiantes ya están en este curso
@@ -192,15 +198,17 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
               </div>
             )}
 
-            {/* Lista de miembros */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-blue-900">Miembros ({miembros?.length ?? 0})</h2>
-              </div>
+              <Link href={usuariosCursoHref} className="block px-5 py-4 border-b border-gray-100 hover:bg-indigo-50 transition-colors">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-semibold text-blue-900">Miembros ({miembros?.length ?? 0})</h2>
+                  <span className="text-xs text-indigo-500 opacity-70">Ver usuarios →</span>
+                </div>
+              </Link>
               {miembros && miembros.length > 0 ? (
                 <div className="divide-y divide-gray-100">
                   {miembros.map((m: any) => (
-                    <div key={m.user_id} className="px-5 py-3 flex items-center gap-3">
+                    <Link key={m.user_id} href={`/usuarios/${m.user_id}`} className="px-5 py-3 flex items-center gap-3 hover:bg-indigo-50 transition-colors">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs shrink-0">
                         {(m.profiles?.full_name ?? m.profiles?.email)?.[0]?.toUpperCase()}
                       </div>
@@ -213,7 +221,7 @@ export default async function CursoDetallePage({ params }: { params: Promise<{ i
                           {m.profiles?.rut ? ` · ${m.profiles.rut}` : ''}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
