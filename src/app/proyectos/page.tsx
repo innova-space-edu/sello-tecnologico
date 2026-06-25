@@ -2,7 +2,6 @@
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 const statusColor: Record<string, string> = {
@@ -15,16 +14,13 @@ const statusColor: Record<string, string> = {
 
 export default function ProyectosPage() {
   const supabase = createClient()
-  const searchParams = useSearchParams()
-  const cursoFiltro = searchParams.get('curso') ?? ''
-  const estadoInicial = searchParams.get('estado') ?? 'Todos'
-
   const [proyectos, setProyectos] = useState<any[]>([])
   const [rol, setRol] = useState<string>('')
   const [userId, setUserId] = useState<string>('')
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date>(new Date())
   const [busqueda, setBusqueda] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState(estadoInicial)
+  const [filtroEstado, setFiltroEstado] = useState('Todos')
+  const [cursoFiltro, setCursoFiltro] = useState('')
   const [cursosAbiertos, setCursosAbiertos] = useState<Record<string, boolean>>({})
   const rolRef = useRef('')
   const userIdRef = useRef('')
@@ -60,6 +56,12 @@ export default function ProyectosPage() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
     const init = async () => {
+      const params = new URLSearchParams(window.location.search)
+      const curso = params.get('curso') ?? ''
+      const estado = params.get('estado') ?? 'Todos'
+      if (curso) setCursoFiltro(decodeURIComponent(curso))
+      if (estado) setFiltroEstado(estado)
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -87,7 +89,7 @@ export default function ProyectosPage() {
   const toggleCurso = (key: string) => setCursosAbiertos(prev => ({ ...prev, [key]: !prev[key] }))
   const esEstudiante = rol === 'estudiante'
   const puedeEliminar = rol === 'admin' || rol === 'docente' || rol === 'coordinador'
-  const cursoFiltroLower = decodeURIComponent(cursoFiltro).toLowerCase()
+  const cursoFiltroLower = cursoFiltro.toLowerCase()
 
   const proyectosFiltrados = proyectos.filter(p => {
     const q = busqueda.toLowerCase()
@@ -148,9 +150,7 @@ export default function ProyectosPage() {
               </span>
             </p>
           </div>
-          <Link href="/proyectos/nuevo" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">
-            + Nuevo proyecto
-          </Link>
+          <Link href="/proyectos/nuevo" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">+ Nuevo proyecto</Link>
         </div>
 
         {cursoFiltro && (
@@ -163,17 +163,13 @@ export default function ProyectosPage() {
         <div className="bg-white rounded-xl shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-48">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-            <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              placeholder="Buscar por proyecto, alumno o curso..."
-              className="w-full border border-gray-200 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por proyecto, alumno o curso..." className="w-full border border-gray-200 rounded-lg pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
           <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
             <option value="Todos">Todos los estados</option>
             {['Borrador', 'En progreso', 'En revisión', 'Aprobado', 'Cerrado'].map(s => <option key={s}>{s}</option>)}
           </select>
-          {(busqueda || filtroEstado !== 'Todos') && (
-            <button onClick={() => { setBusqueda(''); setFiltroEstado('Todos') }} className="text-xs text-gray-400 hover:text-gray-600 px-2">✕ Limpiar</button>
-          )}
+          {(busqueda || filtroEstado !== 'Todos') && <button onClick={() => { setBusqueda(''); setFiltroEstado('Todos') }} className="text-xs text-gray-400 hover:text-gray-600 px-2">✕ Limpiar</button>}
           <div className="flex items-center gap-2 ml-auto">
             <button onClick={expandAll} className="text-xs text-blue-600 border border-blue-200 px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">↕ Expandir</button>
             <button onClick={collapseAll} className="text-xs text-gray-400 border border-gray-200 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">↕ Colapsar</button>
@@ -182,17 +178,9 @@ export default function ProyectosPage() {
         </div>
 
         {proyectos.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <div className="text-5xl mb-4">🗂️</div>
-            <h3 className="text-lg font-semibold text-gray-700">No hay proyectos aún</h3>
-            <Link href="/proyectos/nuevo" className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">+ Crear proyecto</Link>
-          </div>
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center"><div className="text-5xl mb-4">🗂️</div><h3 className="text-lg font-semibold text-gray-700">No hay proyectos aún</h3><Link href="/proyectos/nuevo" className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">+ Crear proyecto</Link></div>
         ) : proyectosFiltrados.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <div className="text-4xl mb-3">🔍</div>
-            <h3 className="text-base font-semibold text-gray-600">Sin resultados</h3>
-            <button onClick={() => { setBusqueda(''); setFiltroEstado('Todos') }} className="text-sm text-blue-600 hover:underline mt-2">Limpiar búsqueda</button>
-          </div>
+          <div className="bg-white rounded-xl shadow-sm p-8 text-center"><div className="text-4xl mb-3">🔍</div><h3 className="text-base font-semibold text-gray-600">Sin resultados</h3><button onClick={() => { setBusqueda(''); setFiltroEstado('Todos') }} className="text-sm text-blue-600 hover:underline mt-2">Limpiar búsqueda</button></div>
         ) : (
           <div className="space-y-3">
             {gruposOrdenados.map(([cursoKey, grupo]) => {
@@ -201,51 +189,22 @@ export default function ProyectosPage() {
               return (
                 <div key={cursoKey} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
                   <button onClick={() => toggleCurso(cursoKey)} className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${esSinCurso ? 'bg-gray-50 hover:bg-gray-100' : 'bg-blue-50 hover:bg-blue-100'}`}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{esSinCurso ? '📁' : '🏫'}</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`font-bold text-sm ${esSinCurso ? 'text-gray-600' : 'text-blue-900'}`}>{grupo.nombre}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${esSinCurso ? 'bg-gray-200 text-gray-500' : 'bg-blue-200 text-blue-700'}`}>
-                          {grupo.proyectos.length} proyecto{grupo.proyectos.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    </div>
+                    <div className="flex items-center gap-3"><span className="text-xl">{esSinCurso ? '📁' : '🏫'}</span><div className="flex items-center gap-2"><span className={`font-bold text-sm ${esSinCurso ? 'text-gray-600' : 'text-blue-900'}`}>{grupo.nombre}</span><span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${esSinCurso ? 'bg-gray-200 text-gray-500' : 'bg-blue-200 text-blue-700'}`}>{grupo.proyectos.length} proyecto{grupo.proyectos.length !== 1 ? 's' : ''}</span></div></div>
                     <span className={`text-base font-medium ${esSinCurso ? 'text-gray-400' : 'text-blue-400'}`}>{abierto ? '▼' : '▶'}</span>
                   </button>
 
                   {abierto && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
-                        <thead className="border-b border-gray-100">
-                          <tr className="bg-gray-50/60">
-                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Proyecto</th>
-                            {!esEstudiante && <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Alumno</th>}
-                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Estado</th>
-                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Última edición</th>
-                            <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Acciones</th>
-                          </tr>
-                        </thead>
+                        <thead className="border-b border-gray-100"><tr className="bg-gray-50/60"><th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Proyecto</th>{!esEstudiante && <th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Alumno</th>}<th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Estado</th><th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Última edición</th><th className="text-left px-5 py-2.5 text-gray-400 font-medium text-xs">Acciones</th></tr></thead>
                         <tbody className="divide-y divide-gray-50">
                           {grupo.proyectos.map(p => (
                             <tr key={p.id} className="hover:bg-blue-50/50 transition-colors">
-                              <td className="px-5 py-3.5">
-                                <div className="flex flex-col gap-0.5">
-                                  <Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline">{p.title}</Link>
-                                  {p.is_draft && <span className="text-xs text-orange-500 font-medium">📋 Borrador sincronizado</span>}
-                                </div>
-                              </td>
+                              <td className="px-5 py-3.5"><div className="flex flex-col gap-0.5"><Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline">{p.title}</Link>{p.is_draft && <span className="text-xs text-orange-500 font-medium">📋 Borrador sincronizado</span>}</div></td>
                               {!esEstudiante && <td className="px-5 py-3.5 text-gray-500 text-xs">{p.profiles?.full_name ?? '—'}</td>}
                               <td className="px-5 py-3.5"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColor[p.status] ?? 'bg-gray-100 text-gray-600'}`}>{p.status}</span></td>
-                              <td className="px-5 py-3.5 text-gray-400 text-xs">
-                                {p.last_autosave_at ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : (p.start_date ?? '—')}
-                              </td>
-                              <td className="px-5 py-3.5">
-                                <div className="flex items-center gap-1.5">
-                                  <Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>
-                                  {(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}
-                                  {(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}
-                                </div>
-                              </td>
+                              <td className="px-5 py-3.5 text-gray-400 text-xs">{p.last_autosave_at ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : (p.start_date ?? '—')}</td>
+                              <td className="px-5 py-3.5"><div className="flex items-center gap-1.5"><Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
                             </tr>
                           ))}
                         </tbody>
