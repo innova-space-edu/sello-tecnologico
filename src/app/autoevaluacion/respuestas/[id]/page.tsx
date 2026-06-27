@@ -1,16 +1,23 @@
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { AUTOEVALUACION_QUESTIONS, getAnswerDisplayValue, getAutoevaluacionSections } from '@/lib/autoevaluacion'
+import { AUTOEVALUACION_QUESTIONS, getAnswerDisplayValue, getAutoevaluacionSections, normalizeAutoevaluacionQuestions } from '@/lib/autoevaluacion'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getSurveyActor } from '@/lib/survey-auth'
 
 type CourseValue = { name?: string | null }
 type CourseRelation = CourseValue | CourseValue[] | null
+type FormatValue = { title?: string | null; questions?: unknown }
+type FormatRelation = FormatValue | FormatValue[] | null
 
 function getCourseName(courses: CourseRelation) {
   if (Array.isArray(courses)) return courses[0]?.name ?? null
   return courses?.name ?? null
+}
+
+function getFormat(format: FormatRelation) {
+  if (Array.isArray(format)) return format[0] ?? null
+  return format ?? null
 }
 
 export default async function AutoevaluacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +28,7 @@ export default async function AutoevaluacionDetallePage({ params }: { params: Pr
   const admin = createAdminSupabaseClient()
   const { data: response } = await admin
     .from('self_evaluations')
-    .select('id, user_id, student_name, project_name, intervention_place, answers, confirmed, status, created_at, courses(name), profiles(full_name, email, role)')
+    .select('id, user_id, student_name, project_name, intervention_place, answers, confirmed, status, created_at, courses(name), profiles(full_name, email, role), self_evaluation_formats(title, questions)')
     .eq('id', id)
     .single()
 
@@ -31,11 +38,15 @@ export default async function AutoevaluacionDetallePage({ params }: { params: Pr
   if (!canReview && response.user_id !== actor.id) redirect('/autoevaluacion')
 
   const courseName = getCourseName(response.courses as CourseRelation)
+  const format = getFormat((response as any).self_evaluation_formats as FormatRelation)
+  const dynamicQuestions = normalizeAutoevaluacionQuestions(format?.questions)
+  const questions = dynamicQuestions.length > 0 ? dynamicQuestions : AUTOEVALUACION_QUESTIONS
+  const formatTitle = format?.title ?? 'Autoevaluación STEAM'
   const answers = response.answers && typeof response.answers === 'object' && !Array.isArray(response.answers)
     ? response.answers as Record<string, unknown>
     : {}
-  const sections = getAutoevaluacionSections()
-  const ratingQuestions = AUTOEVALUACION_QUESTIONS.filter(question => question.type === 'rating')
+  const sections = getAutoevaluacionSections(questions)
+  const ratingQuestions = questions.filter(question => question.type === 'rating')
   const ratingValues = ratingQuestions
     .map(question => Number(answers[question.id]))
     .filter(value => Number.isFinite(value))
@@ -61,7 +72,7 @@ export default async function AutoevaluacionDetallePage({ params }: { params: Pr
                   <span className="text-xs text-gray-400">🕐 {new Date(response.created_at).toLocaleString('es-CL')}</span>
                 </div>
                 <h1 className="text-2xl font-bold text-blue-900">Autoevaluación de {response.student_name}</h1>
-                <p className="text-gray-500 mt-2">{response.project_name} · {response.intervention_place}</p>
+                <p className="text-gray-500 mt-2">{formatTitle} · {response.project_name} · {response.intervention_place}</p>
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-center min-w-36">
                 <p className="text-xs text-blue-500 font-semibold uppercase">Promedio autoevaluación</p>
@@ -77,15 +88,11 @@ export default async function AutoevaluacionDetallePage({ params }: { params: Pr
                 <dl className="space-y-3 text-sm">
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Estudiante</dt><dd className="font-medium text-gray-800 text-right">{response.student_name}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Curso</dt><dd className="font-medium text-gray-800 text-right">{courseName ?? '—'}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-gray-500">Formato</dt><dd className="font-medium text-gray-800 text-right">{formatTitle}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Proyecto</dt><dd className="font-medium text-gray-800 text-right">{response.project_name}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Lugar</dt><dd className="font-medium text-gray-800 text-right">{response.intervention_place}</dd></div>
                   <div className="flex justify-between gap-3"><dt className="text-gray-500">Confirmada</dt><dd className="font-medium text-gray-800 text-right">{response.confirmed ? 'Sí' : 'No'}</dd></div>
                 </dl>
-              </section>
-
-              <section className="bg-white rounded-xl shadow-sm p-5">
-                <h2 className="font-bold text-blue-900 mb-3">🔎 Decisión declarada</h2>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{getAnswerDisplayValue(answers.decision)}</p>
               </section>
             </aside>
 
@@ -94,7 +101,7 @@ export default async function AutoevaluacionDetallePage({ params }: { params: Pr
                 <div key={section} className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
                   <h2 className="font-bold text-blue-900 mb-4">{section}</h2>
                   <div className="space-y-3">
-                    {AUTOEVALUACION_QUESTIONS.filter(question => question.section === section).map(question => {
+                    {questions.filter(question => question.section === section).map(question => {
                       const value = answers[question.id]
                       const isRating = question.type === 'rating'
                       return (
