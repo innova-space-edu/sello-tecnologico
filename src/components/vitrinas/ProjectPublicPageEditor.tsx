@@ -317,6 +317,20 @@ function previewBackground(form: { background_style: string; theme_color: string
   return `radial-gradient(circle at top left, ${form.theme_color}28, transparent 32%), radial-gradient(circle at top right, ${form.accent_color}30, transparent 35%), ${form.background_color}`
 }
 
+function presetMatchesForm(preset: PagePreset, form: any) {
+  return preset.theme === form.theme_color &&
+    preset.accent === form.accent_color &&
+    preset.background === form.background_color &&
+    preset.text === form.text_color &&
+    preset.card === form.card_color &&
+    preset.backgroundStyle === form.background_style &&
+    preset.surfaceStyle === form.surface_style &&
+    preset.buttonStyle === form.button_style &&
+    preset.headerStyle === form.header_style &&
+    preset.layoutStyle === form.layout_style &&
+    preset.fontStyle === form.font_style
+}
+
 export default function ProjectPublicPageEditor({ projectId }: { projectId: string }) {
   const supabase = useMemo(() => createClient(), [])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -332,6 +346,8 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
   const [assets, setAssets] = useState<Asset[]>([])
   const [blocks, setBlocks] = useState<Block[]>(DEFAULT_BLOCKS)
   const [copied, setCopied] = useState(false)
+  const [designOpen, setDesignOpen] = useState(false)
+  const [selectedPresetName, setSelectedPresetName] = useState('')
   const [form, setForm] = useState({
     title: '',
     slug: '',
@@ -360,6 +376,14 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
 
   const isStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(role)
   const canPublish = isStaff || role === 'estudiante'
+  const activePreset = PAGE_PRESETS.find(preset => selectedPresetName === preset.name || presetMatchesForm(preset, form))
+
+  useEffect(() => {
+    const match = PAGE_PRESETS.find(preset => presetMatchesForm(preset, form))
+    if (match) setSelectedPresetName(match.name)
+    else if (selectedPresetName) setSelectedPresetName('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.theme_color, form.accent_color, form.background_color, form.text_color, form.card_color, form.background_style, form.surface_style, form.button_style, form.header_style, form.layout_style, form.font_style])
 
   useEffect(() => {
     const cargar = async () => {
@@ -392,8 +416,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
 
       if (existingPage) {
         const currentPage = existingPage as PublicPage
-        setPage(currentPage)
-        setForm({
+        const nextForm = {
           title: cleanTitle(currentPage.title ?? ''),
           slug: currentPage.slug ?? '',
           description: currentPage.description ?? '',
@@ -413,7 +436,10 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           call_to_action_url: currentPage.call_to_action_url ?? '',
           show_author: currentPage.show_author !== false,
           show_trending: currentPage.show_trending !== false,
-        })
+        }
+        setPage(currentPage)
+        setForm(nextForm)
+        setSelectedPresetName(PAGE_PRESETS.find(preset => presetMatchesForm(preset, nextForm))?.name ?? '')
 
         const [{ data: currentBlocks }, { data: currentAssets }] = await Promise.all([
           supabase.from('project_public_blocks').select('*').eq('page_id', currentPage.id).order('sort_order'),
@@ -638,6 +664,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
   }
 
   const applyPreset = (preset: PagePreset) => {
+    setSelectedPresetName(preset.name)
     setForm(prev => ({
       ...prev,
       theme_color: preset.theme,
@@ -652,6 +679,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       layout_style: preset.layoutStyle,
       font_style: preset.fontStyle,
     }))
+    setMessage(`Tono seleccionado: ${preset.name}. Recuerda guardar para conservar los cambios.`)
   }
 
   const copyPublicUrl = async () => {
@@ -731,157 +759,195 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         </div>
       </section>
 
-      <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
-        <div className="mb-4">
-          <h2 className="font-bold text-blue-900">🎨 Tonos sugeridos para páginas</h2>
-          <p className="text-sm text-gray-500">Elige una paleta completa ya configurada. Después puedes ajustar manualmente en personalización avanzada.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
-          {PAGE_PRESETS.map(preset => (
-            <button
-              key={preset.name}
-              type="button"
-              onClick={() => applyPreset(preset)}
-              className="text-left rounded-2xl border border-gray-200 bg-white p-4 hover:border-blue-300 hover:shadow-sm transition-all"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-black text-gray-900">{preset.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{preset.description}</p>
-                </div>
-                <span className="text-xs rounded-full bg-gray-100 px-2 py-1 text-gray-500">Aplicar</span>
-              </div>
-              <div className="mt-3 grid grid-cols-5 gap-1.5">
-                {[preset.theme, preset.accent, preset.background, preset.text, preset.card].map((color, index) => (
-                  <span key={`${preset.name}-${index}`} className="h-7 rounded-lg border border-gray-200" style={{ background: color }} />
-                ))}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-gray-400">
-                <span>Fondo: {preset.backgroundStyle}</span>
-                <span>·</span>
-                <span>Tarjeta: {preset.surfaceStyle}</span>
-                <span>·</span>
-                <span>Botón: {preset.buttonStyle}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-2xl border border-dashed border-gray-200 p-4">
-          <div className="mb-4">
-            <h3 className="font-bold text-gray-800">Personalización avanzada</h3>
-            <p className="text-xs text-gray-400">Usa esto solo si quieres ajustar un color o estilo después de elegir una paleta sugerida.</p>
+      <section className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setDesignOpen(prev => !prev)}
+          className="w-full px-5 lg:px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-left hover:bg-blue-50 transition-colors"
+        >
+          <div>
+            <h2 className="font-bold text-blue-900">🎨 Tonos sugeridos y personalización</h2>
+            <p className="text-sm text-gray-500">
+              {activePreset ? `Tono activo: ${activePreset.name}` : 'Elige una paleta o personaliza colores, fondo, tarjetas y botones.'}
+            </p>
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <label className="text-sm font-medium text-gray-700">
-              Principal
-              <input type="color" value={form.theme_color} onChange={event => setForm({ ...form, theme_color: event.target.value })}
-                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Secundario
-              <input type="color" value={form.accent_color} onChange={event => setForm({ ...form, accent_color: event.target.value })}
-                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Fondo
-              <input type="color" value={form.background_color} onChange={event => setForm({ ...form, background_color: event.target.value })}
-                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Texto
-              <input type="color" value={form.text_color} onChange={event => setForm({ ...form, text_color: event.target.value })}
-                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Tarjetas
-              <input type="color" value={form.card_color} onChange={event => setForm({ ...form, card_color: event.target.value })}
-                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-            </label>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:grid grid-cols-5 gap-1">
+              {[form.theme_color, form.accent_color, form.background_color, form.text_color, form.card_color].map((color, index) => (
+                <span key={index} className="h-7 w-7 rounded-full border border-gray-200" style={{ background: color }} />
+              ))}
+            </div>
+            {activePreset && <span className="rounded-full bg-green-100 text-green-700 px-3 py-1 text-xs font-black">✓ Seleccionado</span>}
+            <span className="rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-sm font-black">{designOpen ? 'Cerrar ▲' : 'Abrir ▼'}</span>
           </div>
+        </button>
 
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-5">
-            <label className="text-sm font-medium text-gray-700">
-              Fondo visual
-              <select value={form.background_style} onChange={event => setForm({ ...form, background_style: event.target.value })}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <option value="solid">Limpio sin gradiente</option>
-                <option value="soft_gradient">Gradiente suave</option>
-                <option value="aurora">Aurora moderna</option>
-                <option value="diagonal">Diagonal editorial</option>
-                <option value="paper">Papel suave</option>
-                <option value="dark">Oscuro elegante</option>
-              </select>
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Tarjetas
-              <select value={form.surface_style} onChange={event => setForm({ ...form, surface_style: event.target.value })}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <option value="glass">Cristal suave</option>
-                <option value="floating">Flotante</option>
-                <option value="bordered">Borde marcado</option>
-                <option value="flat">Plano simple</option>
-              </select>
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Botones
-              <select value={form.button_style} onChange={event => setForm({ ...form, button_style: event.target.value })}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <option value="solid">Color sólido</option>
-                <option value="gradient">Gradiente</option>
-                <option value="soft">Suave</option>
-              </select>
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Encabezado
-              <select value={form.header_style} onChange={event => setForm({ ...form, header_style: event.target.value })}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <option value="large">Grande</option>
-                <option value="compact">Compacto</option>
-                <option value="cover">Portada amplia</option>
-              </select>
-            </label>
-            <label className="text-sm font-medium text-gray-700">
-              Diseño
-              <select value={form.layout_style} onChange={event => setForm({ ...form, layout_style: event.target.value })}
-                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <option value="magazine">Revista / podcast</option>
-                <option value="gallery">Galería en tarjetas</option>
-                <option value="campaign">Campaña</option>
-              </select>
-            </label>
+        {designOpen && (
+          <div className="border-t border-gray-100 p-5 lg:p-6">
+            <div className="mb-4">
+              <h3 className="font-bold text-blue-900">Tonos sugeridos para páginas</h3>
+              <p className="text-sm text-gray-500">Presiona una tarjeta para aplicarla. El tono seleccionado queda marcado con un distintivo.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
+              {PAGE_PRESETS.map(preset => {
+                const selected = selectedPresetName === preset.name || presetMatchesForm(preset, form)
+                return (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    aria-pressed={selected}
+                    className={`relative text-left rounded-2xl border bg-white p-4 transition-all ${
+                      selected
+                        ? 'border-blue-500 ring-4 ring-blue-100 shadow-md'
+                        : 'border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                    }`}
+                  >
+                    {selected && (
+                      <span className="absolute right-3 top-3 rounded-full bg-blue-600 text-white text-[11px] font-black px-2.5 py-1 shadow-sm">
+                        ✓ Seleccionado
+                      </span>
+                    )}
+                    <div className="flex items-start justify-between gap-3 pr-20">
+                      <div>
+                        <p className="font-black text-gray-900">{preset.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{preset.description}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-5 gap-1.5">
+                      {[preset.theme, preset.accent, preset.background, preset.text, preset.card].map((color, index) => (
+                        <span key={`${preset.name}-${index}`} className={`h-8 rounded-lg border ${selected ? 'border-blue-300' : 'border-gray-200'}`} style={{ background: color }} />
+                      ))}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-gray-400">
+                      <span>Fondo: {preset.backgroundStyle}</span>
+                      <span>·</span>
+                      <span>Tarjeta: {preset.surfaceStyle}</span>
+                      <span>·</span>
+                      <span>Botón: {preset.buttonStyle}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="rounded-2xl border border-dashed border-gray-200 p-4">
+              <div className="mb-4">
+                <h3 className="font-bold text-gray-800">Personalización avanzada</h3>
+                <p className="text-xs text-gray-400">Usa esto solo si quieres ajustar un color o estilo después de elegir una paleta sugerida.</p>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <label className="text-sm font-medium text-gray-700">
+                  Principal
+                  <input type="color" value={form.theme_color} onChange={event => setForm({ ...form, theme_color: event.target.value })}
+                    className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Secundario
+                  <input type="color" value={form.accent_color} onChange={event => setForm({ ...form, accent_color: event.target.value })}
+                    className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Fondo
+                  <input type="color" value={form.background_color} onChange={event => setForm({ ...form, background_color: event.target.value })}
+                    className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Texto
+                  <input type="color" value={form.text_color} onChange={event => setForm({ ...form, text_color: event.target.value })}
+                    className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Tarjetas
+                  <input type="color" value={form.card_color} onChange={event => setForm({ ...form, card_color: event.target.value })}
+                    className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-5">
+                <label className="text-sm font-medium text-gray-700">
+                  Fondo visual
+                  <select value={form.background_style} onChange={event => setForm({ ...form, background_style: event.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="solid">Limpio sin gradiente</option>
+                    <option value="soft_gradient">Gradiente suave</option>
+                    <option value="aurora">Aurora moderna</option>
+                    <option value="diagonal">Diagonal editorial</option>
+                    <option value="paper">Papel suave</option>
+                    <option value="dark">Oscuro elegante</option>
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Tarjetas
+                  <select value={form.surface_style} onChange={event => setForm({ ...form, surface_style: event.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="glass">Cristal suave</option>
+                    <option value="floating">Flotante</option>
+                    <option value="bordered">Borde marcado</option>
+                    <option value="flat">Plano simple</option>
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Botones
+                  <select value={form.button_style} onChange={event => setForm({ ...form, button_style: event.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="solid">Color sólido</option>
+                    <option value="gradient">Gradiente</option>
+                    <option value="soft">Suave</option>
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Encabezado
+                  <select value={form.header_style} onChange={event => setForm({ ...form, header_style: event.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="large">Grande</option>
+                    <option value="compact">Compacto</option>
+                    <option value="cover">Portada amplia</option>
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Diseño
+                  <select value={form.layout_style} onChange={event => setForm({ ...form, layout_style: event.target.value })}
+                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="magazine">Revista / podcast</option>
+                    <option value="gallery">Galería en tarjetas</option>
+                    <option value="campaign">Campaña</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+              <label className="text-sm font-medium text-gray-700">
+                Botón principal opcional
+                <input value={form.call_to_action_label} onChange={event => setForm({ ...form, call_to_action_label: event.target.value })}
+                  placeholder="Ej: Ver informe completo"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </label>
+              <label className="text-sm font-medium text-gray-700">
+                URL del botón
+                <input value={form.call_to_action_url} onChange={event => setForm({ ...form, call_to_action_url: event.target.value })}
+                  placeholder="https://"
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap gap-3 mt-5">
+              <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <input type="checkbox" checked={form.show_author} onChange={event => setForm({ ...form, show_author: event.target.checked })} />
+                Mostrar creador
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <input type="checkbox" checked={form.show_trending} onChange={event => setForm({ ...form, show_trending: event.target.checked })} />
+                Mostrar panel general de interacciones
+              </label>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          <label className="text-sm font-medium text-gray-700">
-            Botón principal opcional
-            <input value={form.call_to_action_label} onChange={event => setForm({ ...form, call_to_action_label: event.target.value })}
-              placeholder="Ej: Ver informe completo"
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            URL del botón
-            <input value={form.call_to_action_url} onChange={event => setForm({ ...form, call_to_action_url: event.target.value })}
-              placeholder="https://"
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          </label>
-        </div>
-
-        <div className="flex flex-wrap gap-3 mt-5">
-          <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            <input type="checkbox" checked={form.show_author} onChange={event => setForm({ ...form, show_author: event.target.checked })} />
-            Mostrar creador
-          </label>
-          <label className="inline-flex items-center gap-2 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            <input type="checkbox" checked={form.show_trending} onChange={event => setForm({ ...form, show_trending: event.target.checked })} />
-            Mostrar panel general de interacciones
-          </label>
-        </div>
-
-        <div className="mt-5 rounded-2xl p-5 border" style={{ background: previewBackground(form), borderColor: `${form.accent_color}33` }}>
+        <div className="mx-5 lg:mx-6 mb-5 rounded-2xl p-5 border" style={{ background: previewBackground(form), borderColor: `${form.accent_color}33` }}>
           <p className="text-xs font-bold uppercase tracking-widest" style={{ color: form.accent_color }}>Vista previa rápida</p>
           <div className="mt-3 rounded-2xl border p-4" style={{ background: form.card_color, color: form.text_color, borderColor: `${form.accent_color}33` }}>
             <h3 className="text-3xl font-black" style={{ color: form.theme_color }}>{form.title || 'Título de la página'}</h3>
@@ -893,7 +959,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         </div>
 
         {publicUrl && (
-          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900 flex flex-wrap gap-3 items-center justify-between">
+          <div className="mx-5 lg:mx-6 mb-5 bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900 flex flex-wrap gap-3 items-center justify-between">
             <div>
               <p className="font-semibold">Link público:</p>
               <a href={publicUrl} target="_blank" rel="noreferrer" className="underline break-all">{publicUrl}</a>
