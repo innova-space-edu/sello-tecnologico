@@ -11,6 +11,15 @@ export type AutoevaluacionQuestion = {
   maxLabel?: string
 }
 
+export type AutoevaluacionFormat = {
+  id?: string | null
+  title: string
+  description?: string | null
+  questions: AutoevaluacionQuestion[]
+}
+
+export const DEFAULT_AUTOEVALUACION_FORMAT_ID = 'default'
+
 export const AUTOEVALUACION_QUESTIONS: AutoevaluacionQuestion[] = [
   {
     id: 'descripcion_proyecto',
@@ -140,16 +149,45 @@ export const AUTOEVALUACION_QUESTIONS: AutoevaluacionQuestion[] = [
   },
 ]
 
-export function getAutoevaluacionSections() {
-  return Array.from(new Set(AUTOEVALUACION_QUESTIONS.map(question => question.section)))
+export const DEFAULT_AUTOEVALUACION_FORMAT: AutoevaluacionFormat = {
+  id: DEFAULT_AUTOEVALUACION_FORMAT_ID,
+  title: 'Autoevaluación STEAM',
+  description: 'Autoevaluación de seguimiento y mantención para proyectos STEAM, sitios verdes y reciclaje.',
+  questions: AUTOEVALUACION_QUESTIONS,
 }
 
-export function getAutoevaluacionQuestionMap() {
-  return new Map(AUTOEVALUACION_QUESTIONS.map(question => [question.id, question]))
+export function getAutoevaluacionSections(questions: AutoevaluacionQuestion[] = AUTOEVALUACION_QUESTIONS) {
+  return Array.from(new Set(questions.map(question => question.section)))
+}
+
+export function getAutoevaluacionQuestionMap(questions: AutoevaluacionQuestion[] = AUTOEVALUACION_QUESTIONS) {
+  return new Map(questions.map(question => [question.id, question]))
 }
 
 export function getAnswerDisplayValue(value: unknown) {
   if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '—'
   if (value === null || value === undefined || value === '') return '—'
   return String(value)
+}
+
+export function normalizeAutoevaluacionQuestions(rawQuestions: unknown): AutoevaluacionQuestion[] {
+  if (!Array.isArray(rawQuestions)) return []
+
+  return rawQuestions.map((raw, index) => {
+    const question = raw && typeof raw === 'object' ? raw as Partial<AutoevaluacionQuestion> : {}
+    const type = ['rating', 'text', 'checkbox', 'single'].includes(String(question.type))
+      ? question.type as AutoevaluacionQuestionType
+      : 'text'
+
+    return {
+      id: String(question.id || `pregunta_${index + 1}`).trim(),
+      section: String(question.section || 'Autoevaluación').trim(),
+      prompt: String(question.prompt || `Pregunta ${index + 1}`).trim(),
+      type,
+      required: Boolean(question.required),
+      options: Array.isArray(question.options) ? question.options.map(String).filter(Boolean) : [],
+      minLabel: question.minLabel ? String(question.minLabel) : undefined,
+      maxLabel: question.maxLabel ? String(question.maxLabel) : undefined,
+    }
+  }).filter(question => question.id && question.prompt && question.section)
 }
