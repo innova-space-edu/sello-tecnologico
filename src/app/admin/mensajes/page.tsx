@@ -40,7 +40,6 @@ export default function AdminMensajesPage() {
     init()
   }, [])
 
-  // Agrupar conversaciones
   const conversaciones: Record<string, any> = {}
   mensajes.forEach(m => {
     const key = [m.sender_id, m.receiver_id].sort().join('-')
@@ -105,32 +104,35 @@ export default function AdminMensajesPage() {
       <Sidebar />
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
 
-        {/* Header */}
         <div className="mb-6">
           <Link href="/admin" className="text-blue-600 text-sm hover:underline">← Panel Admin</Link>
-          <div className="flex justify-between items-start mt-2">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mt-2">
             <div>
               <h1 className="text-2xl font-bold text-blue-900">Monitoreo de Mensajes</h1>
               <p className="text-gray-500 mt-1 text-sm">
                 {mensajes.length} mensajes totales · {listaConversaciones.length} conversaciones
               </p>
             </div>
-            {selectedConv && (
-              <button onClick={() => setSelectedConv(null)}
-                className="text-sm text-blue-600 hover:underline">
-                ← Ver todas
-              </button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <a href="/api/admin/mensajes/export" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-semibold">
+                ⬇️ Descargar mensajes JSONL
+              </a>
+              {selectedConv && (
+                <button onClick={() => setSelectedConv(null)}
+                  className="text-sm text-blue-600 hover:underline px-3 py-2">
+                  ← Ver todas
+                </button>
+              )}
+            </div>
           </div>
           <div className="mt-2 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 inline-flex items-center gap-2">
             <span>⚠️</span>
-            <span className="text-yellow-700 text-xs font-medium">Los usuarios no son notificados de este monitoreo</span>
+            <span className="text-yellow-700 text-xs font-medium">Los usuarios no son notificados de este monitoreo. La descarga es solo para revisión interna y mejora de moderación.</span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Lista de conversaciones */}
           <div className="lg:col-span-1 bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-blue-900">Conversaciones ({listaConversaciones.length})</h2>
@@ -172,10 +174,7 @@ export default function AdminMensajesPage() {
             </div>
           </div>
 
-          {/* Mensajes */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden">
-
-            {/* Header tabla mensajes */}
             <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
               <h2 className="font-semibold text-blue-900">
                 {convSeleccionada
@@ -222,20 +221,16 @@ export default function AdminMensajesPage() {
                             {m.receiver?.role}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-700 text-xs max-w-xs">
-                          <p className="line-clamp-2">{m.content}</p>
+                        <td className="px-4 py-3 max-w-md">
+                          <p className="text-gray-700 text-sm whitespace-pre-wrap break-words">{m.content}</p>
                         </td>
                         <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                          {new Date(m.created_at).toLocaleDateString('es-CL')}
-                          <br />
-                          {new Date(m.created_at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                          {new Date(m.created_at).toLocaleString('es-CL')}
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleDeleteMensaje(m.id)}
+                          <button onClick={() => handleDeleteMensaje(m.id)}
                             disabled={deletingId === m.id}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg disabled:opacity-50"
-                            title="Eliminar mensaje">
+                            className="text-xs text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50">
                             {deletingId === m.id ? '...' : '🗑️'}
                           </button>
                         </td>
@@ -244,7 +239,9 @@ export default function AdminMensajesPage() {
                   </tbody>
                 </table>
               ) : (
-                <div className="p-8 text-center text-gray-400 text-sm">No hay mensajes aún</div>
+                <div className="p-8 text-center text-gray-400 text-sm">
+                  {selectedConv ? 'No hay mensajes en esta conversación' : 'No hay mensajes aún'}
+                </div>
               )}
             </div>
           </div>
