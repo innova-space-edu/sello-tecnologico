@@ -17,8 +17,6 @@ const menu = [
   { href: '/autoevaluacion', label: 'Autoevaluación', icon: '🌱' },
   { href: '/autoevaluacion/respuestas', label: 'Respuestas autoevaluación', icon: '📝' },
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
-  { href: '/admin/plantillas', label: 'Plantillas', icon: '🧩' },
-  { href: '/documentos', label: 'Documentos', icon: '📄' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
   { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
   { href: '/calendario', label: 'Calendario', icon: '📅' },
@@ -143,7 +141,6 @@ export default function Sidebar() {
 
             if (item.href === '/admin' && !esAdmin) return null
             if (item.href === '/admin/moderacion' && !esAdmin) return null
-            if (item.href === '/admin/plantillas' && esEstudianteRol) return null
             if (item.href === '/historial' && !esAdmin) return null
             if (item.href === '/notificaciones' && !esAdmin) return null
             if (item.href === '/mis-encuestas' && !esEstudianteRol) return null
