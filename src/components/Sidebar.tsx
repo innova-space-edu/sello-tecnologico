@@ -22,7 +22,6 @@ const menu = [
   { href: '/calendario', label: 'Calendario', icon: '📅' },
   { href: '/mensajes', label: 'Mensajes', icon: '💬' },
   { href: '/reportes', label: 'Reportes', icon: '📈' },
-  { href: '/historial', label: 'Historial', icon: '🕐' },
   { href: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
   { href: '/admin/moderacion', label: 'Moderación', icon: '🚨' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
@@ -130,7 +129,6 @@ export default function Sidebar() {
 
             if (item.href === '/admin' && !esAdmin) return null
             if (item.href === '/admin/moderacion' && !esAdmin) return null
-            if (item.href === '/historial' && !esAdmin) return null
             if (item.href === '/notificaciones' && !esAdmin) return null
             if (item.href === '/mis-encuestas' && !esEstudianteRol) return null
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null
