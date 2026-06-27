@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getSurveyActor } from '@/lib/survey-auth'
+import { DEFAULT_AUTOEVALUACION_FORMAT, DEFAULT_AUTOEVALUACION_FORMAT_ID } from '@/lib/autoevaluacion'
 
 function canManage(role?: string | null) {
   return ['admin', 'docente', 'coordinador'].includes(String(role ?? ''))
@@ -18,6 +19,13 @@ type Student = {
   role?: string | null
 }
 
+type NotificationFormat = {
+  id: string
+  title: string
+  description?: string | null
+  sourceId: string | null
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const actor = await getSurveyActor()
@@ -32,12 +40,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const admin = createAdminSupabaseClient()
 
-  const { data: format } = await admin
-    .from('self_evaluation_formats')
-    .select('id, title, description')
-    .eq('id', id)
-    .eq('active', true)
-    .single()
+  let format: NotificationFormat | null = null
+  if (id === DEFAULT_AUTOEVALUACION_FORMAT_ID) {
+    format = {
+      id: DEFAULT_AUTOEVALUACION_FORMAT_ID,
+      title: DEFAULT_AUTOEVALUACION_FORMAT.title,
+      description: DEFAULT_AUTOEVALUACION_FORMAT.description,
+      sourceId: null,
+    }
+  } else {
+    const { data } = await admin
+      .from('self_evaluation_formats')
+      .select('id, title, description')
+      .eq('id', id)
+      .eq('active', true)
+      .single()
+
+    if (data) {
+      format = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        sourceId: data.id,
+      }
+    }
+  }
 
   if (!format) return NextResponse.json({ error: 'Formato de autoevaluación no encontrado.' }, { status: 404 })
 
@@ -94,7 +121,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     message: `Tienes una autoevaluación disponible: ${format.title}. Ingresa a la sección Autoevaluación para responderla.`,
     type: 'self_evaluation',
     source_type: 'self_evaluation',
-    source_id: format.id,
+    source_id: format.sourceId,
     dedupe_key: `self_evaluation:assigned:${format.id}:${student.id}`,
     is_read: false,
     read_at: null,
