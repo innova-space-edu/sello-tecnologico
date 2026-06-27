@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { canEditSurvey, getSurveyActor } from '@/lib/survey-auth'
 
+const QUESTION_TYPES = ['text', 'single', 'multiple', 'appreciation', 'checklist', 'rating', 'number']
+
 function normalizeOptionScores(options: string[], rawScores: unknown) {
   const scores = rawScores && typeof rawScores === 'object' && !Array.isArray(rawScores)
     ? rawScores as Record<string, unknown>
@@ -11,26 +13,28 @@ function normalizeOptionScores(options: string[], rawScores: unknown) {
 
 function calculateClosedMaxPoints(questionType: string, optionScores: Record<string, number>) {
   const values = Object.values(optionScores).map(Number).filter(Number.isFinite)
-  if (questionType === 'multiple') return values.reduce((total, value) => total + Math.max(0, value), 0)
+  if (['multiple', 'checklist'].includes(questionType)) return values.reduce((total, value) => total + Math.max(0, value), 0)
   return values.length > 0 ? Math.max(...values, 0) : 0
 }
 
 function normalizeQuestions(questions: any[], surveyId: string) {
   return questions.map((question: any, index: number) => {
-    const questionType = String(question.question_type ?? 'text')
+    const requestedType = String(question.question_type ?? 'text')
+    const questionType = QUESTION_TYPES.includes(requestedType) ? requestedType : 'text'
     const options: string[] = Array.isArray(question.options) ? question.options.map(String).map((option: string) => option.trim()).filter(Boolean) : []
-    const isClosed = ['single', 'multiple'].includes(questionType)
+    const isClosed = ['single', 'multiple', 'checklist'].includes(questionType)
     const optionScores = isClosed ? normalizeOptionScores(options, question.option_scores) : {}
     const maxPoints = isClosed ? calculateClosedMaxPoints(questionType, optionScores) : Number(question.max_points ?? 1)
     const correctAnswers = questionType === 'single'
       ? options.filter(option => Number(optionScores[option] ?? 0) === maxPoints && maxPoints > 0)
-      : questionType === 'multiple'
+      : ['multiple', 'checklist'].includes(questionType)
         ? options.filter(option => Number(optionScores[option] ?? 0) > 0)
         : []
 
     return {
       survey_id: surveyId,
       prompt: String(question.prompt ?? '').trim(),
+      section: String(question.section ?? 'General').trim() || 'General',
       question_type: questionType,
       required: Boolean(question.required),
       sort_order: index,
@@ -47,13 +51,13 @@ function normalizeQuestions(questions: any[], surveyId: string) {
 function validateQuestions(questions: any[]) {
   if (questions.length === 0) return 'Agrega al menos una pregunta válida.'
   for (const question of questions) {
-    if (!Number.isFinite(question.max_points) || question.max_points <= 0) return `El ítem “${question.prompt}” debe tener un puntaje máximo mayor que 0.`
-    if (['single', 'multiple'].includes(question.question_type)) {
-      if (question.options.length < 2) return `Agrega al menos dos alternativas en el ítem “${question.prompt}”.`
-      if (new Set(question.options).size !== question.options.length) return `No repitas alternativas en el ítem “${question.prompt}”.`
+    if (!Number.isFinite(question.max_points) || question.max_points <= 0) return `El item "${question.prompt}" debe tener un puntaje mayor que 0.`
+    if (['single', 'multiple', 'checklist'].includes(question.question_type)) {
+      if (question.options.length < 2) return `Agrega al menos dos opciones en "${question.prompt}".`
+      if (new Set(question.options).size !== question.options.length) return `No repitas opciones en "${question.prompt}".`
       for (const option of question.options) {
         const score = Number(question.option_scores[option])
-        if (!Number.isFinite(score) || score < 0) return `Asigna un puntaje válido, igual o mayor que 0, a cada alternativa del ítem “${question.prompt}”.`
+        if (!Number.isFinite(score) || score < 0) return `Asigna puntaje valido a cada opcion de "${question.prompt}".`
       }
     }
   }
@@ -101,11 +105,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { count: responseCount } = await admin.from('survey_responses').select('*', { count: 'exact', head: true }).eq('survey_id', id)
 
   if ((responseCount ?? 0) > 0) {
-    const { error: updateError } = await admin.from('surveys').update({
-      is_active: body.is_active !== false,
-      allow_anonymous: body.allow_anonymous !== false,
-      updated_at: new Date().toISOString(),
-    }).eq('id', id)
+    const { error: updateError } = await admin.from('surveys').update({ is_active: body.is_active !== false, allow_anonymous: body.allow_anonymous !== false, updated_at: new Date().toISOString() }).eq('id', id)
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
     const staffError = await replaceStaff(admin, id, actor.id, staffIds)
     if (staffError) return NextResponse.json({ error: staffError.message }, { status: 400 })
