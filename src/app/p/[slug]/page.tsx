@@ -47,6 +47,12 @@ type Asset = {
   created_at?: string | null
 }
 
+type EmbedInfo = {
+  url: string
+  embedUrl?: string
+  provider: 'YouTube' | 'Vimeo' | 'Enlace'
+}
+
 function cleanTitle(title: string) {
   return title.replace(/^Vitrina:\s*/i, '').trim()
 }
@@ -83,6 +89,51 @@ function postIcon(type: string) {
   return '📝'
 }
 
+function extractFirstUrl(text?: string | null) {
+  const match = String(text ?? '').match(/https?:\/\/[^\s)]+/i)
+  return match?.[0]?.replace(/[.,;!?]+$/, '') ?? ''
+}
+
+function getEmbedInfo(text?: string | null): EmbedInfo | null {
+  const rawUrl = extractFirstUrl(text)
+  if (!rawUrl) return null
+
+  try {
+    const url = new URL(rawUrl)
+    const host = url.hostname.replace(/^www\./, '')
+
+    if (host === 'youtu.be') {
+      const id = url.pathname.split('/').filter(Boolean)[0]
+      if (id) return { url: rawUrl, embedUrl: `https://www.youtube.com/embed/${id}`, provider: 'YouTube' }
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      const watchId = url.searchParams.get('v')
+      const parts = url.pathname.split('/').filter(Boolean)
+      const shortId = parts[0] === 'shorts' ? parts[1] : ''
+      const embedId = parts[0] === 'embed' ? parts[1] : ''
+      const id = watchId || shortId || embedId
+      if (id) return { url: rawUrl, embedUrl: `https://www.youtube.com/embed/${id}`, provider: 'YouTube' }
+    }
+
+    if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+      const parts = url.pathname.split('/').filter(Boolean)
+      const id = parts.find(part => /^\d+$/.test(part))
+      if (id) return { url: rawUrl, embedUrl: `https://player.vimeo.com/video/${id}`, provider: 'Vimeo' }
+    }
+
+    return { url: rawUrl, provider: 'Enlace' }
+  } catch {
+    return { url: rawUrl, provider: 'Enlace' }
+  }
+}
+
+function contentWithoutFirstUrl(text?: string | null) {
+  const url = extractFirstUrl(text)
+  if (!url) return String(text ?? '').trim()
+  return String(text ?? '').replace(url, '').trim()
+}
+
 function buildBackground(page: PublicPage, theme: string, accent: string) {
   const base = page.background_color ?? '#f8fafc'
   if (page.background_style === 'solid') return base
@@ -101,27 +152,15 @@ function buttonBackground(theme: string, accent: string, buttonStyle?: string | 
 
 function surfaceStyles(page: PublicPage, cardColor: string, accent: string): CSSProperties {
   if (page.surface_style === 'flat') {
-    return {
-      background: cardColor,
-      borderColor: '#e5e7eb',
-      boxShadow: 'none',
-    }
+    return { background: cardColor, borderColor: '#e5e7eb', boxShadow: 'none' }
   }
 
   if (page.surface_style === 'bordered') {
-    return {
-      background: cardColor,
-      borderColor: `${accent}55`,
-      boxShadow: 'none',
-    }
+    return { background: cardColor, borderColor: `${accent}55`, boxShadow: 'none' }
   }
 
   if (page.surface_style === 'floating') {
-    return {
-      background: cardColor,
-      borderColor: `${accent}24`,
-      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.12)',
-    }
+    return { background: cardColor, borderColor: `${accent}24`, boxShadow: '0 18px 40px rgba(15, 23, 42, 0.12)' }
   }
 
   return {
@@ -206,6 +245,37 @@ function FeedPost({
   )
 }
 
+function renderEmbed(embed: EmbedInfo, page: PublicPage, theme: string, accent: string, textColor: string) {
+  if (embed.embedUrl) {
+    return (
+      <div className="bg-black">
+        <iframe
+          src={embed.embedUrl}
+          title={`${embed.provider} incrustado`}
+          className="aspect-video w-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-5 pb-2">
+      <a
+        href={embed.url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 font-black transition hover:opacity-90"
+        style={{ background: `${accent}10`, borderColor: `${accent}22`, color: textColor }}
+      >
+        <span className="min-w-0 truncate">🔗 {embed.url}</span>
+        <span className="shrink-0 rounded-full px-3 py-1 text-xs text-white" style={{ background: buttonBackground(theme, accent, page.button_style) }}>Abrir</span>
+      </a>
+    </div>
+  )
+}
+
 function renderAssetPost(asset: Asset, page: PublicPage, theme: string, accent: string, textColor: string, cardColor: string) {
   const sectionId = `archivo-${asset.id}`
   const title = asset.title ?? asset.file_name
@@ -259,17 +329,20 @@ function renderAssetPost(asset: Asset, page: PublicPage, theme: string, accent: 
 
 function renderBlockPost(block: Block, page: PublicPage, theme: string, accent: string, textColor: string, cardColor: string) {
   const sectionId = `publicacion-${block.id}`
-  const label = blockLabel(block.type)
-  const icon = postIcon(block.type)
+  const embed = getEmbedInfo(block.content)
+  const label = embed ? embed.provider : blockLabel(block.type)
+  const icon = embed ? (embed.embedUrl ? '▶️' : '🔗') : postIcon(block.type)
   const title = block.title || label
+  const textOnly = contentWithoutFirstUrl(block.content)
 
-  const caption = block.content ? (
-    <p className="whitespace-pre-wrap"><span className="font-black">{authorName(page)}</span> {block.content}</p>
+  const caption = textOnly ? (
+    <p className="whitespace-pre-wrap"><span className="font-black">{authorName(page)}</span> {textOnly}</p>
   ) : null
 
   return (
     <FeedPost key={block.id} id={sectionId} title={title} label={label} icon={icon} page={page} theme={theme} accent={accent} textColor={textColor} cardColor={cardColor} targetType="block" targetId={block.id} caption={caption}>
-      {block.type === 'call_to_action' && block.content && (
+      {embed && renderEmbed(embed, page, theme, accent, textColor)}
+      {!embed && block.type === 'call_to_action' && block.content && (
         <div className="px-5 pb-2">
           <a href={block.content} target="_blank" rel="noreferrer" className="inline-flex rounded-full px-5 py-2.5 text-sm font-black text-white" style={{ background: buttonBackground(theme, accent, page.button_style) }}>
             Abrir enlace
