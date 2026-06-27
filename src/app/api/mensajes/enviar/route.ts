@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getSurveyActor } from '@/lib/survey-auth'
 import { analyzeMessageContent } from '@/lib/moderation-engine'
+import { isSchoolWorkContext } from '@/lib/safe-school-context'
 
 type SendMessageBody = {
   receiver_id?: unknown
@@ -28,6 +29,14 @@ async function insertFlag(params: {
     matched_words: params.moderation.matchedWords,
     reviewed: false,
   })
+}
+
+async function insertMessage(admin: ReturnType<typeof createAdminSupabaseClient>, senderId: string, receiverId: string, content: string) {
+  return admin
+    .from('messages')
+    .insert({ sender_id: senderId, receiver_id: receiverId, content })
+    .select('id')
+    .single()
 }
 
 export async function POST(request: Request) {
@@ -89,15 +98,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Esta conversación fue bloqueada por administración.' }, { status: 403 })
   }
 
+  if (isSchoolWorkContext(content)) {
+    const { data: message, error: messageError } = await insertMessage(admin, actor.id, receiverId, content)
+    if (messageError || !message) {
+      return NextResponse.json({ error: messageError?.message ?? 'No fue posible enviar el mensaje.' }, { status: 400 })
+    }
+    return NextResponse.json({ status: 'sent_school_work', id: message.id }, { status: 201 })
+  }
+
   const moderation = analyzeMessageContent(content)
 
   if (moderation.action === 'block_user') {
     await insertFlag({ senderId: actor.id, receiverId, content, moderation })
 
-    await admin
-      .from('profiles')
-      .update({ blocked: true })
-      .eq('id', actor.id)
+    await admin.from('profiles').update({ blocked: true }).eq('id', actor.id)
 
     await admin.from('blocked_pairs').upsert({
       user_a: uidA,
@@ -114,22 +128,13 @@ export async function POST(request: Request) {
 
   if (moderation.action === 'hold_for_review') {
     await insertFlag({ senderId: actor.id, receiverId, content, moderation })
-
     return NextResponse.json({
       status: 'held_for_review',
       warning: moderation.warning ?? 'Mensaje retenido para revisión.',
     }, { status: 202 })
   }
 
-  const { data: message, error: messageError } = await admin
-    .from('messages')
-    .insert({
-      sender_id: actor.id,
-      receiver_id: receiverId,
-      content,
-    })
-    .select('id')
-    .single()
+  const { data: message, error: messageError } = await insertMessage(admin, actor.id, receiverId, content)
 
   if (messageError || !message) {
     return NextResponse.json({ error: messageError?.message ?? 'No fue posible enviar el mensaje.' }, { status: 400 })
