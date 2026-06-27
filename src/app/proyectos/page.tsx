@@ -26,6 +26,8 @@ export default function ProyectosPage() {
   const [cursoFiltro, setCursoFiltro] = useState('')
   const [cursosAbiertos, setCursosAbiertos] = useState<Record<string, boolean>>({})
   const [actualizandoId, setActualizandoId] = useState<string | null>(null)
+  const [actualizandoMasivo, setActualizandoMasivo] = useState(false)
+  const [estadoMasivo, setEstadoMasivo] = useState('En revisión')
   const rolRef = useRef('')
   const userIdRef = useRef('')
 
@@ -92,6 +94,10 @@ export default function ProyectosPage() {
   }
 
   const cambiarEstado = async (p: any, nuevoEstado: string) => {
+    if (!ESTADOS.includes(nuevoEstado)) {
+      alert('Estado no válido. Recarga la página e intenta nuevamente.')
+      return
+    }
     if (!nuevoEstado || nuevoEstado === p.status) return
     const ok = confirm(`¿Cambiar el estado de "${p.title}" de "${p.status}" a "${nuevoEstado}"?`)
     if (!ok) return
@@ -126,6 +132,46 @@ export default function ProyectosPage() {
     const matchCurso = !cursoFiltro || p.course_id === cursoFiltro || p.courses?.name?.toLowerCase().includes(cursoFiltroLower)
     return matchBusqueda && matchEstado && matchCurso
   })
+
+  const cambiarEstadoMasivo = async () => {
+    if (!puedeGestionar) return
+    if (!ESTADOS.includes(estadoMasivo)) {
+      alert('Selecciona un estado válido.')
+      return
+    }
+
+    const ids = proyectosFiltrados
+      .filter(p => p.status !== estadoMasivo)
+      .map(p => p.id)
+      .filter(Boolean)
+
+    if (ids.length === 0) {
+      alert('No hay proyectos visibles para actualizar con ese estado.')
+      return
+    }
+
+    const descripcionFiltro = cursoFiltro || busqueda || filtroEstado !== 'Todos'
+      ? 'los proyectos visibles según los filtros actuales'
+      : 'todos los proyectos'
+
+    const ok = confirm(`¿Cambiar ${ids.length} proyecto(s) a "${estadoMasivo}"?\n\nSe actualizarán ${descripcionFiltro}.`)
+    if (!ok) return
+
+    setActualizandoMasivo(true)
+    const { error } = await supabase
+      .from('projects')
+      .update({ status: estadoMasivo, updated_at: new Date().toISOString() })
+      .in('id', ids)
+
+    if (error) {
+      alert(`No se pudieron actualizar los proyectos.\n\n${error.message}`)
+    } else {
+      alert(`Listo. Se actualizaron ${ids.length} proyecto(s) a "${estadoMasivo}".`)
+    }
+
+    await fetchProyectos(rol, userId)
+    setActualizandoMasivo(false)
+  }
 
   const revisionCount = proyectos.filter(p => p.status === 'En revisión').length
   const revisadosCount = proyectos.filter(p => p.status === 'Revisado').length
@@ -201,7 +247,29 @@ export default function ProyectosPage() {
 
         {puedeGestionar && (
           <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            Para cambiar un proyecto, abre el curso y usa el selector de la columna <strong>Estado</strong>. Puedes dejarlo como Borrador, En progreso, En revisión, Revisado, Aprobado o Cerrado.
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <p>
+                Para cambiar un proyecto, abre el curso y usa el selector de la columna <strong>Estado</strong>. También puedes cambiar todos los proyectos visibles con un solo botón.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={estadoMasivo}
+                  onChange={e => setEstadoMasivo(e.target.value)}
+                  disabled={actualizandoMasivo}
+                  className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-60"
+                >
+                  {ESTADOS.map(estado => <option key={estado} value={estado}>{estado}</option>)}
+                </select>
+                <button
+                  type="button"
+                  onClick={cambiarEstadoMasivo}
+                  disabled={actualizandoMasivo || proyectosFiltrados.length === 0}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {actualizandoMasivo ? 'Actualizando…' : `Cambiar visibles (${proyectosFiltrados.length})`}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -261,7 +329,7 @@ export default function ProyectosPage() {
                                     <div className="flex flex-col gap-1">
                                       <select
                                         value={ESTADOS.includes(p.status) ? p.status : 'Borrador'}
-                                        disabled={actualizandoId === p.id}
+                                        disabled={actualizandoId === p.id || actualizandoMasivo}
                                         onChange={e => cambiarEstado(p, e.target.value)}
                                         className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-60"
                                       >
