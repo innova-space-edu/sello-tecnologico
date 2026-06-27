@@ -10,7 +10,7 @@ const statusColor: Record<string, string> = {
   'En revisión': 'bg-amber-100 text-amber-700 ring-amber-200',
   'Revisado': 'bg-emerald-100 text-emerald-700 ring-emerald-200',
   'Aprobado': 'bg-green-100 text-green-700 ring-green-200',
-  'Cerrado': 'bg-rose-100 text-rose-700 ring-rose-200',
+  'Cerrado': 'bg-rose-100 text-rose-200 ring-rose-200',
 }
 
 const typeIcon: Record<string, string> = {
@@ -68,6 +68,7 @@ export default async function DashboardPage() {
 
   const role = perfil?.role ?? ''
   const isStudent = role === 'estudiante'
+  const isAdmin = role === 'admin'
   const isStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(role)
   const today = new Date().toISOString().split('T')[0]
 
@@ -136,7 +137,6 @@ export default async function DashboardPage() {
   const cerradosOAprobados = proyectos.filter((p: any) => ['Revisado', 'Aprobado', 'Cerrado'].includes(p.status)).length
   const atrasados = proyectos.filter((p: any) => p.end_date && p.end_date < today && !['Revisado', 'Aprobado', 'Cerrado'].includes(p.status))
   const publicadas = paginasPublicas.filter((p: any) => p.is_public && p.status === 'published').length
-  const paginasBorrador = paginasPublicas.filter((p: any) => !p.is_public || p.status !== 'published').length
   const proyectosConEvidencia = new Set(evidencias.map((ev: any) => ev.project_id).filter(Boolean))
   const proyectosSinEvidencia = proyectos.filter((p: any) => !proyectosConEvidencia.has(p.id))
   const avanceGeneral = percent(cerradosOAprobados, totalProyectos)
@@ -165,6 +165,7 @@ export default async function DashboardPage() {
     { label: 'En revisión', value: enRevision.length, icon: '⏳', color: 'bg-amber-50 text-amber-700 ring-amber-100', href: '/proyectos?estado=En%20revisión' },
     { label: 'Revisados', value: revisados.length, icon: '✅', color: 'bg-emerald-50 text-emerald-700 ring-emerald-100', href: '/proyectos?estado=Revisado' },
     { label: 'Evidencias', value: evidencias.length, icon: '📎', color: 'bg-sky-50 text-sky-700 ring-sky-100', href: '/evidencias' },
+    { label: 'Calendario', value: 'Abrir', icon: '📅', color: 'bg-cyan-50 text-cyan-700 ring-cyan-100', href: '/calendario' },
     { label: 'Páginas públicas', value: publicadas, icon: '🌐', color: 'bg-teal-50 text-teal-700 ring-teal-100', href: '/vitrinas' },
     { label: isStudent ? 'Cursos vinculados' : 'Cursos', value: cursosCount, icon: '📚', color: 'bg-violet-50 text-violet-700 ring-violet-100', href: '/cursos' },
     { label: 'Usuarios', value: usuariosCount, icon: '👥', color: 'bg-purple-50 text-purple-700 ring-purple-100', href: '/usuarios', visible: isStaff },
@@ -184,6 +185,8 @@ export default async function DashboardPage() {
       ].filter(item => item.show)
 
   const quickActions = [
+    { href: '/calendario', label: 'Abrir calendario', icon: '📅', visible: true },
+    { href: '/mensajes/broadcast', label: 'Mensaje grupal', icon: '📢', visible: isAdmin },
     { href: '/proyectos/nuevo', label: 'Crear proyecto', icon: '🗂️', visible: true },
     { href: '/proyectos?estado=En%20revisión', label: 'Revisar pendientes', icon: '⏳', visible: isStaff },
     { href: '/proyectos?estado=Revisado', label: 'Ver revisados', icon: '✅', visible: isStaff },
@@ -203,12 +206,13 @@ export default async function DashboardPage() {
               <div className="mb-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">Panel de seguimiento · Sello Tecnológico</div>
               <h1 className="text-2xl lg:text-4xl font-black leading-tight">Hola, {perfil?.full_name ?? user.email}</h1>
               <p className="mt-2 max-w-3xl text-sm text-blue-50">
-                {isStudent ? 'Revisa tus proyectos, invitaciones, evidencias y páginas públicas.' : 'Revisa avances, pendientes, proyectos revisados y datos sincronizados con reportes.'}
+                {isStudent ? 'Revisa tus proyectos, invitaciones, evidencias, calendario y páginas públicas.' : 'Revisa avances, pendientes, calendario, proyectos revisados y datos sincronizados con reportes.'}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Rol: {role || 'sin rol'}</span>
                 <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Avance: {avanceGeneral}%</span>
                 <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Revisados: {revisados.length}</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Mensajes sin leer: {unreadMessages ?? 0}</span>
               </div>
             </div>
 
@@ -218,6 +222,15 @@ export default async function DashboardPage() {
               <p className="mt-2 text-xs text-blue-50">{cerradosOAprobados} de {totalProyectos} proyectos revisados, aprobados o cerrados.</p>
             </div>
           </div>
+        </section>
+
+        <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Link href="/calendario" className="group rounded-[2rem] border border-cyan-100 bg-gradient-to-br from-cyan-50 to-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md">
+            <div className="flex items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-cyan-100 text-3xl text-cyan-700">📅</div><div><p className="text-sm font-black text-cyan-950">Calendario</p><p className="mt-1 text-xs text-cyan-700/70">Ver actividades, fechas y eventos.</p></div></div>
+          </Link>
+          {isAdmin && <Link href="/mensajes/broadcast" className="group rounded-[2rem] border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+            <div className="flex items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-100 text-3xl text-blue-700">📢</div><div><p className="text-sm font-black text-blue-950">Mensaje grupal</p><p className="mt-1 text-xs text-blue-700/70">Enviar comunicado desde administración.</p></div></div>
+          </Link>}
         </section>
 
         <section className="mb-6 flex flex-wrap gap-3">
