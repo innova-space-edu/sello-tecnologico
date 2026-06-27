@@ -133,7 +133,7 @@ export default async function AdminPage() {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
               <h2 className="font-semibold text-blue-900 text-sm lg:text-base">Actividad reciente</h2>
-              <Link href="/historial" className="text-xs text-blue-600 hover:underline">Ver todo →</Link>
+              <span className="text-xs text-gray-400">Últimos 20 registros</span>
             </div>
             <div className="overflow-y-auto max-h-80">
               {logs && logs.length > 0 ? (
