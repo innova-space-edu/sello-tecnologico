@@ -1,6 +1,9 @@
 -- ================================================================
 -- Encuestas editables con secciones, listas de cotejo y escalas
--- Ejecutar después de 20260604_surveys.sql y 20260604_surveys_scoring.sql.
+-- Ejecutar despues de:
+-- 1. 20260604_surveys.sql
+-- 2. 20260604_surveys_scoring.sql
+-- 3. 20260604_surveys_option_scores.sql
 -- ================================================================
 
 begin;
@@ -27,10 +30,10 @@ as $$
 declare
   question_record record;
   selected_answers jsonb;
-  expected_answers jsonb;
-  normalized_text text;
+  selected_option text;
+  accumulated numeric := 0;
 begin
-  select question_type, max_points, correct_answers
+  select question_type, max_points, option_scores
   into question_record
   from public.survey_questions
   where id = new.question_id;
@@ -42,18 +45,19 @@ begin
   new.awarded_points := 0;
 
   if question_record.question_type = 'single' then
-    normalized_text := coalesce(new.value_text, '');
-    if question_record.correct_answers ? normalized_text then
-      new.awarded_points := question_record.max_points;
-    end if;
+    selected_option := coalesce(new.value_text, '');
+    new.awarded_points := least(
+      question_record.max_points,
+      greatest(0, coalesce((question_record.option_scores ->> selected_option)::numeric, 0))
+    );
 
   elsif question_record.question_type in ('multiple', 'checklist') then
     selected_answers := coalesce(new.value_json, '[]'::jsonb);
-    expected_answers := coalesce(question_record.correct_answers, '[]'::jsonb);
-    if jsonb_typeof(selected_answers) = 'array'
-       and selected_answers @> expected_answers
-       and expected_answers @> selected_answers then
-      new.awarded_points := question_record.max_points;
+    if jsonb_typeof(selected_answers) = 'array' then
+      select coalesce(sum(greatest(0, coalesce((question_record.option_scores ->> selected.value)::numeric, 0))), 0)
+      into accumulated
+      from jsonb_array_elements_text(selected_answers) as selected(value);
+      new.awarded_points := least(question_record.max_points, accumulated);
     end if;
 
   elsif question_record.question_type in ('appreciation', 'rating', 'number') then
@@ -72,6 +76,11 @@ end;
 $$;
 
 revoke all on function public.score_survey_answer() from public;
+
+update public.survey_answers
+set value_text = value_text,
+    value_json = value_json,
+    value_number = value_number;
 
 revoke all on table public.survey_questions from anon, authenticated;
 grant select (id, survey_id, prompt, question_type, required, sort_order, options, appreciation_min_label, appreciation_max_label, section) on public.survey_questions to anon, authenticated;
