@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { canManageSurveys, getSurveyActor } from '@/lib/survey-auth'
 
+const QUESTION_TYPES = ['text', 'single', 'multiple', 'appreciation', 'checklist', 'rating', 'number']
+
 function makeSlug(title: string) {
   const base = title
     .normalize('NFD')
@@ -22,25 +24,27 @@ function normalizeOptionScores(options: string[], rawScores: unknown) {
 
 function calculateClosedMaxPoints(questionType: string, optionScores: Record<string, number>) {
   const values = Object.values(optionScores).map(Number).filter(Number.isFinite)
-  if (questionType === 'multiple') return values.reduce((total, value) => total + Math.max(0, value), 0)
+  if (['multiple', 'checklist'].includes(questionType)) return values.reduce((total, value) => total + Math.max(0, value), 0)
   return values.length > 0 ? Math.max(...values, 0) : 0
 }
 
 function normalizeQuestions(questions: any[]) {
   return questions.map((question: any, index: number) => {
-    const questionType = String(question.question_type ?? 'text')
+    const requestedType = String(question.question_type ?? 'text')
+    const questionType = QUESTION_TYPES.includes(requestedType) ? requestedType : 'text'
     const options: string[] = Array.isArray(question.options) ? question.options.map(String).map((option: string) => option.trim()).filter(Boolean) : []
-    const isClosed = ['single', 'multiple'].includes(questionType)
+    const isClosed = ['single', 'multiple', 'checklist'].includes(questionType)
     const optionScores = isClosed ? normalizeOptionScores(options, question.option_scores) : {}
     const maxPoints = isClosed ? calculateClosedMaxPoints(questionType, optionScores) : Number(question.max_points ?? 1)
     const correctAnswers = questionType === 'single'
       ? options.filter(option => Number(optionScores[option] ?? 0) === maxPoints && maxPoints > 0)
-      : questionType === 'multiple'
+      : ['multiple', 'checklist'].includes(questionType)
         ? options.filter(option => Number(optionScores[option] ?? 0) > 0)
         : []
 
     return {
       prompt: String(question.prompt ?? '').trim(),
+      section: String(question.section ?? 'General').trim() || 'General',
       question_type: questionType,
       required: Boolean(question.required),
       sort_order: index,
@@ -58,15 +62,13 @@ function validateQuestions(questions: any[]) {
   if (questions.length === 0) return 'Las preguntas deben tener texto.'
 
   for (const question of questions) {
-    if (!Number.isFinite(question.max_points) || question.max_points <= 0) {
-      return `El ítem “${question.prompt}” debe tener un puntaje máximo mayor que 0.`
-    }
-    if (['single', 'multiple'].includes(question.question_type)) {
-      if (question.options.length < 2) return `Agrega al menos dos alternativas en el ítem “${question.prompt}”.`
-      if (new Set(question.options).size !== question.options.length) return `No repitas alternativas en el ítem “${question.prompt}”.`
+    if (!Number.isFinite(question.max_points) || question.max_points <= 0) return `El item "${question.prompt}" debe tener un puntaje mayor que 0.`
+    if (['single', 'multiple', 'checklist'].includes(question.question_type)) {
+      if (question.options.length < 2) return `Agrega al menos dos opciones en "${question.prompt}".`
+      if (new Set(question.options).size !== question.options.length) return `No repitas opciones en "${question.prompt}".`
       for (const option of question.options) {
         const score = Number(question.option_scores[option])
-        if (!Number.isFinite(score) || score < 0) return `Asigna un puntaje válido, igual o mayor que 0, a cada alternativa del ítem “${question.prompt}”.`
+        if (!Number.isFinite(score) || score < 0) return `Asigna puntaje valido a cada opcion de "${question.prompt}".`
       }
     }
   }
@@ -75,9 +77,7 @@ function validateQuestions(questions: any[]) {
 
 export async function POST(request: Request) {
   const actor = await getSurveyActor()
-  if (!canManageSurveys(actor)) {
-    return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
-  }
+  if (!canManageSurveys(actor)) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
   const body = await request.json()
   const title = String(body.title ?? '').trim()
@@ -100,25 +100,13 @@ export async function POST(request: Request) {
   const admin = createAdminSupabaseClient()
   const { data: survey, error } = await admin
     .from('surveys')
-    .insert({
-      title,
-      description: description || null,
-      slug: makeSlug(title),
-      course_id: courseId,
-      creator_id: actor!.id,
-      is_active: isActive,
-      allow_anonymous: allowAnonymous,
-    })
+    .insert({ title, description: description || null, slug: makeSlug(title), course_id: courseId, creator_id: actor!.id, is_active: isActive, allow_anonymous: allowAnonymous })
     .select('id, slug')
     .single()
 
-  if (error || !survey) {
-    return NextResponse.json({ error: error?.message ?? 'No fue posible crear la encuesta.' }, { status: 400 })
-  }
+  if (error || !survey) return NextResponse.json({ error: error?.message ?? 'No fue posible crear la encuesta.' }, { status: 400 })
 
-  const { error: questionError } = await admin.from('survey_questions').insert(
-    normalizedQuestions.map(question => ({ ...question, survey_id: survey.id }))
-  )
+  const { error: questionError } = await admin.from('survey_questions').insert(normalizedQuestions.map(question => ({ ...question, survey_id: survey.id })))
   if (questionError) {
     await admin.from('surveys').delete().eq('id', survey.id)
     return NextResponse.json({ error: questionError.message }, { status: 400 })
@@ -126,16 +114,12 @@ export async function POST(request: Request) {
 
   const allowedStaff = Array.from(new Set([actor!.id, ...staffIds]))
   if (allowedStaff.length > 0) {
-    const { error: staffError } = await admin.from('survey_course_staff').insert(
-      allowedStaff.map(teacherId => ({ survey_id: survey.id, teacher_id: teacherId }))
-    )
+    const { error: staffError } = await admin.from('survey_course_staff').insert(allowedStaff.map(teacherId => ({ survey_id: survey.id, teacher_id: teacherId })))
     if (staffError) return NextResponse.json({ error: staffError.message }, { status: 400 })
   }
 
   if (studentIds.length > 0) {
-    const { error: studentError } = await admin.from('survey_students').insert(
-      studentIds.map(studentId => ({ survey_id: survey.id, student_id: studentId }))
-    )
+    const { error: studentError } = await admin.from('survey_students').insert(studentIds.map(studentId => ({ survey_id: survey.id, student_id: studentId })))
     if (studentError) return NextResponse.json({ error: studentError.message }, { status: 400 })
   }
 
