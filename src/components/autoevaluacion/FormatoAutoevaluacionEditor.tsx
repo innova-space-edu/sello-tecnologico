@@ -1,10 +1,17 @@
 'use client'
 
 import { AUTOEVALUACION_QUESTIONS, AutoevaluacionQuestion, AutoevaluacionQuestionType } from '@/lib/autoevaluacion'
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState } from 'react'
 
 type Props = {
-  mode: 'copy' | 'new'
+  mode: 'copy' | 'new' | 'edit'
+  initialFormat?: {
+    id: string
+    title: string
+    description?: string | null
+    questions: AutoevaluacionQuestion[]
+  } | null
 }
 
 type EditableQuestion = AutoevaluacionQuestion & {
@@ -27,8 +34,8 @@ function makeId(prefix = 'pregunta') {
 function questionToEditable(question: AutoevaluacionQuestion): EditableQuestion {
   return {
     ...question,
-    id: question.id,
-    localId: makeId(question.id),
+    id: question.id || makeId('pregunta'),
+    localId: makeId(question.id || 'local'),
     options: question.options ?? [],
   }
 }
@@ -47,46 +54,42 @@ function createBlankQuestion(section: string): EditableQuestion {
   }
 }
 
-export default function FormatoAutoevaluacionEditor({ mode }: Props) {
-  const storageKey = mode === 'copy' ? 'autoevaluacion_formato_copia' : 'autoevaluacion_formato_nuevo'
-  const [title, setTitle] = useState(mode === 'copy' ? 'Copia editable · Autoevaluación STEAM' : 'Nuevo formato de autoevaluación')
-  const [description, setDescription] = useState(mode === 'copy'
-    ? 'Formato duplicado desde la autoevaluación actual para reutilizarlo o adaptarlo a otra actividad.'
-    : 'Crea un formato nuevo para que los estudiantes puedan evaluarse de otra manera.'
-  )
-  const [questions, setQuestions] = useState<EditableQuestion[]>(
-    mode === 'copy' ? AUTOEVALUACION_QUESTIONS.map(questionToEditable) : [
-      createBlankQuestion('Autoevaluación personal'),
-      {
-        ...createBlankQuestion('Autoevaluación personal'),
-        id: makeId('responsabilidad'),
-        prompt: '¿Cómo evalúas tu responsabilidad en esta actividad?',
-        type: 'rating',
-        required: true,
-      },
-      {
-        ...createBlankQuestion('Plan de mejora'),
-        id: makeId('mejora'),
-        prompt: '¿Qué mejorarías en una próxima oportunidad?',
-        type: 'text',
-        required: true,
-      },
-    ]
-  )
-  const [savedMessage, setSavedMessage] = useState('')
+function getInitialQuestions(mode: Props['mode'], initialFormat?: Props['initialFormat']) {
+  if (mode === 'edit' && initialFormat?.questions?.length) return initialFormat.questions.map(questionToEditable)
+  if (mode === 'copy') return AUTOEVALUACION_QUESTIONS.map(questionToEditable)
+  return [
+    createBlankQuestion('Autoevaluación personal'),
+    {
+      ...createBlankQuestion('Autoevaluación personal'),
+      id: makeId('responsabilidad'),
+      prompt: '¿Cómo evalúas tu responsabilidad en esta actividad?',
+      type: 'rating',
+      required: true,
+    },
+    {
+      ...createBlankQuestion('Plan de mejora'),
+      id: makeId('mejora'),
+      prompt: '¿Qué mejorarías en una próxima oportunidad?',
+      type: 'text',
+      required: true,
+    },
+  ]
+}
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem(storageKey)
-    if (!saved) return
-    try {
-      const parsed = JSON.parse(saved) as { title?: string; description?: string; questions?: EditableQuestion[] }
-      if (parsed.title) setTitle(parsed.title)
-      if (parsed.description) setDescription(parsed.description)
-      if (Array.isArray(parsed.questions) && parsed.questions.length > 0) setQuestions(parsed.questions)
-    } catch {
-      window.localStorage.removeItem(storageKey)
-    }
-  }, [storageKey])
+export default function FormatoAutoevaluacionEditor({ mode, initialFormat }: Props) {
+  const router = useRouter()
+  const [title, setTitle] = useState(
+    initialFormat?.title ?? (mode === 'copy' ? 'Copia editable · Autoevaluación STEAM' : 'Nuevo formato de autoevaluación')
+  )
+  const [description, setDescription] = useState(
+    initialFormat?.description ?? (mode === 'copy'
+      ? 'Formato duplicado desde la autoevaluación actual para reutilizarlo o adaptarlo a otra actividad.'
+      : 'Crea un formato nuevo para que los estudiantes puedan evaluarse de otra manera.')
+  )
+  const [questions, setQuestions] = useState<EditableQuestion[]>(getInitialQuestions(mode, initialFormat))
+  const [savedMessage, setSavedMessage] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const sections = useMemo(() => Array.from(new Set(questions.map(question => question.section || 'Sin sección'))), [questions])
 
@@ -132,25 +135,66 @@ export default function FormatoAutoevaluacionEditor({ mode }: Props) {
     updateQuestion(localId, { options: (target?.options ?? []).filter((_, index) => index !== optionIndex) })
   }
 
-  const saveDraft = () => {
-    window.localStorage.setItem(storageKey, JSON.stringify({ title, description, questions }))
-    setSavedMessage('Formato guardado como borrador en este navegador.')
-    window.setTimeout(() => setSavedMessage(''), 3000)
+  const normalizeForSave = () => questions.map(({ localId, ...question }) => ({
+    ...question,
+    id: question.id || makeId('pregunta'),
+    section: question.section || 'Autoevaluación',
+    prompt: question.prompt || 'Pregunta de autoevaluación',
+    options: ['checkbox', 'single'].includes(question.type) ? (question.options ?? []).filter(Boolean) : [],
+  }))
+
+  const saveFormat = async () => {
+    setError('')
+    setSavedMessage('')
+    if (!title.trim()) {
+      setError('Debes escribir un nombre para el formato.')
+      return
+    }
+    if (questions.length === 0) {
+      setError('El formato debe tener al menos una pregunta.')
+      return
+    }
+
+    setSaving(true)
+    const endpoint = mode === 'edit' && initialFormat?.id
+      ? `/api/autoevaluacion/formatos/${initialFormat.id}`
+      : '/api/autoevaluacion/formatos'
+    const method = mode === 'edit' && initialFormat?.id ? 'PUT' : 'POST'
+
+    const response = await fetch(endpoint, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        description,
+        questions: normalizeForSave(),
+        source: mode === 'copy' ? 'copy' : 'custom',
+      }),
+    })
+    const data = await response.json().catch(() => ({}))
+
+    setSaving(false)
+    if (!response.ok) {
+      setError(data.error ?? 'No fue posible guardar el formato.')
+      return
+    }
+
+    setSavedMessage(mode === 'edit' ? 'Formato actualizado correctamente.' : 'Formato creado correctamente. Ya aparecerá en Autoevaluación.')
+    window.setTimeout(() => router.push('/autoevaluacion'), 600)
   }
 
   const resetToOriginal = () => {
     if (!window.confirm('¿Restaurar el formato inicial? Se perderán los cambios no guardados.')) return
-    window.localStorage.removeItem(storageKey)
-    setTitle(mode === 'copy' ? 'Copia editable · Autoevaluación STEAM' : 'Nuevo formato de autoevaluación')
-    setDescription(mode === 'copy'
+    setTitle(initialFormat?.title ?? (mode === 'copy' ? 'Copia editable · Autoevaluación STEAM' : 'Nuevo formato de autoevaluación'))
+    setDescription(initialFormat?.description ?? (mode === 'copy'
       ? 'Formato duplicado desde la autoevaluación actual para reutilizarlo o adaptarlo a otra actividad.'
-      : 'Crea un formato nuevo para que los estudiantes puedan evaluarse de otra manera.'
+      : 'Crea un formato nuevo para que los estudiantes puedan evaluarse de otra manera.')
     )
-    setQuestions(mode === 'copy' ? AUTOEVALUACION_QUESTIONS.map(questionToEditable) : [createBlankQuestion('Autoevaluación personal')])
+    setQuestions(getInitialQuestions(mode, initialFormat))
   }
 
   const exportJson = () => {
-    const payload = JSON.stringify({ title, description, questions }, null, 2)
+    const payload = JSON.stringify({ title, description, questions: normalizeForSave() }, null, 2)
     navigator.clipboard.writeText(payload)
     setSavedMessage('Formato copiado al portapapeles en JSON para reutilizarlo después.')
     window.setTimeout(() => setSavedMessage(''), 3000)
@@ -160,7 +204,7 @@ export default function FormatoAutoevaluacionEditor({ mode }: Props) {
     <div className="max-w-5xl mx-auto space-y-5">
       <section className="bg-white rounded-2xl shadow-sm p-5 lg:p-6 border border-blue-100">
         <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">
-          {mode === 'copy' ? 'Editar copia reutilizable' : 'Crear formato nuevo'}
+          {mode === 'edit' ? 'Editar formato guardado' : mode === 'copy' ? 'Editar copia reutilizable' : 'Crear formato nuevo'}
         </p>
         <h1 className="text-2xl font-bold text-blue-900 mt-2">{title}</h1>
         <p className="text-gray-600 mt-2">{description}</p>
@@ -169,12 +213,12 @@ export default function FormatoAutoevaluacionEditor({ mode }: Props) {
             <input value={title} onChange={e => setTitle(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5" />
           </label>
           <label className="text-sm font-medium text-gray-700">Descripción o propósito
-            <input value={description} onChange={e => setDescription(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5" />
+            <input value={description ?? ''} onChange={e => setDescription(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5" />
           </label>
         </div>
         <div className="mt-5 flex flex-col sm:flex-row gap-2">
-          <button type="button" onClick={saveDraft} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold">
-            Guardar borrador
+          <button type="button" onClick={saveFormat} disabled={saving} className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-xl px-4 py-2.5 text-sm font-semibold">
+            {saving ? 'Guardando…' : mode === 'edit' ? 'Guardar cambios' : 'Guardar formato'}
           </button>
           <button type="button" onClick={exportJson} className="bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl px-4 py-2.5 text-sm font-semibold">
             Copiar formato JSON
@@ -183,6 +227,7 @@ export default function FormatoAutoevaluacionEditor({ mode }: Props) {
             Restaurar
           </button>
         </div>
+        {error && <p className="mt-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">⚠️ {error}</p>}
         {savedMessage && <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-100 rounded-xl px-3 py-2">✅ {savedMessage}</p>}
       </section>
 
