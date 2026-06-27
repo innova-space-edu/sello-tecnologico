@@ -10,7 +10,7 @@ const statusColor: Record<string, string> = {
   'En revisión': 'bg-amber-100 text-amber-700 ring-amber-200',
   'Revisado': 'bg-emerald-100 text-emerald-700 ring-emerald-200',
   'Aprobado': 'bg-green-100 text-green-700 ring-green-200',
-  'Cerrado': 'bg-rose-100 text-rose-200 ring-rose-200',
+  'Cerrado': 'bg-rose-100 text-rose-700 ring-rose-200',
 }
 
 const typeIcon: Record<string, string> = {
