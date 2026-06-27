@@ -3,10 +3,13 @@
 import { createClient } from '@/lib/supabase'
 import { useEffect, useMemo, useState } from 'react'
 
+type QuestionType = 'text' | 'single' | 'multiple' | 'appreciation' | 'checklist' | 'rating' | 'number'
+
 type Question = {
   id: string
   prompt: string
-  question_type: 'text' | 'single' | 'multiple' | 'appreciation'
+  section?: string | null
+  question_type: QuestionType
   required: boolean
   options: string[] | null
   appreciation_min_label?: string | null
@@ -52,7 +55,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
 
       const { data, error: surveyError } = await supabase
         .from('surveys')
-        .select('id, title, description, course_id, is_active, survey_questions(id, prompt, question_type, required, options, appreciation_min_label, appreciation_max_label, sort_order)')
+        .select('id, title, description, course_id, is_active, survey_questions(id, prompt, section, question_type, required, options, appreciation_min_label, appreciation_max_label, sort_order)')
         .eq('slug', slug)
         .eq('is_active', true)
         .single()
@@ -61,8 +64,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
         setError('La encuesta no está disponible o fue cerrada.')
       } else {
         const normalized = data as unknown as Survey
-        normalized.survey_questions = [...(normalized.survey_questions ?? [])]
-          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        normalized.survey_questions = [...(normalized.survey_questions ?? [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
         setSurvey(normalized)
       }
       setLoading(false)
@@ -70,12 +72,11 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
     load()
   }, [slug, supabase])
 
+  const sections = useMemo(() => Array.from(new Set((survey?.survey_questions ?? []).map(question => question.section || 'General'))), [survey])
+
   const updateMultiple = (questionId: string, option: string, checked: boolean) => {
     const current = Array.isArray(answers[questionId]) ? answers[questionId] as string[] : []
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: checked ? [...current, option] : current.filter(item => item !== option),
-    }))
+    setAnswers(prev => ({ ...prev, [questionId]: checked ? [...current, option] : current.filter(item => item !== option) }))
   }
 
   const submit = async (event: React.FormEvent) => {
@@ -93,16 +94,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
 
     setSaving(true)
     const responseId = crypto.randomUUID()
-    const { error: responseError } = await supabase
-      .from('survey_responses')
-      .insert({
-        id: responseId,
-        survey_id: survey.id,
-        course_id: survey.course_id,
-        registered_user_id: userId,
-        respondent_name: name.trim() || null,
-        respondent_email: email.trim() || null,
-      })
+    const { error: responseError } = await supabase.from('survey_responses').insert({ id: responseId, survey_id: survey.id, course_id: survey.course_id, registered_user_id: userId, respondent_name: name.trim() || null, respondent_email: email.trim() || null })
 
     if (responseError) {
       setError(responseError.message || 'No fue posible guardar tu respuesta.')
@@ -112,12 +104,13 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
 
     const rows = (survey.survey_questions ?? []).map(question => {
       const value = answers[question.id]
+      const isScale = ['appreciation', 'rating', 'number'].includes(question.question_type)
       return {
         response_id: responseId,
         question_id: question.id,
-        value_text: typeof value === 'string' ? value : null,
+        value_text: typeof value === 'string' && !isScale ? value : null,
         value_json: Array.isArray(value) ? value : null,
-        value_number: question.question_type === 'appreciation' && value ? Number(value) : null,
+        value_number: isScale && value ? Number(value) : null,
       }
     }).filter(row => row.value_text !== null || row.value_json !== null || row.value_number !== null)
 
@@ -145,7 +138,7 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
           <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">Encuesta · Sello Tecnológico</p>
           <h1 className="text-2xl font-bold text-blue-900 mt-2">{survey?.title}</h1>
           {survey?.description && <p className="text-gray-600 mt-2 whitespace-pre-wrap">{survey.description}</p>}
-          <p className="text-sm text-gray-400 mt-3">Formulario público de opinión</p>
+          <p className="text-sm text-gray-400 mt-3">Formulario editable por secciones</p>
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -153,13 +146,18 @@ export default function ResponderEncuesta({ slug }: { slug: string }) {
           <label className="text-sm font-medium text-gray-700">Correo opcional<input type="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5" /></label>
         </section>
 
-        {(survey?.survey_questions ?? []).map((question, index) => (
-          <section key={question.id} className="bg-white rounded-2xl shadow-sm p-6">
-            <p className="font-semibold text-gray-800">{index + 1}. {question.prompt} {question.required && <span className="text-red-500">*</span>}</p>
-            {question.question_type === 'text' && <textarea rows={4} value={(answers[question.id] as string) ?? ''} onChange={e => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))} className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2.5" />}
-            {question.question_type === 'single' && <div className="mt-3 space-y-2">{(question.options ?? []).map(option => <label key={option} className="flex gap-2 items-center"><input type="radio" name={question.id} checked={answers[question.id] === option} onChange={() => setAnswers(prev => ({ ...prev, [question.id]: option }))} /> <span>{option}</span></label>)}</div>}
-            {question.question_type === 'multiple' && <div className="mt-3 space-y-2">{(question.options ?? []).map(option => <label key={option} className="flex gap-2 items-center"><input type="checkbox" checked={Array.isArray(answers[question.id]) && (answers[question.id] as string[]).includes(option)} onChange={e => updateMultiple(question.id, option, e.target.checked)} /> <span>{option}</span></label>)}</div>}
-            {question.question_type === 'appreciation' && <div className="mt-4"><div className="grid grid-cols-5 gap-2">{[1,2,3,4,5].map(value => <button type="button" key={value} onClick={() => setAnswers(prev => ({ ...prev, [question.id]: String(value) }))} className={`rounded-lg border py-3 font-bold ${answers[question.id] === String(value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'}`}>{value}</button>)}</div><div className="flex justify-between text-xs text-gray-400 mt-2"><span>{question.appreciation_min_label}</span><span>{question.appreciation_max_label}</span></div></div>}
+        {sections.map(section => (
+          <section key={section} className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+            <h2 className="font-bold text-blue-900">{section}</h2>
+            {(survey?.survey_questions ?? []).filter(question => (question.section || 'General') === section).map((question, index) => (
+              <article key={question.id} className="border border-gray-200 rounded-xl p-4">
+                <p className="font-semibold text-gray-800">{index + 1}. {question.prompt} {question.required && <span className="text-red-500">*</span>}</p>
+                {question.question_type === 'text' && <textarea rows={4} value={(answers[question.id] as string) ?? ''} onChange={e => setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))} className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2.5" />}
+                {question.question_type === 'single' && <div className="mt-3 space-y-2">{(question.options ?? []).map(option => <label key={option} className="flex gap-2 items-center"><input type="radio" name={question.id} checked={answers[question.id] === option} onChange={() => setAnswers(prev => ({ ...prev, [question.id]: option }))} /> <span>{option}</span></label>)}</div>}
+                {['multiple', 'checklist'].includes(question.question_type) && <div className="mt-3 space-y-2">{(question.options ?? []).map(option => <label key={option} className="flex gap-2 items-center rounded-lg border border-gray-200 p-3"><input type="checkbox" checked={Array.isArray(answers[question.id]) && (answers[question.id] as string[]).includes(option)} onChange={e => updateMultiple(question.id, option, e.target.checked)} /> <span>{option}</span></label>)}</div>}
+                {['appreciation', 'rating', 'number'].includes(question.question_type) && <div className="mt-4"><div className="grid grid-cols-5 gap-2">{[1,2,3,4,5].map(value => <button type="button" key={value} onClick={() => setAnswers(prev => ({ ...prev, [question.id]: String(value) }))} className={`rounded-lg border py-3 font-bold ${answers[question.id] === String(value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'}`}>{value}</button>)}</div><div className="flex justify-between text-xs text-gray-400 mt-2"><span>{question.appreciation_min_label}</span><span>{question.appreciation_max_label}</span></div></div>}
+              </article>
+            ))}
           </section>
         ))}
 
