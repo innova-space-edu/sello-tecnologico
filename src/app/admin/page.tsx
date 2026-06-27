@@ -4,8 +4,6 @@ import Link from 'next/link'
 import AdminActions from './AdminActions'
 import AdminAlertas from './AdminAlertas'
 import { redirect } from 'next/navigation'
-
-// ─── Componente cliente para auto-refresh cada 5s (Server Components no pueden usar timers) ───
 import AdminAutoRefresh from './AdminAutoRefresh'
 
 export default async function AdminPage() {
@@ -56,24 +54,18 @@ export default async function AdminPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      {/* Auto-refresh cada 5 segundos usando router.refresh() del lado cliente */}
       <AdminAutoRefresh intervalo={5000} />
 
-      {/* ✅ lg:ml-64 + pt-16 para móvil */}
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8 min-w-0">
-
-        {/* Header */}
         <div className="mb-6 lg:mb-8">
           <h1 className="text-xl lg:text-2xl font-bold text-blue-900">Panel de Administrador</h1>
           <p className="text-gray-500 mt-1 text-sm">Vista omnisciente del sistema — solo administradores</p>
         </div>
 
-        {/* 🚨 Alertas de bloqueo — solo visibles aquí para el admin */}
         <div className="mb-6">
           <AdminAlertas />
         </div>
 
-        {/* ✅ Stats: 2 cols móvil → 3 tablet → 6 desktop, con wrap garantizado */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 lg:mb-8">
           {[
             { label: 'Usuarios',    value: usuarios?.length ?? 0,  icon: '👥', color: 'bg-purple-100 text-purple-700' },
@@ -93,10 +85,7 @@ export default async function AdminPage() {
           ))}
         </div>
 
-        {/* ✅ Grid de tablas: 1 col móvil, 2 desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-
-          {/* Todos los usuarios */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-100 flex flex-wrap gap-2 justify-between items-center">
               <h2 className="font-semibold text-blue-900 text-sm lg:text-base">
@@ -107,7 +96,6 @@ export default async function AdminPage() {
                 <Link href="/admin/mensajes" className="text-xs text-blue-600 hover:underline">💬 Mensajes</Link>
               </div>
             </div>
-            {/* ✅ overflow-x-auto para tabla en pantallas pequeñas */}
             <div className="overflow-x-auto max-h-80">
               <table className="w-full text-sm min-w-[420px]">
                 <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
@@ -142,7 +130,6 @@ export default async function AdminPage() {
             </div>
           </div>
 
-          {/* Historial reciente */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 lg:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
               <h2 className="font-semibold text-blue-900 text-sm lg:text-base">Actividad reciente</h2>
@@ -173,24 +160,28 @@ export default async function AdminPage() {
           </div>
         </div>
 
-        {/* Monitoreo de mensajes */}
         <div className="bg-white rounded-xl shadow-sm p-4 lg:p-5 mb-4 lg:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="text-3xl">💬</div>
             <div>
               <h2 className="font-semibold text-blue-900 text-sm lg:text-base">Monitoreo de Mensajes</h2>
               <p className="text-gray-500 text-sm mt-0.5">
-                {mensajesCount ?? 0} mensajes totales — solo lectura
+                {mensajesCount ?? 0} mensajes totales — solo lectura y exportación liviana para moderación
               </p>
             </div>
           </div>
-          <Link href="/admin/mensajes"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors w-full sm:w-auto text-center">
-            Ver conversaciones →
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <a href="/api/admin/mensajes/export"
+              className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors text-center">
+              ⬇️ Descargar JSONL
+            </a>
+            <Link href="/admin/mensajes"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors text-center">
+              Ver conversaciones →
+            </Link>
+          </div>
         </div>
 
-        {/* Moderación */}
         <div className="bg-white rounded-xl shadow-sm p-4 lg:p-5 mb-4 lg:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="text-3xl">🚨</div>
@@ -207,7 +198,6 @@ export default async function AdminPage() {
           </Link>
         </div>
 
-        {/* Todos los proyectos */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
           <div className="px-4 lg:px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h2 className="font-semibold text-blue-900 text-sm lg:text-base">
@@ -220,7 +210,6 @@ export default async function AdminPage() {
               <Link href="/proyectos/nuevo" className="text-xs text-blue-600 hover:underline">+ Nuevo</Link>
             </div>
           </div>
-          {/* ✅ overflow-x-auto para tabla */}
           <div className="overflow-x-auto max-h-64">
             <table className="w-full text-sm min-w-[500px]">
               <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
@@ -257,7 +246,6 @@ export default async function AdminPage() {
             </table>
           </div>
         </div>
-
       </main>
     </div>
   )
