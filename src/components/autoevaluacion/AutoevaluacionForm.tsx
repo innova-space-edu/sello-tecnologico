@@ -1,6 +1,6 @@
 'use client'
 
-import { AUTOEVALUACION_QUESTIONS, getAutoevaluacionSections } from '@/lib/autoevaluacion'
+import { AutoevaluacionFormat, AutoevaluacionQuestion, DEFAULT_AUTOEVALUACION_FORMAT, getAutoevaluacionSections } from '@/lib/autoevaluacion'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -17,16 +17,20 @@ type Actor = {
 type Props = {
   actor: Actor
   courses: Course[]
+  selectedFormat?: AutoevaluacionFormat
 }
 
 type AnswerValue = string | string[]
 
-const initialAnswers = Object.fromEntries(
-  AUTOEVALUACION_QUESTIONS.map(question => [question.id, question.type === 'checkbox' ? [] : ''])
-) as Record<string, AnswerValue>
+function buildInitialAnswers(questions: AutoevaluacionQuestion[]) {
+  return Object.fromEntries(
+    questions.map(question => [question.id, question.type === 'checkbox' ? [] : ''])
+  ) as Record<string, AnswerValue>
+}
 
-export default function AutoevaluacionForm({ actor, courses }: Props) {
+export default function AutoevaluacionForm({ actor, courses, selectedFormat = DEFAULT_AUTOEVALUACION_FORMAT }: Props) {
   const router = useRouter()
+  const questions = selectedFormat.questions?.length ? selectedFormat.questions : DEFAULT_AUTOEVALUACION_FORMAT.questions
   const guessedCourse = useMemo(() => {
     const normalizedActorCourse = String(actor.curso ?? '').trim().toLowerCase()
     return courses.find(course => course.name.trim().toLowerCase() === normalizedActorCourse)?.id ?? ''
@@ -38,13 +42,13 @@ export default function AutoevaluacionForm({ actor, courses }: Props) {
     project_name: '',
     intervention_place: '',
   })
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>(initialAnswers)
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>(() => buildInitialAnswers(questions))
   const [confirmed, setConfirmed] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [savedId, setSavedId] = useState('')
 
-  const sections = getAutoevaluacionSections()
+  const sections = getAutoevaluacionSections(questions)
 
   const setAnswer = (questionId: string, value: AnswerValue) => {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
@@ -60,7 +64,7 @@ export default function AutoevaluacionForm({ actor, courses }: Props) {
     if (!form.course_id) return 'Debes seleccionar tu curso.'
     if (!form.project_name.trim()) return 'Debes escribir el nombre del proyecto o intervención.'
     if (!form.intervention_place.trim()) return 'Debes escribir el lugar intervenido en el colegio.'
-    for (const question of AUTOEVALUACION_QUESTIONS) {
+    for (const question of questions) {
       if (!question.required) continue
       const value = answers[question.id]
       if (!value || (Array.isArray(value) && value.length === 0)) {
@@ -87,7 +91,7 @@ export default function AutoevaluacionForm({ actor, courses }: Props) {
     const response = await fetch('/api/autoevaluacion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, answers, confirmed }),
+      body: JSON.stringify({ ...form, answers, confirmed, format_id: selectedFormat.id }),
     })
     const data = await response.json().catch(() => ({}))
 
@@ -119,9 +123,9 @@ export default function AutoevaluacionForm({ actor, courses }: Props) {
   return (
     <form onSubmit={submit} className="max-w-5xl mx-auto space-y-5">
       <section className="bg-white rounded-2xl shadow-sm p-5 lg:p-6 border border-blue-100">
-        <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">Proyecto STEAM · Sitios verdes y reciclaje</p>
-        <h1 className="text-2xl font-bold text-blue-900 mt-2">Autoevaluación de seguimiento y mantención</h1>
-        <p className="text-gray-600 mt-2">Responde con honestidad. Esta autoevaluación permite revisar qué hiciste, qué falló y cómo continuará mejorando el proyecto.</p>
+        <p className="text-xs uppercase tracking-widest text-blue-500 font-semibold">Formato seleccionado</p>
+        <h1 className="text-2xl font-bold text-blue-900 mt-2">{selectedFormat.title}</h1>
+        <p className="text-gray-600 mt-2">{selectedFormat.description ?? 'Responde con honestidad. Esta autoevaluación permite revisar el proceso, los avances y las mejoras necesarias.'}</p>
       </section>
 
       <section className="bg-white rounded-2xl shadow-sm p-5 lg:p-6">
@@ -149,7 +153,7 @@ export default function AutoevaluacionForm({ actor, courses }: Props) {
         <section key={section} className="bg-white rounded-2xl shadow-sm p-5 lg:p-6">
           <h2 className="font-bold text-blue-900 mb-4">{section}</h2>
           <div className="space-y-5">
-            {AUTOEVALUACION_QUESTIONS.filter(question => question.section === section).map((question, index) => (
+            {questions.filter(question => question.section === section).map((question, index) => (
               <article key={question.id} className="border border-gray-200 rounded-xl p-4">
                 <p className="font-semibold text-gray-800">{index + 1}. {question.prompt} {question.required && <span className="text-red-500">*</span>}</p>
 
