@@ -2,7 +2,7 @@ import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import VitrinaSocialPanel from '@/components/vitrinas/VitrinaSocialPanel'
 import VitrinaInlineInteraction from '@/components/vitrinas/VitrinaInlineInteraction'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 type PublicPage = {
   id: string
@@ -85,8 +85,8 @@ function postIcon(type: string) {
 
 function buildBackground(page: PublicPage, theme: string, accent: string) {
   const base = page.background_color ?? '#f8fafc'
-  if (page.background_style === 'solid') return `linear-gradient(180deg, ${base}, #ffffff 100%)`
-  if (page.background_style === 'paper') return `linear-gradient(180deg, ${base}, #ffffff 60%, ${accent}10 100%)`
+  if (page.background_style === 'solid') return base
+  if (page.background_style === 'paper') return `linear-gradient(180deg, ${base} 0%, ${base} 58%, #ffffff 100%)`
   if (page.background_style === 'dark') return `radial-gradient(circle at top left, ${theme}55, transparent 32%), radial-gradient(circle at top right, ${accent}45, transparent 35%), linear-gradient(135deg, #020617, #111827 65%, #020617)`
   if (page.background_style === 'aurora') return `radial-gradient(circle at 10% 10%, ${theme}44, transparent 32%), radial-gradient(circle at 90% 0%, ${accent}55, transparent 34%), linear-gradient(135deg, ${base}, #ffffff 85%)`
   if (page.background_style === 'diagonal') return `linear-gradient(135deg, ${theme}18 0%, ${base} 40%, #ffffff 60%, ${accent}20 100%)`
@@ -97,6 +97,50 @@ function buttonBackground(theme: string, accent: string, buttonStyle?: string | 
   if (buttonStyle === 'solid') return theme
   if (buttonStyle === 'soft') return `linear-gradient(135deg, ${theme}dd, ${accent}99)`
   return `linear-gradient(135deg, ${theme}, ${accent})`
+}
+
+function surfaceStyles(page: PublicPage, cardColor: string, accent: string): CSSProperties {
+  if (page.surface_style === 'flat') {
+    return {
+      background: cardColor,
+      borderColor: '#e5e7eb',
+      boxShadow: 'none',
+    }
+  }
+
+  if (page.surface_style === 'bordered') {
+    return {
+      background: cardColor,
+      borderColor: `${accent}55`,
+      boxShadow: 'none',
+    }
+  }
+
+  if (page.surface_style === 'floating') {
+    return {
+      background: cardColor,
+      borderColor: `${accent}24`,
+      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.12)',
+    }
+  }
+
+  return {
+    background: `${cardColor}f4`,
+    borderColor: `${accent}22`,
+    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.08)',
+    backdropFilter: 'blur(14px)',
+  }
+}
+
+function shouldTintHero(page: PublicPage) {
+  return !['solid', 'paper'].includes(page.background_style ?? 'solid')
+}
+
+function heroBackground(page: PublicPage, theme: string, accent: string, cardColor: string) {
+  if (page.background_style === 'dark') return `linear-gradient(135deg, ${theme}55, ${accent}35)`
+  if (page.header_style === 'cover' && shouldTintHero(page)) return `linear-gradient(135deg, ${theme}22, ${accent}20)`
+  if (page.header_style === 'cover') return cardColor
+  return 'transparent'
 }
 
 function authorName(page: PublicPage) {
@@ -133,18 +177,18 @@ function FeedPost({
   caption?: ReactNode
 }) {
   return (
-    <article id={id} className="scroll-mt-8 overflow-visible rounded-[1.8rem] border shadow-sm" style={{ background: `${cardColor}f7`, borderColor: `${accent}20` }}>
+    <article id={id} className="scroll-mt-8 overflow-visible rounded-[1.8rem] border" style={surfaceStyles(page, cardColor, accent)}>
       <header className="flex items-center justify-between gap-3 px-5 py-4">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg text-white shadow-sm" style={{ background: `linear-gradient(135deg, ${theme}, ${accent})` }}>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-lg text-white shadow-sm" style={{ background: buttonBackground(theme, accent, page.button_style) }}>
             {icon}
           </div>
           <div className="min-w-0">
             <h2 className="truncate text-base font-black" style={{ color: textColor }}>{title}</h2>
-            <p className="truncate text-xs font-semibold text-slate-400">{authorName(page)} · {label}</p>
+            <p className="truncate text-xs font-semibold" style={{ color: `${textColor}80` }}>{authorName(page)} · {label}</p>
           </div>
         </div>
-        <span className="text-xl font-black text-slate-400">•••</span>
+        <span className="text-xl font-black" style={{ color: `${textColor}55` }}>•••</span>
       </header>
 
       {children && <div>{children}</div>}
@@ -173,7 +217,7 @@ function renderAssetPost(asset: Asset, page: PublicPage, theme: string, accent: 
   if (asset.file_type === 'image') {
     return (
       <FeedPost key={asset.id} id={sectionId} title={title} label={label} icon="🖼️" page={page} theme={theme} accent={accent} textColor={textColor} cardColor={cardColor} targetType="asset" targetId={asset.id} caption={caption}>
-        <a href={`/api/vitrinas/assets/${asset.id}`} target="_blank" rel="noreferrer" className="block bg-slate-50">
+        <a href={`/api/vitrinas/assets/${asset.id}`} target="_blank" rel="noreferrer" className="block" style={{ background: page.background_style === 'dark' ? '#020617' : '#f8fafc' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`/api/vitrinas/assets/${asset.id}`} alt={title} className="max-h-[720px] w-full object-contain" />
         </a>
@@ -204,9 +248,9 @@ function renderAssetPost(asset: Asset, page: PublicPage, theme: string, accent: 
   return (
     <FeedPost key={asset.id} id={sectionId} title={title} label={label} icon={postIcon(asset.file_type)} page={page} theme={theme} accent={accent} textColor={textColor} cardColor={cardColor} targetType="asset" targetId={asset.id} caption={caption}>
       <div className="px-5 pb-2">
-        <a href={`/api/vitrinas/assets/${asset.id}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 font-black text-slate-700 transition hover:bg-slate-100">
+        <a href={`/api/vitrinas/assets/${asset.id}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 font-black transition hover:opacity-90" style={{ background: `${accent}10`, borderColor: `${accent}22`, color: textColor }}>
           <span>{postIcon(asset.file_type)} {asset.file_name}</span>
-          <span className="text-xs text-slate-400">Abrir</span>
+          <span className="text-xs" style={{ color: `${textColor}88` }}>Abrir</span>
         </a>
       </div>
     </FeedPost>
@@ -276,15 +320,16 @@ export default async function PublicProjectPage({ params }: { params: Promise<{ 
   const background = buildBackground(currentPage, theme, accent)
   const fontClass = currentPage.font_style === 'classic' ? 'font-serif' : 'font-sans'
   const heroSize = currentPage.header_style === 'compact' ? 'py-10 md:py-14' : currentPage.header_style === 'cover' ? 'py-20 md:py-28' : 'py-14 md:py-20'
+  const tintedHero = shouldTintHero(currentPage)
 
   return (
     <main className={`min-h-screen ${fontClass}`} style={{ background, color: textColor }}>
-      <section className="relative overflow-hidden border-b border-white/60">
-        <div className="absolute inset-0 opacity-25" style={{ background: `linear-gradient(120deg, ${theme}, ${accent})` }} />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/40 to-transparent" />
+      <section className="relative overflow-hidden border-b" style={{ borderColor: `${accent}18`, background: heroBackground(currentPage, theme, accent, cardColor) }}>
+        {tintedHero && <div className="absolute inset-0 opacity-20" style={{ background: `linear-gradient(120deg, ${theme}, ${accent})` }} />}
+        {tintedHero && <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/30 to-transparent" />}
         <div className={`relative max-w-6xl mx-auto px-5 ${heroSize}`}>
           {currentPage.hero_badge && (
-            <div className="inline-flex items-center gap-2 bg-white/85 border border-white rounded-full px-4 py-2 text-sm font-black text-slate-800 shadow-sm mb-6">
+            <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-black shadow-sm mb-6" style={{ background: cardColor, color: textColor, border: `1px solid ${accent}22` }}>
               <span>✨</span> {currentPage.hero_badge}
             </div>
           )}
@@ -297,9 +342,9 @@ export default async function PublicProjectPage({ params }: { params: Promise<{ 
             </p>
           )}
           <div className="flex flex-wrap gap-2 mt-7">
-            {currentPage.projects?.title && <span className="bg-white text-slate-700 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">🗂️ {currentPage.projects.title}</span>}
-            {currentPage.courses?.name && <span className="bg-white text-slate-700 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">📚 {currentPage.courses.name}</span>}
-            {currentPage.show_author !== false && currentPage.profiles?.full_name && <span className="bg-white text-slate-700 px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm">👥 {currentPage.profiles.full_name}</span>}
+            {currentPage.projects?.title && <span className="px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm" style={{ background: cardColor, color: textColor, border: `1px solid ${accent}18` }}>🗂️ {currentPage.projects.title}</span>}
+            {currentPage.courses?.name && <span className="px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm" style={{ background: cardColor, color: textColor, border: `1px solid ${accent}18` }}>📚 {currentPage.courses.name}</span>}
+            {currentPage.show_author !== false && currentPage.profiles?.full_name && <span className="px-3 py-1.5 rounded-full text-sm font-semibold shadow-sm" style={{ background: cardColor, color: textColor, border: `1px solid ${accent}18` }}>👥 {currentPage.profiles.full_name}</span>}
           </div>
           {currentPage.call_to_action_label && currentPage.call_to_action_url && (
             <a href={currentPage.call_to_action_url} target="_blank" rel="noreferrer" className="inline-flex mt-8 rounded-2xl px-6 py-3 text-white font-black shadow-lg" style={{ background: buttonBackground(theme, accent, currentPage.button_style) }}>
@@ -315,13 +360,22 @@ export default async function PublicProjectPage({ params }: { params: Promise<{ 
             {allAssets.map(asset => renderAssetPost(asset, currentPage, theme, accent, textColor, cardColor))}
             {allBlocks.map(block => renderBlockPost(block, currentPage, theme, accent, textColor, cardColor))}
             {allAssets.length === 0 && allBlocks.length === 0 && (
-              <div className="rounded-[1.8rem] border border-dashed border-slate-200 bg-white/80 p-8 text-center text-slate-400">
+              <div className="rounded-[1.8rem] border border-dashed p-8 text-center" style={{ background: `${cardColor}cc`, color: `${textColor}88`, borderColor: `${accent}22` }}>
                 Todavía no hay publicaciones en esta página.
               </div>
             )}
           </div>
 
-          {currentPage.show_trending !== false && <VitrinaSocialPanel slug={currentPage.slug} theme={theme} accent={accent} />}
+          {currentPage.show_trending !== false && (
+            <VitrinaSocialPanel
+              slug={currentPage.slug}
+              theme={theme}
+              accent={accent}
+              textColor={textColor}
+              cardColor={cardColor}
+              surfaceStyle={currentPage.surface_style ?? 'flat'}
+            />
+          )}
         </div>
 
         <footer className="text-center text-sm pt-12" style={{ color: `${textColor}aa` }}>
