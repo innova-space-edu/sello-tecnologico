@@ -58,6 +58,22 @@ type Asset = {
   created_at?: string | null
 }
 
+type PagePreset = {
+  name: string
+  description: string
+  theme: string
+  accent: string
+  background: string
+  text: string
+  card: string
+  backgroundStyle: string
+  surfaceStyle: string
+  buttonStyle: string
+  headerStyle: string
+  layoutStyle: string
+  fontStyle: string
+}
+
 const BLOCK_TYPES = [
   { value: 'text', label: 'Texto / descripción' },
   { value: 'post', label: 'Post o bitácora' },
@@ -111,12 +127,157 @@ const DEFAULT_BLOCKS: Block[] = [
   },
 ]
 
-const COLOR_PRESETS = [
-  { name: 'Podcast morado', theme: '#111827', accent: '#d946ef', background: '#fbf5ff', text: '#0f172a', card: '#ffffff' },
-  { name: 'Medio ambiente', theme: '#166534', accent: '#22c55e', background: '#f0fdf4', text: '#052e16', card: '#ffffff' },
-  { name: 'Calma azul', theme: '#1d4ed8', accent: '#38bdf8', background: '#eff6ff', text: '#0f172a', card: '#ffffff' },
-  { name: 'Energía naranja', theme: '#9a3412', accent: '#fb923c', background: '#fff7ed', text: '#1f2937', card: '#ffffff' },
-  { name: 'Elegante oscuro', theme: '#7c3aed', accent: '#d946ef', background: '#020617', text: '#f8fafc', card: '#111827' },
+const PAGE_PRESETS: PagePreset[] = [
+  {
+    name: 'Podcast morado',
+    description: 'Estilo social con morado, rosado y tarjetas blancas.',
+    theme: '#9d0fd4',
+    accent: '#e600ff',
+    background: '#f7b7f2',
+    text: '#111827',
+    card: '#ffffff',
+    backgroundStyle: 'solid',
+    surfaceStyle: 'floating',
+    buttonStyle: 'solid',
+    headerStyle: 'compact',
+    layoutStyle: 'magazine',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Instagram limpio',
+    description: 'Fondo blanco, tarjetas limpias y acento rosado/naranja.',
+    theme: '#111827',
+    accent: '#e1306c',
+    background: '#fafafa',
+    text: '#111827',
+    card: '#ffffff',
+    backgroundStyle: 'solid',
+    surfaceStyle: 'flat',
+    buttonStyle: 'solid',
+    headerStyle: 'compact',
+    layoutStyle: 'magazine',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Facebook azul',
+    description: 'Azul social, fondo gris claro y tarjetas blancas.',
+    theme: '#1877f2',
+    accent: '#42b72a',
+    background: '#f0f2f5',
+    text: '#050505',
+    card: '#ffffff',
+    backgroundStyle: 'solid',
+    surfaceStyle: 'flat',
+    buttonStyle: 'solid',
+    headerStyle: 'compact',
+    layoutStyle: 'magazine',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Verde blanco',
+    description: 'Tonalidad verde con fondo blanco para proyectos ambientales.',
+    theme: '#15803d',
+    accent: '#22c55e',
+    background: '#ffffff',
+    text: '#052e16',
+    card: '#f0fdf4',
+    backgroundStyle: 'solid',
+    surfaceStyle: 'bordered',
+    buttonStyle: 'solid',
+    headerStyle: 'large',
+    layoutStyle: 'campaign',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Medio ambiente',
+    description: 'Verde suave, natural y claro.',
+    theme: '#166534',
+    accent: '#86efac',
+    background: '#ecfdf5',
+    text: '#052e16',
+    card: '#ffffff',
+    backgroundStyle: 'paper',
+    surfaceStyle: 'glass',
+    buttonStyle: 'soft',
+    headerStyle: 'large',
+    layoutStyle: 'campaign',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Calma azul',
+    description: 'Azules tranquilos para lectura y baja saturación.',
+    theme: '#1d4ed8',
+    accent: '#38bdf8',
+    background: '#eff6ff',
+    text: '#0f172a',
+    card: '#ffffff',
+    backgroundStyle: 'paper',
+    surfaceStyle: 'glass',
+    buttonStyle: 'soft',
+    headerStyle: 'large',
+    layoutStyle: 'gallery',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Colegio azul',
+    description: 'Azul institucional, formal y ordenado.',
+    theme: '#1e3a8a',
+    accent: '#2563eb',
+    background: '#f8fafc',
+    text: '#0f172a',
+    card: '#ffffff',
+    backgroundStyle: 'solid',
+    surfaceStyle: 'bordered',
+    buttonStyle: 'solid',
+    headerStyle: 'large',
+    layoutStyle: 'magazine',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Energía naranja',
+    description: 'Cálido, activo y llamativo.',
+    theme: '#c2410c',
+    accent: '#fb923c',
+    background: '#fff7ed',
+    text: '#1f2937',
+    card: '#ffffff',
+    backgroundStyle: 'diagonal',
+    surfaceStyle: 'floating',
+    buttonStyle: 'gradient',
+    headerStyle: 'cover',
+    layoutStyle: 'campaign',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Elegante oscuro',
+    description: 'Oscuro premium con acento violeta.',
+    theme: '#7c3aed',
+    accent: '#d946ef',
+    background: '#020617',
+    text: '#f8fafc',
+    card: '#111827',
+    backgroundStyle: 'dark',
+    surfaceStyle: 'glass',
+    buttonStyle: 'gradient',
+    headerStyle: 'cover',
+    layoutStyle: 'magazine',
+    fontStyle: 'modern',
+  },
+  {
+    name: 'Minimal blanco',
+    description: 'Blanco, negro y gris para máxima limpieza visual.',
+    theme: '#111827',
+    accent: '#6b7280',
+    background: '#ffffff',
+    text: '#111827',
+    card: '#ffffff',
+    backgroundStyle: 'solid',
+    surfaceStyle: 'flat',
+    buttonStyle: 'solid',
+    headerStyle: 'compact',
+    layoutStyle: 'magazine',
+    fontStyle: 'modern',
+  },
 ]
 
 function slugify(value: string) {
@@ -147,6 +308,15 @@ function formatSize(size?: number | null) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
+function previewBackground(form: { background_style: string; theme_color: string; accent_color: string; background_color: string }) {
+  if (form.background_style === 'solid') return form.background_color
+  if (form.background_style === 'paper') return `linear-gradient(180deg, ${form.background_color}, #ffffff 78%)`
+  if (form.background_style === 'dark') return `radial-gradient(circle at top left, ${form.theme_color}66, transparent 30%), linear-gradient(135deg, #020617, #111827)`
+  if (form.background_style === 'aurora') return `radial-gradient(circle at 10% 10%, ${form.theme_color}44, transparent 32%), radial-gradient(circle at 90% 0%, ${form.accent_color}55, transparent 34%), ${form.background_color}`
+  if (form.background_style === 'diagonal') return `linear-gradient(135deg, ${form.theme_color}20, ${form.background_color} 45%, ${form.accent_color}25)`
+  return `radial-gradient(circle at top left, ${form.theme_color}28, transparent 32%), radial-gradient(circle at top right, ${form.accent_color}30, transparent 35%), ${form.background_color}`
+}
+
 export default function ProjectPublicPageEditor({ projectId }: { projectId: string }) {
   const supabase = useMemo(() => createClient(), [])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -172,10 +342,10 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     text_color: '#0f172a',
     card_color: '#ffffff',
     layout_style: 'magazine',
-    background_style: 'soft_gradient',
+    background_style: 'solid',
     font_style: 'modern',
-    surface_style: 'glass',
-    button_style: 'gradient',
+    surface_style: 'flat',
+    button_style: 'solid',
     header_style: 'large',
     hero_badge: '',
     call_to_action_label: '',
@@ -233,10 +403,10 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           text_color: currentPage.text_color ?? '#0f172a',
           card_color: currentPage.card_color ?? '#ffffff',
           layout_style: currentPage.layout_style ?? 'magazine',
-          background_style: currentPage.background_style ?? 'soft_gradient',
+          background_style: currentPage.background_style ?? 'solid',
           font_style: currentPage.font_style ?? 'modern',
-          surface_style: currentPage.surface_style ?? 'glass',
-          button_style: currentPage.button_style ?? 'gradient',
+          surface_style: currentPage.surface_style ?? 'flat',
+          button_style: currentPage.button_style ?? 'solid',
           header_style: currentPage.header_style ?? 'large',
           hero_badge: currentPage.hero_badge ?? '',
           call_to_action_label: currentPage.call_to_action_label ?? '',
@@ -467,7 +637,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     }
   }
 
-  const applyPreset = (preset: typeof COLOR_PRESETS[number]) => {
+  const applyPreset = (preset: PagePreset) => {
     setForm(prev => ({
       ...prev,
       theme_color: preset.theme,
@@ -475,7 +645,12 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
       background_color: preset.background,
       text_color: preset.text,
       card_color: preset.card,
-      background_style: preset.name === 'Elegante oscuro' ? 'dark' : prev.background_style,
+      background_style: preset.backgroundStyle,
+      surface_style: preset.surfaceStyle,
+      button_style: preset.buttonStyle,
+      header_style: preset.headerStyle,
+      layout_style: preset.layoutStyle,
+      font_style: preset.fontStyle,
     }))
   }
 
@@ -558,97 +733,126 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
 
       <section className="bg-white rounded-xl shadow-sm p-5 lg:p-6">
         <div className="mb-4">
-          <h2 className="font-bold text-blue-900">🎨 Diseño, colores y estilo público</h2>
-          <p className="text-sm text-gray-500">Ajusta la apariencia para que el link público se vea más profesional y compartible.</p>
+          <h2 className="font-bold text-blue-900">🎨 Tonos sugeridos para páginas</h2>
+          <p className="text-sm text-gray-500">Elige una paleta completa ya configurada. Después puedes ajustar manualmente en personalización avanzada.</p>
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-5">
-          {COLOR_PRESETS.map(preset => (
-            <button key={preset.name} type="button" onClick={() => applyPreset(preset)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold hover:bg-gray-50 flex items-center gap-2">
-              <span className="h-4 w-4 rounded-full" style={{ background: `linear-gradient(135deg, ${preset.theme}, ${preset.accent})` }} />
-              {preset.name}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mb-6">
+          {PAGE_PRESETS.map(preset => (
+            <button
+              key={preset.name}
+              type="button"
+              onClick={() => applyPreset(preset)}
+              className="text-left rounded-2xl border border-gray-200 bg-white p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-black text-gray-900">{preset.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{preset.description}</p>
+                </div>
+                <span className="text-xs rounded-full bg-gray-100 px-2 py-1 text-gray-500">Aplicar</span>
+              </div>
+              <div className="mt-3 grid grid-cols-5 gap-1.5">
+                {[preset.theme, preset.accent, preset.background, preset.text, preset.card].map((color, index) => (
+                  <span key={`${preset.name}-${index}`} className="h-7 rounded-lg border border-gray-200" style={{ background: color }} />
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1 text-[10px] font-semibold text-gray-400">
+                <span>Fondo: {preset.backgroundStyle}</span>
+                <span>·</span>
+                <span>Tarjeta: {preset.surfaceStyle}</span>
+                <span>·</span>
+                <span>Botón: {preset.buttonStyle}</span>
+              </div>
             </button>
           ))}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <label className="text-sm font-medium text-gray-700">
-            Principal
-            <input type="color" value={form.theme_color} onChange={event => setForm({ ...form, theme_color: event.target.value })}
-              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Secundario
-            <input type="color" value={form.accent_color} onChange={event => setForm({ ...form, accent_color: event.target.value })}
-              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Fondo
-            <input type="color" value={form.background_color} onChange={event => setForm({ ...form, background_color: event.target.value })}
-              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Texto
-            <input type="color" value={form.text_color} onChange={event => setForm({ ...form, text_color: event.target.value })}
-              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Tarjetas
-            <input type="color" value={form.card_color} onChange={event => setForm({ ...form, card_color: event.target.value })}
-              className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
-          </label>
-        </div>
+        <div className="rounded-2xl border border-dashed border-gray-200 p-4">
+          <div className="mb-4">
+            <h3 className="font-bold text-gray-800">Personalización avanzada</h3>
+            <p className="text-xs text-gray-400">Usa esto solo si quieres ajustar un color o estilo después de elegir una paleta sugerida.</p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-5">
-          <label className="text-sm font-medium text-gray-700">
-            Fondo visual
-            <select value={form.background_style} onChange={event => setForm({ ...form, background_style: event.target.value })}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="soft_gradient">Gradiente suave</option>
-              <option value="solid">Limpio blanco/color</option>
-              <option value="aurora">Aurora moderna</option>
-              <option value="diagonal">Diagonal editorial</option>
-              <option value="paper">Papel suave</option>
-              <option value="dark">Oscuro elegante</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Tarjetas
-            <select value={form.surface_style} onChange={event => setForm({ ...form, surface_style: event.target.value })}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="glass">Cristal suave</option>
-              <option value="floating">Flotante</option>
-              <option value="bordered">Borde marcado</option>
-              <option value="flat">Plano simple</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Botones
-            <select value={form.button_style} onChange={event => setForm({ ...form, button_style: event.target.value })}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="gradient">Gradiente</option>
-              <option value="solid">Color sólido</option>
-              <option value="soft">Suave</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Encabezado
-            <select value={form.header_style} onChange={event => setForm({ ...form, header_style: event.target.value })}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="large">Grande</option>
-              <option value="compact">Compacto</option>
-              <option value="cover">Portada amplia</option>
-            </select>
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Diseño
-            <select value={form.layout_style} onChange={event => setForm({ ...form, layout_style: event.target.value })}
-              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="magazine">Revista / podcast</option>
-              <option value="gallery">Galería en tarjetas</option>
-              <option value="campaign">Campaña</option>
-            </select>
-          </label>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <label className="text-sm font-medium text-gray-700">
+              Principal
+              <input type="color" value={form.theme_color} onChange={event => setForm({ ...form, theme_color: event.target.value })}
+                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Secundario
+              <input type="color" value={form.accent_color} onChange={event => setForm({ ...form, accent_color: event.target.value })}
+                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Fondo
+              <input type="color" value={form.background_color} onChange={event => setForm({ ...form, background_color: event.target.value })}
+                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Texto
+              <input type="color" value={form.text_color} onChange={event => setForm({ ...form, text_color: event.target.value })}
+                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Tarjetas
+              <input type="color" value={form.card_color} onChange={event => setForm({ ...form, card_color: event.target.value })}
+                className="mt-1 h-12 w-full border border-gray-300 rounded-lg px-2 py-1" />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-5">
+            <label className="text-sm font-medium text-gray-700">
+              Fondo visual
+              <select value={form.background_style} onChange={event => setForm({ ...form, background_style: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="solid">Limpio sin gradiente</option>
+                <option value="soft_gradient">Gradiente suave</option>
+                <option value="aurora">Aurora moderna</option>
+                <option value="diagonal">Diagonal editorial</option>
+                <option value="paper">Papel suave</option>
+                <option value="dark">Oscuro elegante</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Tarjetas
+              <select value={form.surface_style} onChange={event => setForm({ ...form, surface_style: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="glass">Cristal suave</option>
+                <option value="floating">Flotante</option>
+                <option value="bordered">Borde marcado</option>
+                <option value="flat">Plano simple</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Botones
+              <select value={form.button_style} onChange={event => setForm({ ...form, button_style: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="solid">Color sólido</option>
+                <option value="gradient">Gradiente</option>
+                <option value="soft">Suave</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Encabezado
+              <select value={form.header_style} onChange={event => setForm({ ...form, header_style: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="large">Grande</option>
+                <option value="compact">Compacto</option>
+                <option value="cover">Portada amplia</option>
+              </select>
+            </label>
+            <label className="text-sm font-medium text-gray-700">
+              Diseño
+              <select value={form.layout_style} onChange={event => setForm({ ...form, layout_style: event.target.value })}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <option value="magazine">Revista / podcast</option>
+                <option value="gallery">Galería en tarjetas</option>
+                <option value="campaign">Campaña</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
@@ -677,11 +881,14 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
           </label>
         </div>
 
-        <div className="mt-5 rounded-2xl p-5 border" style={{ background: `linear-gradient(135deg, ${form.theme_color}18, ${form.accent_color}24), ${form.background_color}`, borderColor: `${form.accent_color}33` }}>
+        <div className="mt-5 rounded-2xl p-5 border" style={{ background: previewBackground(form), borderColor: `${form.accent_color}33` }}>
           <p className="text-xs font-bold uppercase tracking-widest" style={{ color: form.accent_color }}>Vista previa rápida</p>
-          <div className="mt-3 rounded-2xl border p-4" style={{ background: form.card_color, color: form.text_color }}>
+          <div className="mt-3 rounded-2xl border p-4" style={{ background: form.card_color, color: form.text_color, borderColor: `${form.accent_color}33` }}>
             <h3 className="text-3xl font-black" style={{ color: form.theme_color }}>{form.title || 'Título de la página'}</h3>
-            <p className="text-sm mt-2">Así se verán los colores de fondo, texto y tarjeta en la publicación pública.</p>
+            <p className="text-sm mt-2">Así se verán el fondo, texto, tarjetas y botones en la publicación pública.</p>
+            <button type="button" className="mt-4 rounded-full px-4 py-2 text-sm font-black text-white" style={{ background: form.button_style === 'gradient' ? `linear-gradient(135deg, ${form.theme_color}, ${form.accent_color})` : form.theme_color }}>
+              Botón de ejemplo
+            </button>
           </div>
         </div>
 
