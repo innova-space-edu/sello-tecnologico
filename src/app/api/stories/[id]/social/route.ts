@@ -55,11 +55,9 @@ async function snapshot(admin: ReturnType<typeof createAdminSupabaseClient>, sto
 }
 
 type Params = { params: Promise<{ id: string }> }
-
 type SocialBody = {
   action?: 'view' | 'reaction' | 'comment' | 'report'
   visitorKey?: string
-  visitorName?: string
   emoji?: string
   content?: string
   reason?: string
@@ -72,15 +70,10 @@ export async function POST(request: Request, { params }: Params) {
   const body = await request.json().catch(() => ({})) as SocialBody
   const visitorKey = clean(body.visitorKey, 120)
   const user = await optionalUser()
-  if (!user && !visitorKey) return NextResponse.json({ error: 'No fue posible identificar al visitante.' }, { status: 400 })
+  if (!user && !visitorKey && body.action !== 'comment') return NextResponse.json({ error: 'No fue posible identificar al visitante.' }, { status: 400 })
 
   const admin = createAdminSupabaseClient()
-  const { data: story } = await admin
-    .from('community_stories')
-    .select('id, visibility_status, is_featured, expires_at, comments_enabled')
-    .eq('id', id)
-    .maybeSingle()
-
+  const { data: story } = await admin.from('community_stories').select('id, visibility_status, is_featured, expires_at, comments_enabled').eq('id', id).maybeSingle()
   const active = story?.visibility_status === 'published' && (story.is_featured || new Date(story.expires_at).getTime() > Date.now())
   if (!story?.id || !active) return NextResponse.json({ error: 'La historia ya no está disponible.' }, { status: 404 })
 
@@ -90,12 +83,7 @@ export async function POST(request: Request, { params }: Params) {
     existingQuery = user ? existingQuery.eq('profile_id', user.id) : existingQuery.eq('visitor_key', visitorKey)
     const { data: existing } = await existingQuery
     if (!existing?.length) {
-      await admin.from('community_story_views').insert({
-        story_id: id,
-        profile_id: user?.id ?? null,
-        visitor_key: user ? null : visitorKey,
-        user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
-      })
+      await admin.from('community_story_views').insert({ story_id: id, profile_id: user?.id ?? null, visitor_key: user ? null : visitorKey, user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null })
     }
     return NextResponse.json({ ok: true, ...(await snapshot(admin, id, user?.id ?? null, visitorKey)) })
   }
@@ -103,53 +91,29 @@ export async function POST(request: Request, { params }: Params) {
   if (body.action === 'reaction') {
     const emoji = clean(body.emoji, 8)
     if (!EMOJIS.has(emoji)) return NextResponse.json({ error: 'Reacción no válida.' }, { status: 400 })
-
     let query = admin.from('community_story_reactions').select('id, emoji').eq('story_id', id)
     query = user ? query.eq('profile_id', user.id) : query.eq('visitor_key', visitorKey)
     const { data: existing } = await query.maybeSingle()
-
-    if (existing?.id && existing.emoji === emoji) {
-      await admin.from('community_story_reactions').delete().eq('id', existing.id)
-    } else if (existing?.id) {
-      await admin.from('community_story_reactions').update({ emoji, updated_at: new Date().toISOString() }).eq('id', existing.id)
-    } else {
-      await admin.from('community_story_reactions').insert({
-        story_id: id,
-        profile_id: user?.id ?? null,
-        visitor_key: user ? null : visitorKey,
-        emoji,
-      })
-    }
-
+    if (existing?.id && existing.emoji === emoji) await admin.from('community_story_reactions').delete().eq('id', existing.id)
+    else if (existing?.id) await admin.from('community_story_reactions').update({ emoji, updated_at: new Date().toISOString() }).eq('id', existing.id)
+    else await admin.from('community_story_reactions').insert({ story_id: id, profile_id: user?.id ?? null, visitor_key: user ? null : visitorKey, emoji })
     return NextResponse.json({ ok: true, ...(await snapshot(admin, id, user?.id ?? null, visitorKey)) })
   }
 
   if (body.action === 'comment') {
+    if (!user) return NextResponse.json({ error: 'Debes iniciar sesión para comentar.' }, { status: 401 })
     if (!story.comments_enabled) return NextResponse.json({ error: 'Los comentarios están desactivados.' }, { status: 403 })
     const content = clean(body.content, 600)
     if (content.length < 2) return NextResponse.json({ error: 'Escribe un comentario válido.' }, { status: 400 })
-
-    const visitorName = clean(body.visitorName, 80) || 'Visitante'
-    const { error } = await admin.from('community_story_comments').insert({
-      story_id: id,
-      profile_id: user?.id ?? null,
-      visitor_key: user ? null : visitorKey,
-      visitor_name: user ? null : visitorName,
-      content,
-    })
+    const { error } = await admin.from('community_story_comments').insert({ story_id: id, profile_id: user.id, visitor_key: null, visitor_name: null, content })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ ok: true, ...(await snapshot(admin, id, user?.id ?? null, visitorKey)) })
+    return NextResponse.json({ ok: true, ...(await snapshot(admin, id, user.id, visitorKey)) })
   }
 
   if (body.action === 'report') {
     const reason = clean(body.reason, 500)
     if (reason.length < 3) return NextResponse.json({ error: 'Indica el motivo del reporte.' }, { status: 400 })
-    await admin.from('community_story_reports').insert({
-      story_id: id,
-      profile_id: user?.id ?? null,
-      visitor_key: user ? null : visitorKey,
-      reason,
-    })
+    await admin.from('community_story_reports').insert({ story_id: id, profile_id: user?.id ?? null, visitor_key: user ? null : visitorKey, reason })
     return NextResponse.json({ ok: true })
   }
 
