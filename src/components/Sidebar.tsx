@@ -12,6 +12,7 @@ const menu = [
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/comunidad', label: 'Comunidad', icon: '🏠' },
+  { href: '/revision-historias', label: 'Revisión historias', icon: '📱' },
   { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/seguimientos', label: 'Seguimiento', icon: '🧭' },
@@ -22,8 +23,9 @@ const menu = [
   { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
   { href: '/calendario', label: 'Calendario', icon: '📅' },
   { href: '/mensajes', label: 'Mensajes', icon: '💬' },
+  { href: '/mis-notificaciones', label: 'Mis avisos', icon: '🔔' },
   { href: '/reportes', label: 'Reportes', icon: '📈' },
-  { href: '/notificaciones', label: 'Notificaciones', icon: '🔔' },
+  { href: '/notificaciones', label: 'Notificaciones', icon: '📣' },
   { href: '/admin/moderacion', label: 'Moderación', icon: '🚨' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
@@ -37,39 +39,59 @@ export default function Sidebar() {
   const [nombre, setNombre] = useState('')
   const [alertasMod, setAlertasMod] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const [pendingStories, setPendingStories] = useState(0)
 
   useEffect(() => {
+    let modChannel: ReturnType<typeof supabase.channel> | null = null
+    let msgChannel: ReturnType<typeof supabase.channel> | null = null
+    let storyChannel: ReturnType<typeof supabase.channel> | null = null
+
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
       const { data: perfil } = await supabase
         .from('profiles').select('role, full_name').eq('id', user.id).single()
-      setRol(perfil?.role ?? '')
+      const role = perfil?.role ?? ''
+      setRol(role)
       setNombre(perfil?.full_name ?? user.email ?? '')
 
-      if (perfil?.role === 'admin') {
+      const isStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(role)
+      const refreshStoryCount = async () => {
+        const response = await fetch('/api/stories/review?count=1', { cache: 'no-store' })
+        if (!response.ok) return
+        const data = await response.json().catch(() => ({}))
+        setPendingStories(Number(data?.count ?? 0))
+      }
+
+      if (isStaff) {
+        await refreshStoryCount()
+        storyChannel = supabase
+          .channel(`story-review-count-${user.id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'community_stories' }, refreshStoryCount)
+          .subscribe()
+      }
+
+      if (role === 'admin') {
         const { count } = await supabase
           .from('flagged_messages')
           .select('*', { count: 'exact', head: true })
           .eq('reviewed', false)
         setAlertasMod(count ?? 0)
 
-        const modChannel = supabase
+        modChannel = supabase
           .channel('mod-alerts')
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'flagged_messages' }, () => {
             setAlertasMod(prev => prev + 1)
           })
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'flagged_messages' }, async () => {
-            const { count } = await supabase
+            const { count: updatedCount } = await supabase
               .from('flagged_messages')
               .select('*', { count: 'exact', head: true })
               .eq('reviewed', false)
-            setAlertasMod(count ?? 0)
+            setAlertasMod(updatedCount ?? 0)
           })
           .subscribe()
-
-        return () => { supabase.removeChannel(modChannel) }
       }
 
       const { count: unread } = await supabase
@@ -79,17 +101,20 @@ export default function Sidebar() {
         .eq('read', false)
       setUnreadMessages(unread ?? 0)
 
-      const msgChannel = supabase
-        .channel('unread-msgs')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages',
-          filter: `receiver_id=eq.${user.id}` }, () => {
+      msgChannel = supabase
+        .channel(`unread-msgs-${user.id}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, () => {
           setUnreadMessages(prev => prev + 1)
         })
         .subscribe()
-
-      return () => { supabase.removeChannel(msgChannel) }
     }
     init()
+
+    return () => {
+      if (modChannel) supabase.removeChannel(modChannel)
+      if (msgChannel) supabase.removeChannel(msgChannel)
+      if (storyChannel) supabase.removeChannel(storyChannel)
+    }
   }, [])
 
   const handleLogout = async () => {
@@ -102,7 +127,7 @@ export default function Sidebar() {
       <button onClick={() => setOpen(!open)}
         className="lg:hidden fixed top-4 left-4 z-50 bg-blue-900 text-white p-2.5 rounded-xl shadow-lg">
         {open ? '✕' : '☰'}
-        {(alertasMod > 0 || unreadMessages > 0) && (
+        {(alertasMod > 0 || unreadMessages > 0 || pendingStories > 0) && (
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
         )}
       </button>
@@ -127,10 +152,12 @@ export default function Sidebar() {
           {menu.map((item) => {
             const esAdmin = rol === 'admin'
             const esEstudianteRol = rol === 'estudiante'
+            const esStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(rol)
 
             if (item.href === '/admin' && !esAdmin) return null
             if (item.href === '/admin/moderacion' && !esAdmin) return null
             if (item.href === '/notificaciones' && !esAdmin) return null
+            if (item.href === '/revision-historias' && !esStaff) return null
             if (item.href === '/mis-encuestas' && !esEstudianteRol) return null
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null
             if (item.href === '/usuarios' && esEstudianteRol) return null
@@ -143,6 +170,7 @@ export default function Sidebar() {
 
             const esMod = item.href === '/admin/moderacion'
             const esMensajes = item.href === '/mensajes'
+            const esRevisionHistoria = item.href === '/revision-historias'
 
             return (
               <Link key={item.href} href={item.href}
@@ -160,6 +188,11 @@ export default function Sidebar() {
                 {esMensajes && unreadMessages > 0 && (
                   <span className="ml-auto flex items-center justify-center bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 font-bold">
                     {unreadMessages > 9 ? '9+' : unreadMessages}
+                  </span>
+                )}
+                {esRevisionHistoria && pendingStories > 0 && (
+                  <span className="ml-auto flex items-center justify-center bg-amber-400 text-blue-950 text-xs rounded-full min-w-5 h-5 px-1 font-bold">
+                    {pendingStories > 9 ? '9+' : pendingStories}
                   </span>
                 )}
               </Link>
