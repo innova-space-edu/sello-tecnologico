@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import CommunityFeed from '@/components/social/CommunityFeed'
 import CommunityTrending from '@/components/social/CommunityTrending'
+import StoriesRail from '@/components/stories/StoriesRail'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,16 +44,12 @@ export default function ComunidadPage() {
           <div className="mt-4 rounded-3xl bg-gradient-to-br from-blue-700 to-indigo-800 p-5 text-white shadow-sm">
             <p className="text-xs font-black uppercase tracking-widest text-blue-200">Sello Tecnológico</p>
             <h2 className="mt-2 text-lg font-black">Una sola comunidad</h2>
-            <p className="mt-2 text-sm leading-relaxed text-blue-100">Todas las páginas, proyectos, podcasts y evidencias públicas conectadas en un feed continuo.</p>
+            <p className="mt-2 text-sm leading-relaxed text-blue-100">Todas las páginas, proyectos, podcasts, historias y evidencias públicas conectadas en un feed continuo.</p>
           </div>
         </aside>
 
         <section className="min-w-0">
-          <div className="mb-5 rounded-3xl bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 p-6 text-white shadow-sm sm:p-8">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">Red social educativa</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Descubre lo que está creando nuestra comunidad</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-blue-100 sm:text-base">Explora publicaciones de todos los proyectos, reacciona, comenta, comparte y sigue las páginas que más te interesan.</p>
-          </div>
+          <StoriesRail />
           <CommunityFeed />
         </section>
 

@@ -16,6 +16,7 @@ export async function proxy(request: NextRequest) {
     '/comunidad',
     '/p',
     '/api/feed',
+    '/api/stories',
     '/api/vitrinas/social',
     '/api/vitrinas/assets',
   ]
