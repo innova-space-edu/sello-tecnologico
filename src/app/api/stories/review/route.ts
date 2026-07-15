@@ -22,34 +22,35 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const countOnly = url.searchParams.get('count') === '1'
   if (countOnly) {
-    const { count } = await current.admin
-      .from('community_stories')
-      .select('id', { count: 'exact', head: true })
-      .eq('review_status', 'pending')
-      .eq('visibility_status', 'published')
+    const { count } = await current.admin.from('community_stories').select('id', { count: 'exact', head: true }).eq('review_status', 'pending').eq('visibility_status', 'published')
     return NextResponse.json({ count: count ?? 0 }, { headers: { 'Cache-Control': 'no-store' } })
   }
 
-  const { data: stories, error } = await current.admin
-    .from('community_stories')
-    .select('*')
-    .in('review_status', ['pending','flagged','correction_requested'])
-    .order('created_at', { ascending: false })
-    .limit(100)
+  // Se conservan y muestran todas: pendientes, aprobadas, corregidas, ocultas y anuladas.
+  const { data: stories, error } = await current.admin.from('community_stories').select('*').order('created_at', { ascending: false }).limit(300)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   const rows = stories ?? []
   const ids = rows.map((row: any) => row.id)
   const authorIds = Array.from(new Set(rows.map((row: any) => row.author_id).filter(Boolean)))
   const pageIds = Array.from(new Set(rows.map((row: any) => row.page_id).filter(Boolean)))
-  const [itemsResult, profilesResult, pagesResult] = await Promise.all([
+
+  const [itemsResult, profilesResult, pagesResult, historyResult] = await Promise.all([
     ids.length ? current.admin.from('community_story_items').select('*').in('story_id', ids).order('sort_order') : Promise.resolve({ data: [] as any[] }),
     authorIds.length ? current.admin.from('profiles').select('id, full_name, email, role').in('id', authorIds) : Promise.resolve({ data: [] as any[] }),
     pageIds.length ? current.admin.from('project_public_pages').select('id, title, slug').in('id', pageIds) : Promise.resolve({ data: [] as any[] }),
+    ids.length ? current.admin.from('community_story_review_history').select('*').in('story_id', ids).order('created_at', { ascending: false }).limit(1500) : Promise.resolve({ data: [] as any[], error: null }),
   ])
 
   const items = itemsResult.data ?? []
+  const history = historyResult.data ?? []
+  const historyActorIds = Array.from(new Set(history.map((row: any) => row.actor_id).filter(Boolean)))
+  const { data: historyActors } = historyActorIds.length
+    ? await current.admin.from('profiles').select('id, full_name, email, role').in('id', historyActorIds)
+    : { data: [] as any[] }
+
   const profiles = new Map((profilesResult.data ?? []).map((row: any) => [row.id, row]))
+  const actors = new Map((historyActors ?? []).map((row: any) => [row.id, row]))
   const pages = new Map((pagesResult.data ?? []).map((row: any) => [row.id, { ...row, title: String(row.title ?? '').replace(/^Vitrina:\s*/i, '') }]))
   const paths = items.map((item: any) => item.storage_path)
   const { data: signed } = paths.length ? await current.admin.storage.from('community-stories').createSignedUrls(paths, 60 * 30) : { data: [] as any[] }
@@ -61,13 +62,15 @@ export async function GET(request: Request) {
       author: profiles.get(row.author_id) ?? null,
       page: row.page_id ? pages.get(row.page_id) ?? null : null,
       items: items.filter((item: any) => item.story_id === row.id).map((item: any) => ({ ...item, signed_url: urls.get(item.storage_path) ?? '' })),
+      history: history.filter((entry: any) => entry.story_id === row.id).map((entry: any) => ({ ...entry, actor: entry.actor_id ? actors.get(entry.actor_id) ?? null : null })),
     })),
+    history_available: !historyResult.error,
   }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 type ReviewBody = {
   id?: string
-  action?: 'reviewed' | 'hide' | 'restore' | 'feature' | 'unfeature' | 'correction'
+  action?: 'reviewed' | 'hide' | 'restore' | 'feature' | 'unfeature' | 'correction' | 'cancel'
 }
 
 export async function POST(request: Request) {
@@ -82,16 +85,17 @@ export async function POST(request: Request) {
   let updates: Record<string, unknown> = {}
   if (body.action === 'reviewed') updates = { review_status: 'reviewed', reviewed_by: current.user.id, reviewed_at: now }
   else if (body.action === 'hide') updates = { visibility_status: 'hidden', review_status: 'flagged', reviewed_by: current.user.id, reviewed_at: now }
+  else if (body.action === 'cancel') updates = { visibility_status: 'deleted', review_status: 'flagged', reviewed_by: current.user.id, reviewed_at: now }
   else if (body.action === 'restore') updates = { visibility_status: 'published', review_status: 'reviewed', reviewed_by: current.user.id, reviewed_at: now }
   else if (body.action === 'feature') updates = { is_featured: true, review_status: 'reviewed', reviewed_by: current.user.id, reviewed_at: now }
-  else if (body.action === 'unfeature') updates = { is_featured: false }
+  else if (body.action === 'unfeature') updates = { is_featured: false, reviewed_by: current.user.id, reviewed_at: now }
   else if (body.action === 'correction') updates = { review_status: 'correction_requested', reviewed_by: current.user.id, reviewed_at: now }
   else return NextResponse.json({ error: 'Acción no reconocida.' }, { status: 400 })
 
   const { data, error } = await current.admin.from('community_stories').update(updates).eq('id', id).select('id, visibility_status, review_status, is_featured').maybeSingle()
   if (error || !data?.id) return NextResponse.json({ error: error?.message ?? 'Historia no encontrada.' }, { status: 400 })
 
-  if (['reviewed','hide','restore','feature','correction'].includes(body.action ?? '')) {
+  if (['reviewed','hide','cancel','restore','feature','correction'].includes(body.action ?? '')) {
     await current.admin.from('user_notifications').update({ is_read: true, read_at: now, updated_at: now }).eq('source_type', 'story').eq('source_id', id)
   }
 
