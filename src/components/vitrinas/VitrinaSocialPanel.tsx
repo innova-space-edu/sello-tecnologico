@@ -43,7 +43,7 @@ function panelStyle(cardColor: string, accent: string, surfaceStyle?: string) {
 export default function VitrinaSocialPanel({ slug, theme, accent, textColor = '#0f172a', cardColor = '#ffffff', surfaceStyle = 'flat' }: Props) {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<SocialData>({ trending: [] })
-  const apiUrl = useMemo(() => `/api/vitrinas/social/${slug}`, [slug])
+  const apiUrl = useMemo(() => `/api/vitrinas/social/${slug}?includeTrending=1&includeComments=0`, [slug])
 
   const refresh = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -73,9 +73,9 @@ export default function VitrinaSocialPanel({ slug, theme, accent, textColor = '#
             <h2 className="font-black" style={{ color: textColor }}>Trending</h2>
             <p className="text-xs" style={{ color: `${textColor}88` }}>Páginas públicas con más actividad</p>
           </div>
-          <span className="text-xs px-2 py-1 rounded-full" style={{ background: `${accent}18`, color: accent }}>
-            Sello Tecnológico
-          </span>
+          <Link href="/comunidad" className="text-xs px-2 py-1 rounded-full" style={{ background: `${accent}18`, color: accent }}>
+            Ver comunidad
+          </Link>
         </div>
 
         <div className="space-y-3">
