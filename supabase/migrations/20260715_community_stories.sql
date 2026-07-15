@@ -5,18 +5,19 @@ begin;
 
 create extension if not exists pgcrypto;
 
--- Permite que los avisos personales identifiquen revisiones de historias.
+-- Permite que los avisos personales identifiquen revisiones de historias
+-- sin eliminar los tipos de notificación creados por módulos anteriores.
 alter table public.user_notifications
   drop constraint if exists user_notifications_type_check;
 alter table public.user_notifications
   add constraint user_notifications_type_check
-  check (type in ('info','survey','followup','result','feedback','story_review'));
+  check (type in ('info','survey','followup','result','feedback','self_evaluation','story_review'));
 
 alter table public.user_notifications
   drop constraint if exists user_notifications_source_type_check;
 alter table public.user_notifications
   add constraint user_notifications_source_type_check
-  check (source_type is null or source_type in ('survey','followup','system','story'));
+  check (source_type is null or source_type in ('survey','followup','system','self_evaluation','story'));
 
 create table if not exists public.community_stories (
   id uuid primary key default gen_random_uuid(),
@@ -152,7 +153,8 @@ using (
   )
 );
 
--- El autor puede crear y administrar sus propias historias.
+-- El autor puede crear y administrar el contenido propio. Un trigger impide
+-- que un estudiante se marque revisado, destacado o cambie la visibilidad.
 drop policy if exists community_stories_author_insert on public.community_stories;
 create policy community_stories_author_insert
 on public.community_stories for insert to authenticated
@@ -236,6 +238,37 @@ using (
     or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('admin','docente','coordinador','utp'))
   )
 );
+
+create or replace function public.protect_community_story_review_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  actor_role text;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  select role into actor_role from public.profiles where id = auth.uid();
+  if coalesce(actor_role, '') not in ('admin','docente','coordinador','utp') then
+    new.visibility_status := old.visibility_status;
+    new.review_status := old.review_status;
+    new.is_featured := old.is_featured;
+    new.reviewed_by := old.reviewed_by;
+    new.reviewed_at := old.reviewed_at;
+    new.expires_at := old.expires_at;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_protect_community_story_review_fields on public.community_stories;
+create trigger trg_protect_community_story_review_fields
+before update on public.community_stories
+for each row execute function public.protect_community_story_review_fields();
 
 create or replace function public.set_community_story_updated_at()
 returns trigger language plpgsql set search_path = public as $$
