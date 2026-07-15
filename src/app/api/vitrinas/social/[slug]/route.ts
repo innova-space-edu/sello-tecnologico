@@ -40,7 +40,6 @@ function withReadTarget(query: any, targetType: TargetType, targetId: string | n
 
 async function validateTarget(admin: ReturnType<typeof createAdminSupabaseClient>, pageId: string, targetType: TargetType, targetId: string | null) {
   if (targetType === 'page') return { block_id: null, asset_id: null, error: null }
-
   if (!targetId) return { block_id: null, asset_id: null, error: 'Falta identificador de la publicación.' }
 
   if (targetType === 'block') {
@@ -72,6 +71,8 @@ export async function GET(request: Request, { params }: Params) {
   const url = new URL(request.url)
   const { type: targetType, id: targetId } = normalizeTarget(url.searchParams.get('targetType'), url.searchParams.get('targetId'))
   const visitorKey = cleanText(url.searchParams.get('visitorKey'), 120)
+  const includeComments = url.searchParams.get('includeComments') !== '0'
+  const includeTrending = url.searchParams.get('includeTrending') === '1'
   const { admin, page } = await getPublishedPage(slug)
 
   if (!page) return NextResponse.json({ error: 'Página no publicada.' }, { status: 404 })
@@ -96,7 +97,7 @@ export async function GET(request: Request, { params }: Params) {
       .eq('page_id', page.id)
       .eq('is_hidden', false)
       .order('created_at', { ascending: false })
-      .limit(targetType === 'page' ? 8 : 30),
+      .limit(includeComments ? (targetType === 'page' ? 8 : 30) : 0),
     targetType,
     targetId,
   )
@@ -109,24 +110,22 @@ export async function GET(request: Request, { params }: Params) {
       )
     : null
 
+  const trendingQuery = includeTrending
+    ? admin
+        .from('project_public_page_trending')
+        .select('id, title, slug, description, theme_color, accent_color, likes_count, views_count, comments_count, trend_score, published_at')
+        .order('trend_score', { ascending: false })
+        .order('published_at', { ascending: false })
+        .limit(8)
+    : Promise.resolve({ data: [] as any[] })
+
   const [likesResult, viewsResult, commentsResult, likedResult, trendingResult] = await Promise.all([
     likesQuery,
     viewsQuery,
     commentsQuery,
     likedQuery ?? Promise.resolve({ data: [] }),
-    admin
-      .from('project_public_page_trending')
-      .select('id, title, slug, description, theme_color, accent_color, likes_count, views_count, comments_count, trend_score, published_at')
-      .order('trend_score', { ascending: false })
-      .order('published_at', { ascending: false })
-      .limit(8),
+    trendingQuery,
   ])
-
-  const trending = (trendingResult.data ?? []).sort((a: any, b: any) => {
-    if (a.slug === slug && b.slug !== slug && (trendingResult.data ?? []).length === 1) return -1
-    if (b.slug === slug && a.slug !== slug && (trendingResult.data ?? []).length === 1) return 1
-    return (b.trend_score ?? 0) - (a.trend_score ?? 0)
-  })
 
   return NextResponse.json({
     page,
@@ -137,9 +136,9 @@ export async function GET(request: Request, { params }: Params) {
       comments: commentsResult.count ?? 0,
     },
     liked: Boolean(likedResult?.data?.length),
-    comments: commentsResult.data ?? [],
-    trending,
-  })
+    comments: includeComments ? (commentsResult.data ?? []) : [],
+    trending: trendingResult.data ?? [],
+  }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -156,14 +155,36 @@ export async function POST(request: Request, { params }: Params) {
   if (target.error) return NextResponse.json({ error: target.error }, { status: 400 })
 
   if (body.action === 'view') {
-    await admin.from('project_public_page_views').insert({
-      page_id: page.id,
-      block_id: target.block_id,
-      asset_id: target.asset_id,
-      visitor_key: visitorKey || null,
-      user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
-    })
-    return NextResponse.json({ ok: true })
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString()
+    let counted = true
+
+    if (visitorKey) {
+      const recentQuery = withTarget(
+        admin
+          .from('project_public_page_views')
+          .select('id')
+          .eq('page_id', page.id)
+          .eq('visitor_key', visitorKey)
+          .gte('created_at', thirtyMinutesAgo)
+          .limit(1),
+        targetType,
+        targetId,
+      )
+      const { data: recent } = await recentQuery
+      counted = !recent?.length
+    }
+
+    if (counted) {
+      await admin.from('project_public_page_views').insert({
+        page_id: page.id,
+        block_id: target.block_id,
+        asset_id: target.asset_id,
+        visitor_key: visitorKey || null,
+        user_agent: request.headers.get('user-agent')?.slice(0, 300) ?? null,
+      })
+    }
+
+    return NextResponse.json({ ok: true, counted })
   }
 
   if (body.action === 'like') {
@@ -194,7 +215,6 @@ export async function POST(request: Request, { params }: Params) {
   if (body.action === 'comment') {
     const content = cleanText(body.content, 600)
     const visitorName = cleanText(body.visitorName, 80) || 'Visitante'
-
     if (!content || content.length < 2) return NextResponse.json({ error: 'Escribe un comentario válido.' }, { status: 400 })
 
     const { error } = await admin.from('project_public_page_comments').insert({
