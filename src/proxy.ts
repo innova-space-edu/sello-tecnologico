@@ -4,11 +4,23 @@ import type { NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
+  const pathname = request.nextUrl.pathname
 
-  const publicPaths = ['/login', '/registro', '/bloqueado', '/formularios', '/auth/callback', '/api/register-profile']
-  if (publicPaths.some(p => request.nextUrl.pathname.startsWith(p))) {
-    return response
-  }
+  const publicPaths = [
+    '/login',
+    '/registro',
+    '/bloqueado',
+    '/formularios',
+    '/auth/callback',
+    '/api/register-profile',
+    '/comunidad',
+    '/p',
+    '/api/feed',
+    '/api/vitrinas/social',
+    '/api/vitrinas/assets',
+  ]
+  const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(`${path}/`))
+  if (isPublicPath) return response
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,7 +63,7 @@ export async function proxy(request: NextRequest) {
   ]
 
   if (perfil?.role === 'estudiante') {
-    const restringida = rutasRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
+    const restringida = rutasRestringidas.some(r => pathname.startsWith(r))
     if (restringida) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
@@ -64,7 +76,7 @@ export async function proxy(request: NextRequest) {
     '/usuarios',
   ]
   if (rolesDocente.includes(perfil?.role ?? '')) {
-    const restringida = rutasDocenteRestringidas.some(r => request.nextUrl.pathname.startsWith(r))
+    const restringida = rutasDocenteRestringidas.some(r => pathname.startsWith(r))
     if (restringida) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
