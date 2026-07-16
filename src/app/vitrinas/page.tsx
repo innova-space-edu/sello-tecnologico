@@ -58,9 +58,18 @@ export default async function VitrinasPage() {
 
   if (!isStaff) query = query.eq('created_by', user?.id ?? '')
 
-  const { data } = await query
-  const pages = (data ?? []) as unknown as PublicPage[]
+  const [{ data }, pendingResult] = await Promise.all([
+    query,
+    isStaff
+      ? supabase
+          .from('community_stories')
+          .select('*', { count: 'exact', head: true })
+          .eq('review_status', 'pending')
+      : Promise.resolve({ count: 0 }),
+  ])
 
+  const pages = (data ?? []) as unknown as PublicPage[]
+  const pendingStories = Number(pendingResult.count ?? 0)
   const published = pages.filter(page => page.status === 'published').length
   const drafts = pages.filter(page => page.status !== 'published').length
 
@@ -74,9 +83,35 @@ export default async function VitrinasPage() {
             <h1 className="text-2xl font-bold text-blue-900 mt-1">Páginas públicas</h1>
             <p className="text-gray-500 mt-1">Crea páginas con podcast, videos, imágenes y materiales para compartir con un link público.</p>
           </div>
-          <Link href="/vitrinas/nueva" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-            + Crear página
-          </Link>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/comunidad"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+            >
+              <span aria-hidden="true">🏠</span>
+              Ver comunidad
+            </Link>
+
+            {isStaff && (
+              <Link
+                href="/revision-historias"
+                className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-800 shadow-sm transition hover:bg-amber-100"
+              >
+                <span aria-hidden="true">🎬</span>
+                Revisión de videos e historias
+                {pendingStories > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-black text-blue-950">
+                    {pendingStories > 99 ? '99+' : pendingStories}
+                  </span>
+                )}
+              </Link>
+            )}
+
+            <Link href="/vitrinas/nueva" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
+              + Crear página
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">

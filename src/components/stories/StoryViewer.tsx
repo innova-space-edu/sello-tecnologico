@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import CommentEmojiPicker from '@/components/social/CommentEmojiPicker'
 import ReactionPicker, { type SocialReaction } from '@/components/social/ReactionPicker'
 import type { CommunityStory, StoryReactionEmoji } from './types'
 
@@ -46,6 +47,8 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
   const supabase = useMemo(() => createClient(), [])
   const [itemIndex, setItemIndex] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [commentFocused, setCommentFocused] = useState(false)
+  const [emojiOpen, setEmojiOpen] = useState(false)
   const [muted, setMuted] = useState(true)
   const [progress, setProgress] = useState(0)
   const [visitorKey, setVisitorKey] = useState('')
@@ -63,8 +66,10 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
   const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState('')
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const commentRef = useRef<HTMLTextAreaElement | null>(null)
 
   const item = story.items[itemIndex]
+  const interactionPaused = paused || commentFocused || emojiOpen
   const shareUrl = useMemo(
     () => typeof window === 'undefined' ? '' : `${window.location.origin}/comunidad?historia=${story.id}`,
     [story.id],
@@ -115,6 +120,8 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
     setItemIndex(0)
     setProgress(0)
     setPaused(false)
+    setCommentFocused(false)
+    setEmojiOpen(false)
     setComments(story.comments)
     setReactions(story.reactions)
     setReactionCount(story.reactions_count)
@@ -139,7 +146,7 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
   }, [story.id, visitorKey])
 
   useEffect(() => {
-    if (!item || item.media_type !== 'image' || paused) return
+    if (!item || item.media_type !== 'image' || interactionPaused) return
 
     const started = Date.now() - progress * 6000
     const timer = window.setInterval(() => {
@@ -152,7 +159,7 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
     }, 80)
 
     return () => window.clearInterval(timer)
-  }, [goForward, item, paused, progress])
+  }, [goForward, interactionPaused, item, progress])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -173,9 +180,9 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
 
   useEffect(() => {
     if (!videoRef.current) return
-    if (paused) videoRef.current.pause()
+    if (interactionPaused) videoRef.current.pause()
     else videoRef.current.play().catch(() => null)
-  }, [paused, itemIndex])
+  }, [interactionPaused, itemIndex])
 
   const applySnapshot = (data: any) => {
     if (data.reactions) setReactions(data.reactions)
@@ -286,7 +293,7 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
               {item.media_type === 'video' && (
                 <button type="button" onClick={() => setMuted(value => !value)} className="rounded-full bg-black/40 px-3 py-2 text-xs font-black">{muted ? '🔇' : '🔊'}</button>
               )}
-              <button type="button" onClick={() => setPaused(value => !value)} className="rounded-full bg-black/40 px-3 py-2 text-xs font-black">{paused ? '▶' : 'Ⅱ'}</button>
+              <button type="button" onClick={() => setPaused(value => !value)} className="rounded-full bg-black/40 px-3 py-2 text-xs font-black">{interactionPaused ? '▶' : 'Ⅱ'}</button>
             </div>
           </div>
 
@@ -359,19 +366,27 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
               <p className="text-xs text-slate-400">Comprobando sesión…</p>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex items-end gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 focus-within:ring-2 focus-within:ring-blue-200">
               <textarea
+                ref={commentRef}
                 value={comment}
                 onChange={event => setComment(event.target.value)}
-                onFocus={() => setPaused(true)}
-                onBlur={() => setPaused(false)}
+                onFocus={() => setCommentFocused(true)}
+                onBlur={() => setCommentFocused(false)}
                 onKeyDown={event => event.stopPropagation()}
                 rows={2}
                 disabled={!currentUser}
                 placeholder={currentUser ? 'Escribe un comentario…' : 'Inicia sesión para comentar'}
-                className="min-h-12 flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                className="min-h-12 flex-1 resize-none border-0 bg-transparent px-3 py-2 text-sm outline-none disabled:bg-slate-100"
               />
-              <button type="submit" disabled={sending || !comment.trim() || !currentUser} className="self-end rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white disabled:bg-slate-300">Publicar</button>
+              <CommentEmojiPicker
+                value={comment}
+                onChange={setComment}
+                textareaRef={commentRef}
+                disabled={!currentUser || sending}
+                onOpenChange={setEmojiOpen}
+              />
+              <button type="submit" disabled={sending || !comment.trim() || !currentUser} className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-black text-white disabled:bg-slate-300">Publicar</button>
             </div>
           </form>
 
@@ -382,7 +397,7 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
               <div key={entry.id} className="flex gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">{entry.author_name[0]?.toUpperCase()}</div>
                 <div>
-                  <p className="text-sm"><strong>{entry.author_name}</strong> {entry.content}</p>
+                  <p className="whitespace-pre-wrap text-sm"><strong>{entry.author_name}</strong> {entry.content}</p>
                   <p className="mt-1 text-[11px] font-semibold text-slate-400">{formatDate(entry.created_at)}</p>
                 </div>
               </div>
