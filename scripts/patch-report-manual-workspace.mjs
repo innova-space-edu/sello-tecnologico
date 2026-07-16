@@ -38,6 +38,12 @@ replaceEditor(
   'configuración de bloque',
 )
 
+replaceEditor(
+  "    setSections(prev => [...prev, data as ReportSection])",
+  "    setSections(prev => prev.some(section => section.id === data.id) ? prev : [...prev, data as ReportSection].sort((a, b) => a.sort_order - b.sort_order))",
+  'evitar sección duplicada por realtime',
+)
+
 if (!editor.includes('const moveSection = async')) {
   replaceEditor(
 `  const removeSection = async (id: string) => {`,
@@ -62,6 +68,28 @@ if (!editor.includes('const moveSection = async')) {
     'mover bloques',
   )
 }
+
+replaceEditor(
+  "    if (!canEdit || sections.length <= 1) return",
+  "    if (!canEdit) return",
+  'permitir documento sin bloques',
+)
+
+replaceEditor(
+`  const reportAction = async (action: string, actionMessage?: string) => {
+    setError('')`,
+`  const reportAction = async (action: string, actionMessage?: string) => {
+    setError('')
+    if (action === 'submit') {
+      while (savingRef.current) await new Promise(resolve => window.setTimeout(resolve, 100))
+      await saveDirty()
+      if (dirtyIdsRef.current.size || titleDirtyRef.current || savingRef.current) {
+        setError('El informe todavía tiene cambios pendientes. Revisa el estado de guardado e intenta enviarlo nuevamente.')
+        return
+      }
+    }`,
+  'guardar antes de enviar',
+)
 
 replaceEditor(
 `    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
