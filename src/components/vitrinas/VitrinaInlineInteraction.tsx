@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import CommentEmojiPicker from '@/components/social/CommentEmojiPicker'
 import ReactionPicker, { type SocialReaction } from '@/components/social/ReactionPicker'
 
 type TargetType = 'page' | 'block' | 'asset'
@@ -13,8 +14,6 @@ type SocialData = {
   reactions: Partial<Record<SocialReaction, number>>
   viewer_reaction?: SocialReaction | null
 }
-
-const QUICK_EMOJIS = ['😍', '👏', '🔥', '❤️', '😂', '🙌', '⭐', '🌱', '🎧', '💡', '😮', '🥳', '👍', '💜', '✨']
 
 function getVisitorKey() {
   const key = 'sello_vitrina_visitor_key'
@@ -49,10 +48,10 @@ export default function VitrinaInlineInteraction({ slug, targetType, targetId, t
   const [sending, setSending] = useState(false)
   const [copied, setCopied] = useState(false)
   const [notice, setNotice] = useState('')
-  const [showEmojis, setShowEmojis] = useState(false)
   const [showShare, setShowShare] = useState(false)
   const [shareUrl, setShareUrl] = useState('')
   const [data, setData] = useState<SocialData>({ stats: { likes: 0, views: 0, comments: 0 }, comments: [], reactions: {}, viewer_reaction: null })
+  const commentRef = useRef<HTMLTextAreaElement | null>(null)
 
   const params = useMemo(() => {
     const search = new URLSearchParams()
@@ -149,11 +148,6 @@ export default function VitrinaInlineInteraction({ slug, targetType, targetId, t
     setSending(false)
   }
 
-  const addEmoji = (emoji: string) => {
-    setComment(prev => `${prev}${prev.endsWith(' ') || prev.length === 0 ? '' : ' '}${emoji} `)
-    setShowEmojis(false)
-  }
-
   const copyShareUrl = async () => {
     await navigator.clipboard.writeText(shareUrl).catch(() => null)
     setCopied(true)
@@ -183,11 +177,10 @@ export default function VitrinaInlineInteraction({ slug, targetType, targetId, t
 
       <form onSubmit={sendComment} className="mt-4 space-y-2">
         {authChecked && currentUser ? <p className="text-xs font-semibold text-slate-500">Comentando como <strong className="text-slate-800">{currentUser.name}</strong></p> : authChecked ? <div className="rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">Para comentar debes <Link href="/login" className="font-black underline">iniciar sesión</Link>.</div> : <p className="text-xs text-slate-400">Comprobando sesión…</p>}
-        <div className="relative flex items-start gap-2 rounded-[1.5rem] border border-slate-200 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-blue-300">
-          <button type="button" disabled={!currentUser} onClick={() => setShowEmojis(prev => !prev)} className="mt-0.5 shrink-0 bg-transparent px-1 text-lg leading-none text-slate-500 transition hover:scale-110 hover:text-slate-800 disabled:opacity-40" aria-label="Abrir emojis">😊</button>
-          {showEmojis && <div className="absolute bottom-12 left-2 z-20 w-64 rounded-2xl border border-slate-100 bg-white p-2 shadow-xl"><div className="grid grid-cols-5 gap-1">{QUICK_EMOJIS.map(emoji => <button key={emoji} type="button" onClick={() => addEmoji(emoji)} className="flex h-9 w-9 items-center justify-center rounded-full bg-transparent text-lg transition hover:bg-slate-100" aria-label={`Agregar ${emoji}`}>{emoji}</button>)}</div></div>}
-          <textarea value={comment} onChange={event => setComment(event.target.value)} disabled={!currentUser} placeholder={currentUser ? 'Agrega un comentario...' : 'Inicia sesión para comentar'} rows={1} className="min-h-7 flex-1 resize-none border-0 bg-transparent text-sm outline-none placeholder:text-slate-400 disabled:text-slate-400" />
-          <button type="submit" disabled={sending || !comment.trim() || !currentUser} className="shrink-0 rounded-full px-4 py-1.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300" style={comment.trim() && currentUser ? { background: `linear-gradient(135deg, ${theme}, ${accent})` } : undefined}>{sending ? '...' : 'Publicar'}</button>
+        <div className="relative flex items-end gap-1 rounded-[1.5rem] border border-slate-200 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-blue-300">
+          <textarea ref={commentRef} value={comment} onChange={event => setComment(event.target.value)} disabled={!currentUser} placeholder={currentUser ? 'Agrega un comentario...' : 'Inicia sesión para comentar'} rows={1} className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm outline-none placeholder:text-slate-400 disabled:text-slate-400" />
+          <CommentEmojiPicker value={comment} onChange={setComment} textareaRef={commentRef} disabled={!currentUser || sending} />
+          <button type="submit" disabled={sending || !comment.trim() || !currentUser} className="h-10 shrink-0 rounded-full px-4 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300" style={comment.trim() && currentUser ? { background: `linear-gradient(135deg, ${theme}, ${accent})` } : undefined}>{sending ? '...' : 'Publicar'}</button>
         </div>
         {notice && <p className="text-xs font-semibold text-slate-500">{notice}</p>}
       </form>
