@@ -1,7 +1,7 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 
 const EMOJI_GROUPS = {
   Caras: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🫣','🤭','🫢','🫡','🤫','🫠','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕'],
@@ -38,7 +38,6 @@ const GROUP_ICONS: Record<EmojiGroup, string> = {
 export default function CommentEmojiPicker({ value, onChange, textareaRef, disabled = false, onOpenChange }: Props) {
   const [open, setOpen] = useState(false)
   const [group, setGroup] = useState<EmojiGroup>('Caras')
-  const [query, setQuery] = useState('')
   const [mounted, setMounted] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -47,15 +46,12 @@ export default function CommentEmojiPicker({ value, onChange, textareaRef, disab
 
   useEffect(() => setMounted(true), [])
 
-  const allEmojis = useMemo(() => Array.from(new Set(Object.values(EMOJI_GROUPS).flat())), [])
-  const visibleEmojis = query.trim() ? allEmojis : [...EMOJI_GROUPS[group]]
-
   const updatePosition = () => {
     const button = buttonRef.current
     if (!button) return
     const rect = button.getBoundingClientRect()
     const width = Math.min(360, window.innerWidth - 24)
-    const height = 390
+    const height = 340
     const left = Math.min(Math.max(12, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 12)
     const top = rect.bottom + height + 12 <= window.innerHeight
       ? rect.bottom + 8
@@ -125,39 +121,32 @@ export default function CommentEmojiPicker({ value, onChange, textareaRef, disab
       role="dialog"
       aria-label="Selector de emojis"
     >
-      <div className="flex items-center gap-2 border-b border-slate-100 p-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl bg-slate-100 px-3 py-2">
-          <span aria-hidden="true">🔎</span>
-          <input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder="Buscar emojis"
-            className="min-w-0 flex-1 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-          />
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div>
+          <p className="text-sm font-black text-slate-900">Agregar emoji</p>
+          <p className="text-[11px] font-semibold text-slate-400">Elige una categoría y agrega todos los que quieras.</p>
         </div>
         <button type="button" onClick={() => changeOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-lg text-slate-500 hover:bg-slate-100" aria-label="Cerrar emojis">×</button>
       </div>
 
-      {!query.trim() && (
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2 py-2">
-          {(Object.keys(EMOJI_GROUPS) as EmojiGroup[]).map(name => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setGroup(name)}
-              className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-lg transition ${group === name ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-slate-100'}`}
-              title={name}
-              aria-label={name}
-            >
-              {GROUP_ICONS[name]}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-100 px-2 py-2">
+        {(Object.keys(EMOJI_GROUPS) as EmojiGroup[]).map(name => (
+          <button
+            key={name}
+            type="button"
+            onClick={() => setGroup(name)}
+            className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-lg transition ${group === name ? 'bg-blue-100 ring-2 ring-blue-400' : 'hover:bg-slate-100'}`}
+            title={name}
+            aria-label={name}
+          >
+            {GROUP_ICONS[name]}
+          </button>
+        ))}
+      </div>
 
       <div className="max-h-64 overflow-y-auto p-3">
         <div className="grid grid-cols-7 gap-1 sm:grid-cols-8">
-          {visibleEmojis.map(emoji => (
+          {EMOJI_GROUPS[group].map(emoji => (
             <button
               key={emoji}
               type="button"
