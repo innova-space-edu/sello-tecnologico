@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "apply:pages-video": "node scripts/patch-sidebar-pages.mjs && node scripts/patch-page-video-editor.mjs && node scripts/patch-public-video-blocks.mjs",
+    "apply:pages-video": "node scripts/patch-sidebar-pages.mjs && node scripts/patch-sidebar-reports.mjs && node scripts/patch-page-video-editor.mjs && node scripts/patch-public-video-blocks.mjs",
     "predev": "npm run apply:pages-video",
     "dev": "next dev",
     "prebuild": "npm run apply:pages-video",
