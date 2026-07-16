@@ -44,10 +44,13 @@ export default function NuevoInformePage() {
     setError('')
     if (!projectId || !title.trim()) { setError('Selecciona un proyecto y escribe el título del informe.'); return }
     setSaving(true)
+    let createdReportId: string | null = null
+
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Debes iniciar sesión.')
       const project = projects.find(item => item.id === projectId)
+      if (!project) throw new Error('No se encontró el proyecto seleccionado.')
 
       const { data: existing } = await supabase
         .from('project_reports')
@@ -62,7 +65,7 @@ export default function NuevoInformePage() {
 
       const { data: report, error: reportError } = await supabase.from('project_reports').insert({
         project_id: projectId,
-        course_id: project?.course_id ?? null,
+        course_id: project.course_id ?? null,
         created_by: user.id,
         title: title.trim(),
         status: 'draft',
@@ -73,6 +76,7 @@ export default function NuevoInformePage() {
         if (reportError?.code === '23505') throw new Error('Este proyecto ya tiene un informe. Ábrelo desde la lista de Informes y solicita al jefe que te agregue al equipo.')
         throw reportError ?? new Error('No se pudo crear el informe.')
       }
+      createdReportId = report.id
 
       const { error: memberError } = await supabase.from('project_report_members').insert({
         report_id: report.id,
@@ -92,8 +96,12 @@ export default function NuevoInformePage() {
       const { error: sectionError } = await supabase.from('project_report_sections').insert(sections)
       if (sectionError) throw sectionError
 
+      createdReportId = null
       router.push(`/informes/${report.id}`)
     } catch (err: any) {
+      if (createdReportId) {
+        await supabase.from('project_reports').delete().eq('id', createdReportId)
+      }
       setError(err?.message ?? 'No fue posible crear el informe.')
     } finally {
       setSaving(false)
