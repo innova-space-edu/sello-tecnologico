@@ -22,11 +22,29 @@ export default function NuevoInformePage() {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
-      const { data } = await supabase
-        .from('projects')
-        .select('id, title, course_id, courses(name)')
-        .order('created_at', { ascending: false })
-      setProjects(data ?? [])
+
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const baseSelect = 'id, title, course_id, courses(name)'
+
+      if (profile?.role === 'estudiante') {
+        const [{ data: owned }, { data: collaborations }] = await Promise.all([
+          supabase.from('projects').select(baseSelect).eq('owner_id', user.id).order('created_at', { ascending: false }),
+          supabase.from('project_collaborators').select('project_id').eq('user_id', user.id).eq('status', 'accepted'),
+        ])
+
+        const sharedIds = Array.from(new Set((collaborations ?? []).map((row: any) => row.project_id).filter(Boolean)))
+        let shared: any[] = []
+        if (sharedIds.length) {
+          const { data } = await supabase.from('projects').select(baseSelect).in('id', sharedIds).order('created_at', { ascending: false })
+          shared = data ?? []
+        }
+
+        const merged = [...(owned ?? []), ...shared]
+        setProjects(Array.from(new Map(merged.map((project: any) => [project.id, project])).values()))
+      } else {
+        const { data } = await supabase.from('projects').select(baseSelect).order('created_at', { ascending: false })
+        setProjects(data ?? [])
+      }
       setLoading(false)
     }
     void load()
@@ -124,10 +142,12 @@ export default function NuevoInformePage() {
           <section className="rounded-2xl bg-white p-6 shadow-sm">
             <label className="block text-sm font-semibold text-gray-700">Proyecto relacionado
               <select value={projectId} onChange={event => selectProject(event.target.value)} disabled={loading} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300">
-                <option value="">{loading ? 'Cargando proyectos…' : 'Selecciona un proyecto'}</option>
+                <option value="">{loading ? 'Cargando proyectos…' : 'Selecciona un proyecto propio o compartido'}</option>
                 {projects.map(project => <option key={project.id} value={project.id}>{project.title} — {project.courses?.name ?? 'Sin curso'}</option>)}
               </select>
             </label>
+
+            {!loading && projects.length === 0 && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No tienes proyectos propios ni colaboraciones aceptadas disponibles para crear un informe.</p>}
 
             <label className="mt-5 block text-sm font-semibold text-gray-700">Título del informe
               <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Informe del proyecto" className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-300" />
@@ -145,7 +165,7 @@ export default function NuevoInformePage() {
               </div>
             </div>
 
-            <button type="button" disabled={saving || loading} onClick={() => void createReport()} className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-60">{saving ? 'Creando informe…' : 'Crear informe y abrir editor'}</button>
+            <button type="button" disabled={saving || loading || projects.length === 0} onClick={() => void createReport()} className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white hover:bg-blue-700 disabled:opacity-60">{saving ? 'Creando informe…' : 'Crear informe y abrir editor'}</button>
           </section>
 
           <aside className="rounded-2xl border border-blue-100 bg-blue-50 p-5 xl:sticky xl:top-5 xl:self-start">
