@@ -75,7 +75,8 @@ replaceEditor(
   'permitir documento sin bloques',
 )
 
-replaceEditor(
+if (!editor.includes("    if (action === 'submit') {")) {
+  replaceEditor(
 `  const reportAction = async (action: string, actionMessage?: string) => {
     setError('')`,
 `  const reportAction = async (action: string, actionMessage?: string) => {
@@ -88,8 +89,9 @@ replaceEditor(
         return
       }
     }`,
-  'guardar antes de enviar',
-)
+    'guardar antes de enviar',
+  )
+}
 
 replaceEditor(
 `    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
