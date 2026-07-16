@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "apply:pages-video": "node scripts/patch-sidebar-pages.mjs && node scripts/patch-sidebar-reports.mjs && node scripts/patch-page-video-editor.mjs && node scripts/patch-public-video-blocks.mjs && node scripts/patch-report-manual-workspace.mjs && node scripts/normalize-report-workspace-patch.mjs",
+    "apply:pages-video": "node scripts/patch-sidebar-pages.mjs && node scripts/patch-sidebar-reports.mjs && node scripts/patch-page-video-editor.mjs && node scripts/patch-public-video-blocks.mjs && node scripts/patch-report-manual-workspace.mjs && node scripts/normalize-report-workspace-patch.mjs && node scripts/patch-report-evaluation-state.mjs",
     "predev": "npm run apply:pages-video",
     "dev": "next dev",
     "prebuild": "npm run apply:pages-video",
