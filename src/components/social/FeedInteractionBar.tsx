@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import CommentEmojiPicker from './CommentEmojiPicker'
 import ReactionPicker, { type SocialReaction } from './ReactionPicker'
 import type { FeedPost } from './types'
 
@@ -45,6 +46,7 @@ export default function FeedInteractionBar({ post }: { post: FeedPost }) {
   const [reactions, setReactions] = useState<Partial<Record<SocialReaction, number>>>({ '❤️': post.likes_count })
   const [viewerReaction, setViewerReaction] = useState<SocialReaction | null>(null)
   const [stats, setStats] = useState({ likes: post.likes_count, comments: post.comments_count, views: post.views_count })
+  const commentRef = useRef<HTMLTextAreaElement | null>(null)
 
   const params = useMemo(() => {
     const search = new URLSearchParams({ targetType, targetId: post.item_id, visitorKey: key, includeComments: '1' })
@@ -173,9 +175,10 @@ export default function FeedInteractionBar({ post }: { post: FeedPost }) {
       {commentsOpen && (
         <div className="mt-4">
           {authChecked && currentUser ? <p className="mb-2 text-xs font-semibold text-slate-500">Comentando como <strong className="text-slate-800">{currentUser.name}</strong></p> : authChecked ? <div className="mb-3 rounded-xl bg-blue-50 px-3 py-2 text-sm text-blue-800">Para comentar debes <Link href="/login" className="font-black underline">iniciar sesión</Link>.</div> : <p className="mb-2 text-xs text-slate-400">Comprobando sesión…</p>}
-          <form onSubmit={sendComment} className="flex flex-1 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 focus-within:ring-2 focus-within:ring-blue-200">
-            <textarea value={comment} onChange={event => setComment(event.target.value)} disabled={!currentUser} placeholder={currentUser ? 'Escribe un comentario…' : 'Inicia sesión para comentar'} rows={1} className="min-h-9 flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none disabled:text-slate-400" />
-            <button type="submit" disabled={busy || !comment.trim() || !currentUser} className="rounded-xl bg-blue-600 px-4 text-xs font-black text-white disabled:bg-slate-300">Publicar</button>
+          <form onSubmit={sendComment} className="flex flex-1 items-end gap-1 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 focus-within:ring-2 focus-within:ring-blue-200">
+            <textarea ref={commentRef} value={comment} onChange={event => setComment(event.target.value)} disabled={!currentUser} placeholder={currentUser ? 'Escribe un comentario…' : 'Inicia sesión para comentar'} rows={1} className="min-h-9 flex-1 resize-none bg-transparent px-3 py-2 text-sm outline-none disabled:text-slate-400" />
+            <CommentEmojiPicker value={comment} onChange={setComment} textareaRef={commentRef} disabled={!currentUser || busy} />
+            <button type="submit" disabled={busy || !comment.trim() || !currentUser} className="h-10 rounded-xl bg-blue-600 px-4 text-xs font-black text-white disabled:bg-slate-300">Publicar</button>
           </form>
 
           <div className="mt-4 space-y-3">
