@@ -6,11 +6,20 @@ const STAFF_ROLES = ['admin', 'docente', 'coordinador', 'utp']
 
 type ActionName = 'submit' | 'start_review' | 'request_changes' | 'finalize' | 'evaluated' | 'rubric_published'
 
+const ALLOWED_STATES: Record<ActionName, string[]> = {
+  submit: ['draft', 'changes_requested'],
+  start_review: ['submitted'],
+  request_changes: ['submitted', 'in_review', 'evaluated'],
+  finalize: ['in_review', 'evaluated'],
+  evaluated: ['submitted', 'in_review', 'evaluated'],
+  rubric_published: ['draft', 'submitted', 'in_review', 'changes_requested', 'evaluated', 'finalized'],
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await request.json().catch(() => ({})) as { action?: ActionName; message?: string }
   const action = body.action
-  if (!action) return NextResponse.json({ error: 'Acción no válida' }, { status: 400 })
+  if (!action || !ALLOWED_STATES[action]) return NextResponse.json({ error: 'Acción no válida' }, { status: 400 })
 
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,6 +31,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     admin.from('profiles').select('role, full_name').eq('id', user.id).single(),
   ])
   if (!report) return NextResponse.json({ error: 'Informe no encontrado' }, { status: 404 })
+  if (!ALLOWED_STATES[action].includes(report.status)) {
+    return NextResponse.json({ error: `La acción no está disponible mientras el informe está en estado ${report.status}.` }, { status: 409 })
+  }
 
   const isLeader = report.created_by === user.id
   const isStaff = STAFF_ROLES.includes(profile?.role ?? '')
@@ -65,7 +77,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       message ||= `La evaluación de ${report.title} ya está disponible con su puntaje y nota final.`
     }
     if (action === 'rubric_published') {
-      status = report.status
       title = 'Rúbrica publicada'
       message ||= `Ya puedes revisar la rúbrica del informe ${report.title}.`
       if (report.course_id) {
@@ -91,9 +102,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       type: action === 'rubric_published' ? 'report_rubric' : 'project_report',
       source_type: 'report',
       source_id: id,
+      dedupe_key: `report:${action}:${id}:${userId}`,
       is_read: false,
+      read_at: null,
+      updated_at: now,
     }))
-    await admin.from('user_notifications').insert(notifications)
+    await admin.from('user_notifications').upsert(notifications, { onConflict: 'dedupe_key' })
   }
 
   return NextResponse.json({ ok: true, status })
