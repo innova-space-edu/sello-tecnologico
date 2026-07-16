@@ -28,14 +28,12 @@ as $$
       and (
         p.owner_id = auth.uid()
         or private.is_project_report_staff()
-        or (
-          p.course_id is not null
-          and exists (
-            select 1
-            from public.course_members cm
-            where cm.course_id = p.course_id
-              and cm.user_id = auth.uid()
-          )
+        or exists (
+          select 1
+          from public.project_collaborators pc
+          where pc.project_id = p.id
+            and pc.user_id = auth.uid()
+            and pc.status = 'accepted'
         )
       )
   );
@@ -67,7 +65,7 @@ grant usage on schema private to authenticated;
 grant execute on function private.can_create_report_for_project(uuid, uuid) to authenticated;
 grant execute on function private.is_report_course_member(uuid, uuid) to authenticated;
 
--- Solo quien pertenece al proyecto/curso puede iniciar el informe.
+-- Solo el propietario o un colaborador aceptado puede iniciar el informe.
 drop policy if exists reports_create_owner on public.project_reports;
 create policy reports_create_owner on public.project_reports
 for insert to authenticated
