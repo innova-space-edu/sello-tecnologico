@@ -85,11 +85,13 @@ using (
 );
 
 -- Permitir la fila inicial del jefe y luego solo editores del mismo curso.
+-- El equipo se puede modificar únicamente mientras el informe está editable.
 drop policy if exists report_members_manage_leader on public.project_report_members;
 create policy report_members_manage_leader on public.project_report_members
 for insert to authenticated
 with check (
   private.is_project_report_leader(report_id)
+  and private.can_edit_project_report(report_id)
   and added_by = auth.uid()
   and (
     (
@@ -102,6 +104,15 @@ with check (
       and private.is_report_course_member(report_id, user_id)
     )
   )
+);
+
+drop policy if exists report_members_delete_leader on public.project_report_members;
+create policy report_members_delete_leader on public.project_report_members
+for delete to authenticated
+using (
+  private.is_project_report_leader(report_id)
+  and private.can_edit_project_report(report_id)
+  and member_role <> 'leader'
 );
 
 -- Sincronizar altas y bajas de integrantes entre usuarios conectados.
