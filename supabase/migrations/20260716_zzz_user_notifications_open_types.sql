@@ -3,6 +3,8 @@
 
 begin;
 
+create extension if not exists pgcrypto;
+
 alter table if exists public.user_notifications
   drop constraint if exists user_notifications_type_check;
 
