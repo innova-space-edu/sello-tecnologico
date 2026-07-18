@@ -10,6 +10,12 @@ function NuevaEvidenciaForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const proyectoDesdeURL = searchParams.get('proyecto')
+  const steamPhase = searchParams.get('steam_phase')
+  const steamRequirement = searchParams.get('requirement')
+  const steamVersion = searchParams.get('version')
+  const requestedType = searchParams.get('type')
+  const requestedTitle = searchParams.get('title')
+  const returnTo = searchParams.get('returnTo')
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
@@ -41,11 +47,17 @@ function NuevaEvidenciaForm() {
         const lista = data ?? []
         setProyectos(lista)
         // Pre-seleccionar si viene por query param
-        if (proyectoDesdeURL) {
-          setForm(prev => ({ ...prev, project_id: proyectoDesdeURL }))
+        if (proyectoDesdeURL || requestedType || requestedTitle) {
+          setForm(prev => ({
+            ...prev,
+            project_id: proyectoDesdeURL ?? prev.project_id,
+            type: requestedType && TIPOS.includes(requestedType) ? requestedType : prev.type,
+            title: requestedTitle ?? prev.title,
+            evidencia_tipo: steamVersion === '2' ? 'final' : steamVersion === '1' ? 'intermedia' : prev.evidencia_tipo,
+          }))
         }
       })
-  }, [proyectoDesdeURL])
+  }, [proyectoDesdeURL, requestedTitle, requestedType, steamVersion])
 
   const proyectoSeleccionado = proyectos.find(p => p.id === form.project_id)
 
@@ -123,6 +135,9 @@ function NuevaEvidenciaForm() {
       herramienta_usada: form.herramienta_usada || null,
       uso_ia: form.uso_ia || null,
       evidencia_tipo: form.evidencia_tipo,
+      steam_phase_key: steamPhase || null,
+      steam_requirement_key: steamRequirement || null,
+      steam_version_number: steamVersion ? Number(steamVersion) : null,
     })
 
     if (insertError) {
@@ -132,7 +147,7 @@ function NuevaEvidenciaForm() {
     }
 
     setUploadProgress(100)
-    router.push('/evidencias')
+    router.push(returnTo || '/evidencias')
   }
 
   const formatSize = (bytes: number) => {
@@ -149,6 +164,11 @@ function NuevaEvidenciaForm() {
           <button onClick={() => router.push('/evidencias')} className="text-blue-600 text-sm hover:underline">← Volver</button>
           <h1 className="text-2xl font-bold text-blue-900 mt-2">Nueva Evidencia</h1>
           <p className="text-gray-500 mt-1">Sube archivos, imágenes o videos como evidencia de aprendizaje</p>
+          {steamPhase && (
+            <div className="mt-3 w-fit rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700">
+              🚀 Evidencia vinculada a la ruta STEAM{steamVersion ? ` · versión ${steamVersion}` : ''}
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
@@ -347,7 +367,7 @@ function NuevaEvidenciaForm() {
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-xl transition-colors disabled:opacity-50">
               {loading ? 'Guardando...' : '💾 Guardar evidencia'}
             </button>
-            <button type="button" onClick={() => router.push('/evidencias')}
+            <button type="button" onClick={() => router.push(returnTo || '/evidencias')}
               className="border border-gray-300 text-gray-600 px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors">
               Cancelar
             </button>

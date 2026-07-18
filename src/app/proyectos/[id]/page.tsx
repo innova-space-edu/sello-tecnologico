@@ -206,6 +206,12 @@ export default async function ProyectoDetallePage({ params }: { params: Promise<
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              {proyecto.steam_template_slug && (
+                <Link href={`/proyectos/${proyecto.id}/steam`}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm shrink-0">
+                  🚀 Continuar ruta STEAM
+                </Link>
+              )}
               <ExportProyectoPDF
                 proyecto={proyecto}
                 evidencias={evidencias ?? []}

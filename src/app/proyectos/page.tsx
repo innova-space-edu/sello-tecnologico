@@ -219,7 +219,10 @@ export default function ProyectosPage() {
               </span>
             </p>
           </div>
-          <Link href="/proyectos/nuevo" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">+ Nuevo proyecto</Link>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link href="/proyectos/steam" className="bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-700 hover:to-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm shadow-sm">🚀 Crear proyecto STEAM</Link>
+            <Link href="/proyectos/nuevo" className="bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm">+ Proyecto libre</Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -298,7 +301,7 @@ export default function ProyectosPage() {
         </div>
 
         {proyectos.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center"><div className="text-5xl mb-4">🗂️</div><h3 className="text-lg font-semibold text-gray-700">No hay proyectos aún</h3><Link href="/proyectos/nuevo" className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors">+ Crear proyecto</Link></div>
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center"><div className="text-5xl mb-4">🗂️</div><h3 className="text-lg font-semibold text-gray-700">No hay proyectos aún</h3><div className="mt-4 flex flex-wrap justify-center gap-2"><Link href="/proyectos/steam" className="inline-block bg-gradient-to-r from-violet-600 to-blue-600 text-white font-semibold px-5 py-2.5 rounded-xl">🚀 Crear proyecto STEAM</Link><Link href="/proyectos/nuevo" className="inline-block border border-blue-200 text-blue-700 font-semibold px-5 py-2.5 rounded-xl">Proyecto libre</Link></div></div>
         ) : proyectosFiltrados.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm p-8 text-center"><div className="text-4xl mb-3">🔍</div><h3 className="text-base font-semibold text-gray-600">Sin resultados</h3><button onClick={() => { setBusqueda(''); setFiltroEstado('Todos') }} className="text-sm text-blue-600 hover:underline mt-2">Limpiar búsqueda</button></div>
         ) : (
@@ -322,7 +325,7 @@ export default function ProyectosPage() {
                             const puedeCambiarEsteProyecto = puedeGestionar || p.owner_id === userId
                             return (
                               <tr key={p.id} className="hover:bg-blue-50/50 transition-colors">
-                                <td className="px-5 py-3.5"><div className="flex flex-col gap-0.5"><Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline">{p.title}</Link>{p.is_draft && <span className="text-xs text-orange-500 font-medium">📋 Borrador sincronizado</span>}</div></td>
+                                <td className="px-5 py-3.5"><div className="flex flex-col gap-0.5"><Link href={`/proyectos/${p.id}`} className="font-medium text-blue-700 hover:underline">{p.title}</Link>{p.steam_template_slug && <span className="w-fit rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700">🚀 Ruta STEAM</span>}{p.is_draft && <span className="text-xs text-orange-500 font-medium">📋 Borrador sincronizado</span>}</div></td>
                                 {!esEstudiante && <td className="px-5 py-3.5 text-gray-500 text-xs">{p.profiles?.full_name ?? '—'}</td>}
                                 <td className="px-5 py-3.5 min-w-[190px]">
                                   {puedeCambiarEsteProyecto ? (
@@ -342,7 +345,7 @@ export default function ProyectosPage() {
                                   )}
                                 </td>
                                 <td className="px-5 py-3.5 text-gray-400 text-xs">{p.last_autosave_at ? new Date(p.last_autosave_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : (p.start_date ?? '—')}</td>
-                                <td className="px-5 py-3.5"><div className="flex flex-wrap items-center gap-1.5"><Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
+                                <td className="px-5 py-3.5"><div className="flex flex-wrap items-center gap-1.5">{p.steam_template_slug && <Link href={`/proyectos/${p.id}/steam`} className="text-violet-700 hover:bg-violet-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-bold border border-violet-200">🚀 Continuar</Link>}<Link href={`/proyectos/${p.id}`} className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium">👁️ Ver</Link>{(p.owner_id === userId || puedeEliminar) && <Link href={`/proyectos/${p.id}/editar`} className="text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-blue-200">✏️ Editar</Link>}{(p.owner_id === userId || puedeEliminar) && <button onClick={() => handleDelete(p.id, p.title)} className="text-red-500 hover:bg-red-50 px-2 py-1.5 rounded-lg transition-colors text-xs font-medium border border-red-200">🗑️</button>}</div></td>
                               </tr>
                             )
                           })}
