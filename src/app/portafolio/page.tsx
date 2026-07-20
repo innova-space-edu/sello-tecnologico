@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 import Sidebar from '@/components/Sidebar'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
@@ -17,7 +18,7 @@ const etapaIcon: Record<string, string> = {
 }
 
 export default function PortafolioPage() {
-  const supabase = createClient()
+  const [supabase] = useState(() => createClient())
   const [perfil, setPerfil] = useState<any>(null)
   const [rol, setRol] = useState('')
   const [todosPortafolios, setTodosPortafolios] = useState<any[]>([])
@@ -121,7 +122,7 @@ export default function PortafolioPage() {
       setLoading(false)
     }
     init()
-  }, [])
+  }, [supabase])
 
   const handleSave = async () => {
     if (!portafolio) return
@@ -157,7 +158,7 @@ export default function PortafolioPage() {
   if (loading) return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="lg:ml-64 flex-1 p-8 pt-16 lg:pt-8 flex items-center justify-center">
+      <main className="flex flex-1 items-center justify-center p-8 pt-16 lg:pt-8">
         <p className="text-gray-400">Cargando portafolio...</p>
       </main>
     </div>
@@ -166,7 +167,7 @@ export default function PortafolioPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
+      <main className="flex-1 p-4 pt-16 lg:p-8 lg:pt-8">
 
         {/* Vista admin/docente: lista de portafolios agrupados por curso */}
         {['admin', 'docente', 'coordinador'].includes(rol) && todosPortafolios.length > 0 && (() => {
@@ -231,48 +232,37 @@ export default function PortafolioPage() {
           )
         })()}
 
-        {/* Header */}
-        <div className="mb-6 flex justify-between items-start flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-900">📂 Portafolio Tecnológico</h1>
-            <p className="text-gray-500 mt-1 text-sm">
-              {perfil?.full_name ?? perfil?.email} · Año {new Date().getFullYear()}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/portafolio/feria"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors text-sm">
-              🎪 Modo Feria
-            </Link>
-            <div className="flex items-center gap-2">
-              <ExportPortafolioPDF
-                portafolio={portafolio}
-                estudiante={perfil}
-                evidencias={evidencias}
-                proyectos={proyectos}
-                secciones={portfolioSections}
-              />
-              <button onClick={handleSave} disabled={saving}
-                className="bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm disabled:opacity-50">
-                {saving ? 'Guardando...' : saved ? '✅ Guardado' : '💾 Guardar'}
-              </button>
+        {/* Portada visual del portafolio editable */}
+        <header className="relative mb-6 overflow-hidden rounded-[32px] bg-slate-950 px-6 py-7 text-white shadow-2xl shadow-violet-200/40 sm:px-8">
+          <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-fuchsia-500/35 blur-3xl" />
+          <div className="absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="relative flex flex-wrap items-start justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400 to-fuchsia-500 text-2xl font-black shadow-lg">{perfil?.full_name?.[0]?.toUpperCase() ?? '?'}</div>
+              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200">Mi espacio creativo · {new Date().getFullYear()}</p><h1 className="mt-1 text-2xl font-black sm:text-3xl">Portafolio de {perfil?.full_name ?? perfil?.email}</h1><p className="mt-1 text-sm text-slate-300">Organiza tu historia, presenta tus proyectos y muestra cómo has mejorado.</p></div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/portafolio/feria" className="rounded-full bg-white/10 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/15 transition hover:bg-white/20">🎪 Modo Feria</Link>
+              <ExportPortafolioPDF portafolio={portafolio} estudiante={perfil} evidencias={evidencias} proyectos={proyectos} secciones={portfolioSections} />
+              <button onClick={handleSave} disabled={saving} className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-emerald-400 disabled:opacity-50">{saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}</button>
             </div>
           </div>
-        </div>
+          <div className="relative mt-6 grid grid-cols-3 gap-3 sm:max-w-lg"><div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p className="text-2xl font-black">{proyectos.length}</p><p className="text-[10px] text-slate-300">Proyectos</p></div><div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p className="text-2xl font-black">{evidencias.length}</p><p className="text-[10px] text-slate-300">Evidencias</p></div><div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p className="text-2xl font-black">{portfolioSections.length}</p><p className="text-[10px] text-slate-300">Secciones propias</p></div></div>
+        </header>
 
         {/* Tabs */}
-        <div className="flex gap-1 flex-wrap mb-6">
+        <div className="mb-6 flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200">
           {TABS.map((t, i) => (
             <button key={i} onClick={() => setTab(i)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                tab === i ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 hover:bg-blue-50 border border-gray-200'
+              className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${
+                tab === i ? 'bg-slate-950 text-white shadow-md' : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'
               }`}>
-              {t}
+              <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-[10px] ${tab === i ? 'bg-white/15' : 'bg-slate-100'}`}>{i + 1}</span>{t.replace(/^[A-G]\.\s*/, '')}
             </button>
           ))}
         </div>
 
-        <div className="max-w-3xl space-y-4">
+        <div className="max-w-5xl space-y-4">
 
           {/* A — Información */}
           {tab === 0 && (
@@ -417,7 +407,7 @@ export default function PortafolioPage() {
                             {ev.drive_url && <span className="text-xs text-blue-600">🔗 Drive</span>}
                           </div>
                           {ev.reflexion_aprendizaje && (
-                            <p className="text-xs text-gray-500 mt-1 line-clamp-1 italic">"{ev.reflexion_aprendizaje}"</p>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-1 italic">“{ev.reflexion_aprendizaje}”</p>
                           )}
                         </div>
                         <p className="text-xs text-gray-400 shrink-0">
@@ -528,7 +518,7 @@ export default function PortafolioPage() {
                           <Link key={ev.id} href={`/evidencias/${ev.id}`}
                             className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition-colors">
                             {ev.file_url && ev.file_type?.startsWith('image/') ? (
-                              <img src={ev.file_url} className="w-10 h-10 rounded object-cover shrink-0" />
+                              <img src={ev.file_url} alt={ev.title} className="w-10 h-10 rounded object-cover shrink-0" />
                             ) : (
                               <div className="w-10 h-10 bg-yellow-100 rounded flex items-center justify-center text-lg shrink-0">📎</div>
                             )}
@@ -559,7 +549,7 @@ export default function PortafolioPage() {
                           <Link key={ev.id} href={`/evidencias/${ev.id}`}
                             className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
                             {ev.file_url && ev.file_type?.startsWith('image/') ? (
-                              <img src={ev.file_url} className="w-10 h-10 rounded object-cover shrink-0" />
+                              <img src={ev.file_url} alt={ev.title} className="w-10 h-10 rounded object-cover shrink-0" />
                             ) : (
                               <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center text-lg shrink-0">📎</div>
                             )}
@@ -590,7 +580,7 @@ export default function PortafolioPage() {
                           <Link key={ev.id} href={`/evidencias/${ev.id}`}
                             className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
                             {ev.file_url && ev.file_type?.startsWith('image/') ? (
-                              <img src={ev.file_url} className="w-10 h-10 rounded object-cover shrink-0" />
+                              <img src={ev.file_url} alt={ev.title} className="w-10 h-10 rounded object-cover shrink-0" />
                             ) : (
                               <div className="w-10 h-10 bg-green-100 rounded flex items-center justify-center text-lg shrink-0">📎</div>
                             )}

@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Sidebar from '@/components/Sidebar'
 import PrintProjectPortfolioButton from '@/components/PrintProjectPortfolioButton'
+import PortfolioValue, { PortfolioAction, PortfolioEmpty, PortfolioField, hasPortfolioContent } from '@/components/portafolio/PortfolioValue'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getSurveyActor } from '@/lib/survey-auth'
 import Link from 'next/link'
@@ -39,36 +41,25 @@ const PROJECT_SECTIONS = [
   { title: '7. Configuración STEAM', keys: ['steam_template_slug', 'steam_route', 'steam_mode', 'steam_level'] },
 ]
 
-function isEmpty(value: unknown) {
-  return value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0)
-}
-
 function humanize(key: string) {
   return LABELS[key] ?? key.replaceAll('_', ' ').replace(/^./, letter => letter.toUpperCase())
 }
 
-function DisplayValue({ value }: { value: unknown }) {
-  if (isEmpty(value)) return <span className="text-gray-400">Sin información</span>
-  if (typeof value === 'boolean') return <span>{value ? 'Sí' : 'No'}</span>
-  if (Array.isArray(value)) return <div className="flex flex-wrap gap-1.5">{value.map((item, index) => <span key={index} className="rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-700">{typeof item === 'object' ? JSON.stringify(item) : String(item)}</span>)}</div>
-  if (typeof value === 'object') return <pre className="overflow-x-auto whitespace-pre-wrap font-sans text-sm">{JSON.stringify(value, null, 2)}</pre>
-  const text = String(value)
-  if (/^https?:\/\//.test(text)) return <a className="break-all text-blue-600 underline" href={text} target="_blank" rel="noreferrer">{text}</a>
-  return <p className="whitespace-pre-wrap break-words">{text}</p>
+const TONES = {
+  violet: 'from-violet-600 to-fuchsia-500 bg-violet-50 text-violet-700',
+  blue: 'from-blue-600 to-cyan-500 bg-blue-50 text-blue-700',
+  emerald: 'from-emerald-600 to-teal-500 bg-emerald-50 text-emerald-700',
+  amber: 'from-amber-500 to-orange-500 bg-amber-50 text-amber-700',
+  rose: 'from-rose-600 to-pink-500 bg-rose-50 text-rose-700',
+} as const
+
+function Section({ id, icon, eyebrow, title, count, tone = 'violet', children }: { id: string; icon: string; eyebrow: string; title: string; count?: number; tone?: keyof typeof TONES; children: React.ReactNode }) {
+  return <section id={id} className="scroll-mt-28 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_60px_-35px_rgba(15,23,42,0.35)] print:break-inside-avoid"><div className={`h-1.5 bg-gradient-to-r ${TONES[tone].split(' ').slice(0, 2).join(' ')}`} /><div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5 sm:px-7"><div className="flex gap-3"><span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl ${TONES[tone].split(' ').slice(2).join(' ')}`}>{icon}</span><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">{eyebrow}</p><h2 className="mt-1 text-lg font-black text-slate-900 sm:text-xl">{title}</h2></div></div>{count !== undefined && <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{count}</span>}</div><div className="space-y-5 p-5 sm:p-7">{children}</div></section>
 }
 
-function Field({ label, value }: { label: string; value: unknown }) {
-  if (isEmpty(value)) return null
-  return <div className="rounded-xl border border-gray-100 bg-gray-50 p-4"><p className="mb-1 text-xs font-bold uppercase tracking-wide text-gray-400">{label}</p><div className="text-sm leading-relaxed text-gray-700"><DisplayValue value={value} /></div></div>
-}
-
-function Section({ id, icon, title, count, children }: { id: string; icon: string; title: string; count?: number; children: React.ReactNode }) {
-  return <section id={id} className="scroll-mt-24 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-100 print:break-inside-avoid"><div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 lg:px-6"><h2 className="font-bold text-blue-950">{icon} {title}</h2>{count !== undefined && <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{count}</span>}</div><div className="space-y-4 p-5 lg:p-6">{children}</div></section>
-}
-
-function AnswerValue({ answer }: { answer: any }) {
-  const value = answer?.value_json ?? answer?.value_number ?? answer?.value_text
-  return <DisplayValue value={value} />
+function dateLabel(value?: string | null) {
+  if (!value) return 'Sin fecha'
+  return new Date(value).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 export default async function ProjectPortfolioPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SearchParams }) {
@@ -123,59 +114,107 @@ export default async function ProjectPortfolioPage({ params, searchParams }: { p
   }
 
   const usedProjectKeys = new Set(PROJECT_SECTIONS.flatMap(section => section.keys))
-  const extraProjectFields = Object.entries(project).filter(([key, value]) => !SYSTEM_FIELDS.has(key) && !usedProjectKeys.has(key) && !isEmpty(value))
-  const moduleCounts = [evidences?.length ?? 0, followups?.length ?? 0, surveyResponses?.length ?? 0, selfEvaluations?.length ?? 0, publicPages?.length ?? 0, report ? 1 : 0]
+  const extraProjectFields = Object.entries(project).filter(([key, value]) => !SYSTEM_FIELDS.has(key) && !usedProjectKeys.has(key) && hasPortfolioContent(value))
+  const moduleCounts = [workspace ? 1 : 0, evidences?.length ?? 0, followups?.length ?? 0, surveyResponses?.length ?? 0, selfEvaluations?.length ?? 0, publicPages?.length ?? 0, report ? 1 : 0]
   const completedModules = moduleCounts.filter(count => count > 0).length + 1
+  const progress = Math.round((completedModules / 8) * 100)
+  const navItems = [
+    ['formulario', '📝', 'Plantilla'], ['steam', '🚀', 'Ruta STEAM'], ['evidencias', '📎', 'Evidencias'],
+    ['seguimientos', '📈', 'Seguimiento'], ['encuestas', '🗳️', 'Encuestas'], ['autoevaluacion', '🪞', 'Autoevaluación'],
+    ['pagina', '🌐', 'Página web'], ['informe', '📄', 'Informe'],
+  ]
 
-  return <div className="flex min-h-screen bg-gray-50 print:block print:bg-white"><div className="print:hidden"><Sidebar /></div><main className="min-w-0 flex-1 p-4 pt-16 lg:ml-64 lg:p-8 lg:pt-8 print:m-0 print:p-0">
-    <div className="mx-auto max-w-6xl space-y-5">
-      <div className="print:hidden"><Link href={query.portafolio ? `/portafolio/${query.portafolio}` : '/portafolio'} className="text-sm text-blue-600 hover:underline">← Volver al portafolio</Link></div>
-      <header className="rounded-2xl bg-gradient-to-r from-blue-950 via-blue-800 to-indigo-700 p-6 text-white print:bg-blue-900">
-        <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-200">Expediente automático completo</p><h1 className="mt-2 text-2xl font-bold lg:text-3xl">{project.title}</h1><p className="mt-2 text-sm text-blue-100">{targetProfile.full_name ?? targetProfile.email} · {targetProfile.curso ?? project.courses?.name ?? 'Sin curso'}</p></div><PrintProjectPortfolioButton /></div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-xl bg-white/10 p-3"><p className="text-2xl font-bold">{completedModules}/7</p><p className="text-xs text-blue-100">Módulos reunidos</p></div><div className="rounded-xl bg-white/10 p-3"><p className="text-2xl font-bold">{evidences?.length ?? 0}</p><p className="text-xs text-blue-100">Evidencias</p></div><div className="rounded-xl bg-white/10 p-3"><p className="text-2xl font-bold">{followups?.length ?? 0}</p><p className="text-xs text-blue-100">Seguimientos</p></div><div className="rounded-xl bg-white/10 p-3"><p className="text-2xl font-bold">{project.status ?? '—'}</p><p className="text-xs text-blue-100">Estado actual</p></div></div>
-      </header>
+  return <div className="flex min-h-screen bg-[#f5f6fb] print:block print:bg-white">
+    <div className="print:hidden"><Sidebar /></div>
+    <main className="min-w-0 flex-1 px-3 pb-14 pt-16 sm:px-5 lg:px-8 lg:pt-7 print:m-0 print:p-0">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
+          <Link href={query.portafolio ? `/portafolio/${query.portafolio}` : '/portafolio'} className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-violet-700">← Volver al portafolio</Link>
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200">Actualización automática</span>
+        </div>
 
-      <nav className="print:hidden flex gap-2 overflow-x-auto rounded-xl bg-white p-3 text-xs font-semibold shadow-sm">{[['formulario','Plantilla'],['steam','Ruta STEAM'],['evidencias','Evidencias'],['seguimientos','Seguimiento'],['encuestas','Encuestas'],['autoevaluacion','Autoevaluación'],['pagina','Página web'],['informe','Informe']].map(([anchor, label]) => <a key={anchor} href={`#${anchor}`} className="whitespace-nowrap rounded-lg bg-gray-50 px-3 py-2 text-blue-700 hover:bg-blue-50">{label}</a>)}</nav>
+        <header className="relative overflow-hidden rounded-[32px] bg-slate-950 px-6 py-7 text-white shadow-2xl shadow-violet-200/40 sm:px-9 sm:py-9 print:rounded-none print:bg-slate-900">
+          <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-fuchsia-500/35 blur-3xl" />
+          <div className="absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-cyan-400/25 blur-3xl" />
+          <div className="relative flex flex-wrap items-start justify-between gap-6">
+            <div className="max-w-3xl">
+              <div className="flex flex-wrap gap-2"><span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-violet-100 ring-1 ring-white/15">Portafolio vivo</span><span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-200 ring-1 ring-emerald-300/20">{project.status ?? 'En construcción'}</span></div>
+              <h1 className="mt-5 text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">{project.title}</h1>
+              <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">Una historia completa del proceso: desde la idea inicial hasta el resultado, la evaluación y las mejoras.</p>
+              <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold text-slate-200"><span className="rounded-full bg-white/10 px-3 py-2">👤 {targetProfile.full_name ?? targetProfile.email}</span><span className="rounded-full bg-white/10 px-3 py-2">🎓 {targetProfile.curso ?? project.courses?.name ?? 'Sin curso'}</span>{project.tipo_proyecto && <span className="rounded-full bg-white/10 px-3 py-2">✨ {project.tipo_proyecto}</span>}</div>
+            </div>
+            <PrintProjectPortfolioButton />
+          </div>
+          <div className="relative mt-8 grid gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{progress}%</p><p className="mt-1 text-xs text-slate-300">Portafolio reunido</p></div>
+            <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{completedModules}/8</p><p className="mt-1 text-xs text-slate-300">Módulos con contenido</p></div>
+            <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{evidences?.length ?? 0}</p><p className="mt-1 text-xs text-slate-300">Evidencias registradas</p></div>
+            <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{followups?.length ?? 0}</p><p className="mt-1 text-xs text-slate-300">Hitos de seguimiento</p></div>
+          </div>
+          <div className="relative mt-5 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-300" style={{ width: `${progress}%` }} /></div>
+        </header>
 
-      <Section id="formulario" icon="📝" title="Plantilla inicial completa">
-        <p className="text-sm text-gray-500">Se muestra todo el formulario guardado, sin resumir ni recortar respuestas.</p>
-        {PROJECT_SECTIONS.map(section => {
-          const fields = section.keys.filter(key => !isEmpty(project[key]))
-          if (!fields.length) return null
-          return <details open key={section.title} className="rounded-xl border border-gray-200 p-4"><summary className="cursor-pointer font-bold text-blue-900">{section.title}</summary><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">{fields.map(key => <Field key={key} label={humanize(key)} value={project[key]} />)}</div></details>
-        })}
-        {extraProjectFields.length > 0 && <details open className="rounded-xl border border-gray-200 p-4"><summary className="cursor-pointer font-bold text-blue-900">8. Otros datos registrados</summary><div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">{extraProjectFields.map(([key, value]) => <Field key={key} label={humanize(key)} value={value} />)}</div></details>}
-      </Section>
+        <div className="mt-6 grid items-start gap-6 xl:grid-cols-[230px_minmax(0,1fr)]">
+          <aside className="sticky top-5 hidden rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-200 xl:block print:hidden">
+            <p className="px-3 pb-2 pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Recorrido del proyecto</p>
+            <nav className="space-y-1">{navItems.map(([anchor, icon, label], index) => <a key={anchor} href={`#${anchor}`} className="group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-slate-600 transition hover:bg-violet-50 hover:text-violet-700"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 group-hover:bg-white">{icon}</span><span className="flex-1">{label}</span><span className="text-[10px] text-slate-300">{String(index + 1).padStart(2, '0')}</span></a>)}</nav>
+          </aside>
 
-      <Section id="steam" icon="🚀" title="Ruta, fases y prototipos STEAM" count={workspace ? 1 : 0}>
-        {!workspace ? <p className="text-sm text-gray-400">Este proyecto no utiliza una ruta guiada STEAM.</p> : <><div className="grid grid-cols-2 gap-3 md:grid-cols-4"><Field label="Plantilla" value={workspace.template_slug} /><Field label="Ruta" value={workspace.route_type} /><Field label="Fase actual" value={workspace.current_phase} /><Field label="Progreso" value={`${workspace.progress_percent}%`} /></div><div className="space-y-3">{(workspace.steam_phase_entries ?? []).sort((a:any,b:any)=>a.phase_number-b.phase_number).map((phase:any) => <details open key={phase.id} className="rounded-xl border p-4"><summary className="font-bold text-blue-900">Fase {phase.phase_number}: {phase.phase_key} · {phase.status}</summary><div className="mt-3 grid gap-3"><Field label="Formulario completo" value={phase.content} /><Field label="Reflexión del estudiante" value={phase.student_reflection} /><Field label="Retroalimentación docente" value={phase.teacher_feedback} /></div></details>)}</div><Field label="Bitácora completa" value={workspace.steam_journal_entries} /><Field label="Versiones de prototipo" value={workspace.steam_prototype_versions} /><Field label="Pruebas realizadas" value={workspace.steam_project_tests} /></>}
-      </Section>
+          <div className="min-w-0 space-y-6">
+            <nav className="flex gap-2 overflow-x-auto rounded-2xl bg-white p-2 shadow-sm ring-1 ring-slate-200 xl:hidden print:hidden">{navItems.map(([anchor, icon, label]) => <a key={anchor} href={`#${anchor}`} className="whitespace-nowrap rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700">{icon} {label}</a>)}</nav>
 
-      <Section id="evidencias" icon="📎" title="Evidencias y reflexiones" count={evidences?.length ?? 0}>
-        {!evidences?.length ? <p className="text-sm text-gray-400">Sin evidencias.</p> : evidences.map((ev:any) => <article key={ev.id} className="rounded-xl border border-gray-200 p-4"><div className="flex flex-wrap justify-between gap-2"><div><h3 className="font-bold text-gray-800">{ev.title}</h3><p className="text-xs text-gray-400">{ev.evidencia_tipo ?? ev.type ?? 'Evidencia'} · {new Date(ev.created_at).toLocaleString('es-CL')} · {ev.profiles?.full_name ?? 'Autor no indicado'}</p></div><Link href={`/evidencias/${ev.id}`} className="print:hidden text-sm font-semibold text-blue-600">Abrir original →</Link></div><div className="mt-3 grid gap-3 md:grid-cols-2">{Object.entries(ev).filter(([key,value]) => !['id','project_id','created_by','profiles','created_at','updated_at'].includes(key) && !isEmpty(value)).map(([key,value]) => <Field key={key} label={humanize(key)} value={value} />)}</div></article>)}
-      </Section>
+            <Section id="formulario" icon="📝" eyebrow="Capítulo 01" title="Idea y planificación inicial" tone="violet">
+              <p className="max-w-3xl text-sm leading-6 text-slate-500">Aquí está la plantilla completa que dio origen al proyecto. Los apartados vacíos se ocultan para que la lectura sea clara.</p>
+              <div className="space-y-4">{PROJECT_SECTIONS.map((section, sectionIndex) => {
+                const fields = section.keys.filter(key => hasPortfolioContent(project[key]))
+                if (!fields.length) return null
+                return <details open key={section.title} className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60"><summary className="cursor-pointer list-none px-5 py-4 font-black text-slate-800 marker:hidden"><span className="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white text-xs text-violet-700 shadow-sm">{sectionIndex + 1}</span>{section.title.replace(/^\d+\.\s*/, '')}<span className="float-right text-slate-300 group-open:rotate-180">⌄</span></summary><div className="grid gap-3 border-t border-slate-200 bg-white p-4 md:grid-cols-2">{fields.map(key => <PortfolioField key={key} label={humanize(key)} value={project[key]} accent={sectionIndex % 2 ? 'blue' : 'violet'} />)}</div></details>
+              })}</div>
+              {extraProjectFields.length > 0 && <details className="rounded-2xl border border-slate-200"><summary className="cursor-pointer px-5 py-4 font-black text-slate-700">Otros datos registrados</summary><div className="grid gap-3 border-t p-4 md:grid-cols-2">{extraProjectFields.map(([key, value]) => <PortfolioField key={key} label={humanize(key)} value={value} />)}</div></details>}
+            </Section>
 
-      <Section id="seguimientos" icon="📈" title="Seguimiento del proyecto" count={followups?.length ?? 0}>
-        {!followups?.length ? <p className="text-sm text-gray-400">Sin seguimientos asociados a este estudiante.</p> : followups.map((follow:any) => <article key={follow.id} className="rounded-xl border border-gray-200 p-4"><div className="flex justify-between gap-3"><div><h3 className="font-bold text-gray-800">{follow.subject ?? 'Sesión de seguimiento'}</h3><p className="text-xs text-gray-400">{follow.followup_date} · {follow.overall_status ?? 'Sin estado'} · Docente: {follow.teacher?.full_name ?? '—'}</p></div><Link href={`/seguimientos/${follow.id}`} className="print:hidden text-sm font-semibold text-blue-600">Abrir original →</Link></div><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Observaciones" value={follow.observations} /><Field label="Retroalimentación" value={follow.feedback} /><Field label="Puntaje global" value={follow.score} /><Field label="Compromiso o ticket" value={follow.ticket} /></div><Field label="Criterios evaluados" value={follow.followup_items} /><Field label="Participantes" value={(follow.followup_participants ?? []).map((p:any)=>p.profiles?.full_name ?? p.user_id)} /><Field label="Evidencias fotográficas" value={follow.followup_photos} /></article>)}
-      </Section>
+            <Section id="steam" icon="🚀" eyebrow="Capítulo 02" title="Ruta STEAM, prototipos y pruebas" count={workspace ? 1 : 0} tone="blue">
+              {!workspace ? <PortfolioEmpty icon="🚀" title="Ruta STEAM aún no iniciada" description="Cuando el equipo comience una ruta guiada, sus fases, bitácora, prototipos y pruebas aparecerán aquí." /> : <>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><PortfolioField label="Plantilla" value={workspace.template_slug} accent="blue" /><PortfolioField label="Ruta" value={workspace.route_type} accent="blue" /><PortfolioField label="Fase actual" value={workspace.current_phase} accent="blue" /><PortfolioField label="Progreso" value={`${workspace.progress_percent ?? 0}%`} accent="blue" /></div>
+                <div className="space-y-3">{(workspace.steam_phase_entries ?? []).sort((a:any,b:any)=>a.phase_number-b.phase_number).map((phase:any) => <details open={phase.status === 'completed' || phase.status === 'in_progress'} key={phase.id} className="overflow-hidden rounded-2xl border border-blue-100"><summary className="cursor-pointer bg-blue-50 px-5 py-4 font-black text-blue-950"><span className="mr-3 rounded-full bg-blue-600 px-2.5 py-1 text-xs text-white">Fase {phase.phase_number}</span>{humanize(phase.phase_key)} <span className="float-right text-xs font-bold text-blue-500">{humanize(phase.status ?? 'pendiente')}</span></summary><div className="grid gap-3 p-4"><PortfolioField label="Trabajo realizado" value={phase.content} accent="blue" /><PortfolioField label="Reflexión del estudiante" value={phase.student_reflection} accent="emerald" /><PortfolioField label="Retroalimentación docente" value={phase.teacher_feedback} accent="amber" /></div></details>)}</div>
+                <div className="grid gap-4 lg:grid-cols-3"><PortfolioField label="Bitácora del equipo" value={workspace.steam_journal_entries} accent="blue" /><PortfolioField label="Versiones del prototipo" value={workspace.steam_prototype_versions} accent="violet" /><PortfolioField label="Pruebas realizadas" value={workspace.steam_project_tests} accent="emerald" /></div>
+              </>}
+            </Section>
 
-      <Section id="encuestas" icon="🗳️" title="Encuestas y respuestas personales" count={surveyResponses?.length ?? 0}>
-        {!surveyResponses?.length ? <p className="text-sm text-gray-400">Sin respuestas de encuesta vinculadas.</p> : surveyResponses.map((response:any) => { const survey = Array.isArray(response.surveys) ? response.surveys[0] : response.surveys; const questions = survey?.survey_questions ?? []; const questionMap = new Map(questions.map((q:any)=>[q.id,q])); return <article key={response.id} className="rounded-xl border border-gray-200 p-4"><h3 className="font-bold text-gray-800">{survey?.title ?? 'Encuesta'}</h3><p className="mt-1 text-sm text-gray-500">{survey?.description}</p><div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4"><Field label="Puntaje" value={response.earned_points} /><Field label="Máximo" value={response.max_points} /><Field label="Logro" value={response.achievement_percent == null ? null : `${response.achievement_percent}%`} /><Field label="Nota" value={response.grade} /></div><Field label="Retroalimentación docente" value={response.feedback} /><div className="mt-3 space-y-2">{(response.survey_answers ?? []).map((answer:any) => <div key={answer.id} className="rounded-lg bg-gray-50 p-3"><p className="text-sm font-semibold text-gray-700">{(questionMap.get(answer.question_id) as any)?.prompt ?? 'Pregunta'}</p><div className="mt-1 text-sm text-gray-600"><AnswerValue answer={answer} /></div></div>)}</div></article> })}
-      </Section>
+            <Section id="evidencias" icon="📎" eyebrow="Capítulo 03" title="Galería de evidencias y aprendizajes" count={evidences?.length ?? 0} tone="emerald">
+              {!evidences?.length ? <PortfolioEmpty icon="📎" title="Todavía no hay evidencias" description="Las fotografías, videos, documentos, enlaces y reflexiones del proyecto se reunirán automáticamente aquí." /> : <div className="grid gap-4 lg:grid-cols-2">{evidences.map((ev:any) => <article key={ev.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"><div className="flex items-start justify-between gap-3 bg-gradient-to-br from-emerald-50 to-cyan-50 p-5"><div><span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 shadow-sm">{ev.evidencia_tipo ?? ev.type ?? 'Evidencia'}</span><h3 className="mt-3 text-lg font-black text-slate-900">{ev.title}</h3><p className="mt-1 text-xs text-slate-500">{dateLabel(ev.created_at)} · {ev.profiles?.full_name ?? 'Autor no indicado'}</p></div><PortfolioAction href={`/evidencias/${ev.id}`}>Abrir →</PortfolioAction></div><div className="space-y-3 p-5"><PortfolioValue value={ev.file_url ?? ev.drive_url} emptyLabel="Sin archivo adjunto" /><PortfolioField label="Descripción" value={ev.description} accent="emerald" /><PortfolioField label="Lo que aprendí" value={ev.reflexion_aprendizaje} accent="emerald" /><PortfolioField label="Dificultad y solución" value={[ev.dificultad, ev.como_resolvi].filter(Boolean)} accent="amber" /></div></article>)}</div>}
+            </Section>
 
-      <Section id="autoevaluacion" icon="🪞" title="Autoevaluación completa" count={selfEvaluations?.length ?? 0}>
-        {!selfEvaluations?.length ? <p className="text-sm text-gray-400">Sin autoevaluaciones vinculadas.</p> : selfEvaluations.map((evaluation:any) => { const format = Array.isArray(evaluation.self_evaluation_formats) ? evaluation.self_evaluation_formats[0] : evaluation.self_evaluation_formats; const questions = Array.isArray(format?.questions) ? format.questions : []; const answers = evaluation.answers ?? {}; return <article key={evaluation.id} className="rounded-xl border border-gray-200 p-4"><div className="flex justify-between gap-3"><div><h3 className="font-bold text-gray-800">{format?.title ?? 'Autoevaluación'}</h3><p className="text-xs text-gray-400">{new Date(evaluation.created_at).toLocaleString('es-CL')} · {evaluation.status}</p></div><Link href={`/autoevaluacion/respuestas/${evaluation.id}`} className="print:hidden text-sm font-semibold text-blue-600">Abrir original →</Link></div><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Proyecto declarado" value={evaluation.project_name} /><Field label="Lugar o contexto" value={evaluation.intervention_place} /></div><div className="mt-3 space-y-2">{questions.length ? questions.map((question:any) => <div key={question.id} className="rounded-lg bg-gray-50 p-3"><p className="text-sm font-semibold text-gray-700">{question.prompt}</p><div className="mt-1 text-sm text-gray-600"><DisplayValue value={answers[question.id]} /></div></div>) : Object.entries(answers).map(([key,value]) => <Field key={key} label={humanize(key)} value={value} />)}</div></article>})}
-      </Section>
+            <Section id="seguimientos" icon="📈" eyebrow="Capítulo 04" title="Seguimiento, acuerdos y retroalimentación" count={followups?.length ?? 0} tone="amber">
+              {!followups?.length ? <PortfolioEmpty icon="📈" title="Sin seguimientos vinculados" description="Las reuniones, criterios, fotografías y comentarios docentes aparecerán como una línea de progreso." /> : <div className="relative space-y-4 before:absolute before:bottom-4 before:left-[19px] before:top-4 before:w-0.5 before:bg-amber-100">{followups.map((follow:any, index:number) => <article key={follow.id} className="relative ml-10 rounded-3xl border border-amber-100 bg-amber-50/40 p-5"><span className="absolute -left-[34px] top-5 flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white ring-4 ring-[#f5f6fb]">{index + 1}</span><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-black text-slate-900">{follow.subject ?? 'Sesión de seguimiento'}</h3><p className="mt-1 text-xs text-slate-500">{dateLabel(follow.followup_date)} · Docente: {follow.teacher?.full_name ?? 'No indicado'}</p></div><PortfolioAction href={`/seguimientos/${follow.id}`}>Ver seguimiento →</PortfolioAction></div><div className="mt-4 grid gap-3 md:grid-cols-2"><PortfolioField label="Observaciones" value={follow.observations} accent="amber" /><PortfolioField label="Retroalimentación" value={follow.feedback} accent="amber" /><PortfolioField label="Compromisos" value={follow.ticket} accent="violet" /><PortfolioField label="Criterios evaluados" value={follow.followup_items} accent="blue" /><PortfolioField label="Participantes" value={(follow.followup_participants ?? []).map((p:any)=>p.profiles?.full_name).filter(Boolean)} accent="emerald" /><PortfolioField label="Evidencias fotográficas" value={follow.followup_photos} accent="rose" /></div></article>)}</div>}
+            </Section>
 
-      <Section id="pagina" icon="🌐" title="Página web del proyecto" count={publicPages?.length ?? 0}>
-        {!publicPages?.length ? <p className="text-sm text-gray-400">Sin página web vinculada.</p> : publicPages.map((page:any) => <article key={page.id} className="rounded-xl border border-gray-200 p-4"><div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-bold text-gray-800">{page.title}</h3><p className="text-sm text-gray-500">{page.description}</p><p className="mt-1 text-xs text-gray-400">Estado: {page.status} · {page.is_public ? 'Pública' : 'Privada'}</p></div>{page.slug && <Link href={`/p/${page.slug}`} className="print:hidden text-sm font-semibold text-blue-600">Ver página →</Link>}</div><Field label="Bloques completos" value={(page.project_public_blocks ?? []).sort((a:any,b:any)=>a.sort_order-b.sort_order)} /><Field label="Archivos y recursos" value={page.project_public_assets} /></article>)}
-      </Section>
+            <Section id="encuestas" icon="🗳️" eyebrow="Capítulo 05" title="Encuestas y respuestas" count={surveyResponses?.length ?? 0} tone="rose">
+              {!surveyResponses?.length ? <PortfolioEmpty icon="🗳️" title="Sin encuestas respondidas" description="Las respuestas vinculadas a este proyecto se presentarán pregunta por pregunta, sin datos técnicos." /> : <div className="space-y-4">{surveyResponses.map((response:any) => { const survey = Array.isArray(response.surveys) ? response.surveys[0] : response.surveys; const questions = survey?.survey_questions ?? []; const questionMap = new Map(questions.map((q:any)=>[q.id,q])); return <article key={response.id} className="rounded-3xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/50 p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h3 className="text-lg font-black text-slate-900">{survey?.title ?? 'Encuesta'}</h3><p className="mt-1 max-w-2xl text-sm text-slate-500">{survey?.description}</p></div>{response.achievement_percent != null && <div className="rounded-2xl bg-rose-600 px-4 py-3 text-center text-white"><p className="text-2xl font-black">{response.achievement_percent}%</p><p className="text-[10px] uppercase tracking-wide">Logro</p></div>}</div><div className="mt-4 grid gap-3 md:grid-cols-2">{(response.survey_answers ?? []).map((answer:any) => <div key={answer.id} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-rose-100"><p className="text-sm font-black text-slate-700">{(questionMap.get(answer.question_id) as any)?.prompt ?? 'Pregunta'}</p><div className="mt-2"><PortfolioValue value={answer?.value_json ?? answer?.value_number ?? answer?.value_text} /></div></div>)}</div><div className="mt-4"><PortfolioField label="Retroalimentación docente" value={response.feedback} accent="rose" /></div></article> })}</div>}
+            </Section>
 
-      <Section id="informe" icon="📄" title="Informe final, comentarios y evaluación" count={report ? 1 : 0}>
-        {!report ? <p className="text-sm text-gray-400">Sin informe final vinculado.</p> : <><div className="flex flex-wrap justify-between gap-3"><div><h3 className="font-bold text-gray-800">{report.title}</h3><p className="text-xs text-gray-400">Estado: {report.status} · Actualizado: {new Date(report.updated_at).toLocaleString('es-CL')}</p></div><Link href={`/informes/${report.id}`} className="print:hidden text-sm font-semibold text-blue-600">Abrir informe →</Link></div><Field label="Integrantes" value={reportMembers.map(member => ({ nombre: member.profiles?.full_name ?? member.profiles?.email, rol: member.member_role }))} /><div className="space-y-3">{reportSections.map(section => <article key={section.id} className="rounded-xl bg-gray-50 p-4"><h4 className="font-bold text-blue-900">{section.title}</h4><div className="mt-2"><DisplayValue value={section.content} /></div></article>)}</div><Field label="Comentarios y retroalimentación por sección" value={reportComments.map(comment => ({ autor: comment.profiles?.full_name, comentario: comment.body, estado: comment.status, fecha: comment.created_at }))} />{reportEvaluation && <div className="rounded-xl border border-green-200 bg-green-50 p-4"><h4 className="font-bold text-green-900">Evaluación final</h4><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Puntaje obtenido" value={`${reportEvaluation.earned_points ?? 0} / ${reportEvaluation.total_points ?? 0}`} /><Field label="Nota final" value={reportEvaluation.final_grade} /><Field label="Retroalimentación general" value={reportEvaluation.general_feedback} /><Field label="Rúbrica y criterios" value={reportEvaluation.project_report_scores} /></div></div>}</>}
-      </Section>
+            <Section id="autoevaluacion" icon="🪞" eyebrow="Capítulo 06" title="Autoevaluación y reflexión personal" count={selfEvaluations?.length ?? 0} tone="violet">
+              {!selfEvaluations?.length ? <PortfolioEmpty icon="🪞" title="Sin autoevaluaciones vinculadas" description="Cuando el estudiante reflexione sobre su participación, sus respuestas completas aparecerán aquí." /> : <div className="space-y-4">{selfEvaluations.map((evaluation:any) => { const format = Array.isArray(evaluation.self_evaluation_formats) ? evaluation.self_evaluation_formats[0] : evaluation.self_evaluation_formats; const questions = Array.isArray(format?.questions) ? format.questions : []; const answers = evaluation.answers ?? {}; return <article key={evaluation.id} className="rounded-3xl border border-violet-100 bg-violet-50/30 p-5"><div className="flex flex-wrap justify-between gap-3"><div><h3 className="text-lg font-black text-slate-900">{format?.title ?? 'Autoevaluación'}</h3><p className="mt-1 text-xs text-slate-500">{dateLabel(evaluation.created_at)} · {evaluation.status}</p></div><PortfolioAction href={`/autoevaluacion/respuestas/${evaluation.id}`}>Abrir original →</PortfolioAction></div><div className="mt-4 grid gap-3 md:grid-cols-2">{questions.length ? questions.map((question:any) => <PortfolioField key={question.id} label={question.prompt} value={answers[question.id]} accent="violet" />) : Object.entries(answers).map(([key,value]) => <PortfolioField key={key} label={humanize(key)} value={value} accent="violet" />)}</div></article>})}</div>}
+            </Section>
 
-      <footer className="rounded-xl bg-blue-50 p-4 text-center text-xs text-blue-700">Este expediente se actualiza automáticamente con toda la información registrada en el proyecto.</footer>
-    </div>
-  </main></div>
+            <Section id="pagina" icon="🌐" eyebrow="Capítulo 07" title="Página web y publicación del proyecto" count={publicPages?.length ?? 0} tone="blue">
+              {!publicPages?.length ? <PortfolioEmpty icon="🌐" title="Página pública aún no creada" description="Cuando el equipo publique su proyecto, aquí se verá su portada, contenido, recursos y acceso directo." /> : <div className="grid gap-4 lg:grid-cols-2">{publicPages.map((page:any) => <article key={page.id} className="overflow-hidden rounded-3xl bg-slate-950 text-white"><div className="relative p-6"><div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-cyan-400/20 blur-2xl" /><p className="relative text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">{page.is_public ? 'Publicada' : 'Borrador privado'}</p><h3 className="relative mt-2 text-2xl font-black">{page.title}</h3><p className="relative mt-2 text-sm leading-6 text-slate-300">{page.description}</p>{page.slug && <div className="relative mt-5"><PortfolioAction href={`/p/${page.slug}`}>Visitar página →</PortfolioAction></div>}</div><div className="space-y-3 bg-white p-5 text-slate-800"><PortfolioField label="Contenido publicado" value={(page.project_public_blocks ?? []).sort((a:any,b:any)=>a.sort_order-b.sort_order)} accent="blue" /><PortfolioField label="Archivos y recursos" value={page.project_public_assets} accent="emerald" /></div></article>)}</div>}
+            </Section>
+
+            <Section id="informe" icon="📄" eyebrow="Capítulo 08" title="Informe final, comentarios y evaluación" count={report ? 1 : 0} tone="emerald">
+              {!report ? <PortfolioEmpty icon="📄" title="Informe final aún no creado" description="El informe colaborativo y su evaluación aparecerán aquí sin necesidad de buscarlo en otro módulo." /> : <>
+                <div className="flex flex-wrap items-start justify-between gap-4 rounded-3xl bg-gradient-to-r from-emerald-600 to-teal-600 p-6 text-white"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">Documento final · {humanize(report.status ?? 'borrador')}</p><h3 className="mt-2 text-2xl font-black">{report.title}</h3><p className="mt-1 text-xs text-emerald-100">Actualizado {dateLabel(report.updated_at)}</p></div><PortfolioAction href={`/informes/${report.id}`}>Abrir informe →</PortfolioAction></div>
+                <PortfolioField label="Equipo del informe" value={reportMembers.map(member => ({ nombre: member.profiles?.full_name ?? member.profiles?.email, rol: humanize(member.member_role) }))} accent="emerald" />
+                <div className="grid gap-4 lg:grid-cols-2">{reportSections.map((section, index) => <article key={section.id} className={`rounded-3xl border p-5 ${hasPortfolioContent(section.content) ? 'border-slate-200 bg-white shadow-sm' : 'border-dashed border-slate-200 bg-slate-50/60'}`}><div className="flex gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-xs font-black text-emerald-700">{String(index + 1).padStart(2, '0')}</span><div className="min-w-0"><h4 className="font-black text-slate-900">{section.title}</h4><div className="mt-3"><PortfolioValue value={section.content} emptyLabel="Pendiente por completar" /></div></div></div></article>)}</div>
+                <PortfolioField label="Comentarios y retroalimentación" value={reportComments.map(comment => ({ autor: comment.profiles?.full_name, comentario: comment.body, estado: humanize(comment.status ?? ''), fecha: dateLabel(comment.created_at) }))} accent="amber" />
+                {reportEvaluation && <div className="rounded-3xl bg-gradient-to-br from-emerald-50 to-cyan-50 p-5 ring-1 ring-emerald-100"><div className="flex items-center gap-3"><span className="text-3xl">🏅</span><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Evaluación final</p><h4 className="text-xl font-black text-emerald-950">Resultados y retroalimentación</h4></div></div><div className="mt-4 grid gap-3 md:grid-cols-2"><PortfolioField label="Puntaje obtenido" value={`${reportEvaluation.earned_points ?? 0} / ${reportEvaluation.total_points ?? 0}`} accent="emerald" /><PortfolioField label="Nota final" value={reportEvaluation.final_grade} accent="emerald" /><PortfolioField label="Retroalimentación general" value={reportEvaluation.general_feedback} accent="blue" /><PortfolioField label="Rúbrica y criterios" value={reportEvaluation.project_report_scores} accent="violet" /></div></div>}
+              </>}
+            </Section>
+
+            <footer className="rounded-3xl bg-slate-950 px-6 py-7 text-center text-sm text-slate-300"><p className="font-black text-white">Un portafolio que crece con el proyecto</p><p className="mt-1">Cada formulario, evidencia y evaluación nueva se integra automáticamente en este recorrido.</p></footer>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
 }
