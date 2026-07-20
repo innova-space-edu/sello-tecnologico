@@ -259,18 +259,40 @@ $$;
 insert into public.project_portfolios(portfolio_id, project_id, user_id, member_role)
 select po.id, members.project_id, members.user_id, members.member_role
 from (
-  select p.id project_id, p.owner_id user_id, 'owner'::text member_role, p.created_at from public.projects p
-  union
-  select pc.project_id, pc.user_id, coalesce(pc.role, 'collaborator'), p.created_at
-  from public.project_collaborators pc join public.projects p on p.id = pc.project_id
-  where pc.status = 'accepted'
-  union
-  select r.project_id, rm.user_id, rm.member_role, r.created_at
-  from public.project_report_members rm join public.project_reports r on r.id = rm.report_id
+  -- Un mismo estudiante puede figurar como dueño, colaborador y miembro del
+  -- informe. DISTINCT ON garantiza una sola fila por clave antes del UPSERT.
+  select distinct on (all_members.project_id, all_members.user_id)
+    all_members.project_id,
+    all_members.user_id,
+    all_members.member_role,
+    all_members.created_at
+  from (
+    select p.id project_id, p.owner_id user_id, 'owner'::text member_role,
+      p.created_at, 1 role_priority
+    from public.projects p
+    union all
+    select pc.project_id, pc.user_id, coalesce(pc.role, 'collaborator'),
+      p.created_at, 2 role_priority
+    from public.project_collaborators pc
+    join public.projects p on p.id = pc.project_id
+    where pc.status = 'accepted'
+    union all
+    select r.project_id, rm.user_id, rm.member_role, r.created_at, 3 role_priority
+    from public.project_report_members rm
+    join public.project_reports r on r.id = rm.report_id
+  ) all_members
+  order by all_members.project_id, all_members.user_id, all_members.role_priority
 ) members
-left join public.portfolios po
-  on po.user_id = members.user_id
- and po.year = extract(year from coalesce(members.created_at, now()))::integer
+-- También puede haber más de un portafolio anual antiguo; se escoge el más
+-- reciente para evitar multiplicar nuevamente la clave del expediente.
+left join lateral (
+  select candidate.id
+  from public.portfolios candidate
+  where candidate.user_id = members.user_id
+    and candidate.year = extract(year from coalesce(members.created_at, now()))::integer
+  order by candidate.created_at desc, candidate.id
+  limit 1
+) po on true
 on conflict (project_id, user_id) do update
 set portfolio_id = coalesce(excluded.portfolio_id, public.project_portfolios.portfolio_id),
     member_role = excluded.member_role,
