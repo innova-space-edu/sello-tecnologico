@@ -132,7 +132,7 @@ export function PortfolioEmpty({ icon, title, description }: { icon: string; tit
 
 export function PortfolioAction({ href, children }: { href: string; children: React.ReactNode }) {
   const external = /^https?:\/\//.test(href)
-  const className = 'inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-700'
+  const className = 'inline-flex items-center justify-center rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-violet-200 transition hover:-translate-y-0.5 hover:bg-violet-700'
   if (external) return <a href={href} target="_blank" rel="noreferrer" className={className}>{children}</a>
   return <Link href={href} className={className}>{children}</Link>
 }
