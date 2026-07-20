@@ -293,10 +293,7 @@ left join lateral (
   order by candidate.created_at desc, candidate.id
   limit 1
 ) po on true
-on conflict (project_id, user_id) do update
-set portfolio_id = coalesce(excluded.portfolio_id, public.project_portfolios.portfolio_id),
-    member_role = excluded.member_role,
-    updated_at = now();
+on conflict (project_id, user_id) do nothing;
 
 -- Copia completa del formulario del proyecto para cada integrante.
 insert into public.project_portfolio_items(
@@ -304,8 +301,7 @@ insert into public.project_portfolio_items(
 )
 select pp.id, 'project_form', p.id, p.title, to_jsonb(p), p.created_at
 from public.project_portfolios pp join public.projects p on p.id = pp.project_id
-on conflict (project_portfolio_id, source_type, source_id) do update
-set title = excluded.title, snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 -- Evidencias: contenido compartido del proyecto, conservando el autor en el JSON.
 insert into public.project_portfolio_items(
@@ -313,8 +309,7 @@ insert into public.project_portfolio_items(
 )
 select pp.id, 'evidence', e.id, e.title, to_jsonb(e), e.created_at
 from public.project_portfolios pp join public.evidences e on e.project_id = pp.project_id
-on conflict (project_portfolio_id, source_type, source_id) do update
-set title = excluded.title, snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 -- Contenido individual vinculado automáticamente al único proyecto del usuario.
 insert into public.project_portfolio_items(
@@ -324,8 +319,7 @@ select pp.id, 'self_evaluation', se.id, 'Autoevaluación', to_jsonb(se), se.crea
 from public.self_evaluations se
 join public.project_portfolios pp on pp.project_id = se.project_id and pp.user_id = se.user_id
 where se.project_id is not null
-on conflict (project_portfolio_id, source_type, source_id) do update
-set snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 insert into public.project_portfolio_items(
   project_portfolio_id, source_type, source_id, title, snapshot, source_created_at
@@ -340,8 +334,7 @@ from public.survey_responses sr
 join public.surveys s on s.id = sr.survey_id
 join public.project_portfolios pp on pp.project_id = sr.project_id and pp.user_id = sr.registered_user_id
 where sr.project_id is not null and sr.registered_user_id is not null
-on conflict (project_portfolio_id, source_type, source_id) do update
-set title = excluded.title, snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 -- Módulos compartidos ya existentes.
 insert into public.project_portfolio_items(project_portfolio_id, source_type, source_id, title, snapshot, source_created_at)
@@ -349,19 +342,19 @@ select pp.id, 'public_page', pg.id, pg.title,
   jsonb_build_object('page', to_jsonb(pg), 'blocks', coalesce((select jsonb_agg(to_jsonb(b) order by b.sort_order) from public.project_public_blocks b where b.page_id = pg.id), '[]'::jsonb), 'assets', coalesce((select jsonb_agg(to_jsonb(a) order by a.sort_order) from public.project_public_assets a where a.page_id = pg.id), '[]'::jsonb)), pg.created_at
 from public.project_public_pages pg join public.project_portfolios pp on pp.project_id = pg.project_id
 where pg.project_id is not null
-on conflict (project_portfolio_id, source_type, source_id) do update set title = excluded.title, snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 insert into public.project_portfolio_items(project_portfolio_id, source_type, source_id, title, snapshot, source_created_at)
 select pp.id, 'report', r.id, r.title,
   jsonb_build_object('report', to_jsonb(r), 'members', coalesce((select jsonb_agg(to_jsonb(m)) from public.project_report_members m where m.report_id = r.id), '[]'::jsonb), 'sections', coalesce((select jsonb_agg(to_jsonb(s) order by s.sort_order) from public.project_report_sections s where s.report_id = r.id), '[]'::jsonb), 'comments', coalesce((select jsonb_agg(to_jsonb(c) order by c.created_at) from public.project_report_comments c where c.report_id = r.id), '[]'::jsonb), 'evaluation', (select to_jsonb(ev) from public.project_report_evaluations ev where ev.report_id = r.id limit 1)), r.created_at
 from public.project_reports r join public.project_portfolios pp on pp.project_id = r.project_id
-on conflict (project_portfolio_id, source_type, source_id) do update set title = excluded.title, snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 insert into public.project_portfolio_items(project_portfolio_id, source_type, source_id, title, snapshot, source_created_at)
 select pp.id, 'steam_workspace', w.id, 'Ruta STEAM',
   jsonb_build_object('workspace', to_jsonb(w), 'phases', coalesce((select jsonb_agg(to_jsonb(pe) order by pe.phase_number) from public.steam_phase_entries pe where pe.workspace_id = w.id), '[]'::jsonb), 'journal', coalesce((select jsonb_agg(to_jsonb(j) order by j.entry_date) from public.steam_journal_entries j where j.workspace_id = w.id), '[]'::jsonb), 'prototypes', coalesce((select jsonb_agg(to_jsonb(v) order by v.version_number) from public.steam_prototype_versions v where v.workspace_id = w.id), '[]'::jsonb), 'tests', coalesce((select jsonb_agg(to_jsonb(t) order by t.version_number) from public.steam_project_tests t where t.workspace_id = w.id), '[]'::jsonb)), w.created_at
 from public.steam_project_workspaces w join public.project_portfolios pp on pp.project_id = w.project_id
-on conflict (project_portfolio_id, source_type, source_id) do update set snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 -- Seguimientos solo para los estudiantes participantes.
 insert into public.project_portfolio_items(project_portfolio_id, source_type, source_id, title, snapshot, source_created_at)
@@ -375,7 +368,7 @@ join (
   from public.followup_participants
 ) participant on participant.followup_id = f.id
 join public.project_portfolios pp on pp.project_id = f.project_id and pp.user_id = participant.user_id
-on conflict (project_portfolio_id, source_type, source_id) do update set snapshot = excluded.snapshot, updated_at = now();
+on conflict (project_portfolio_id, source_type, source_id) do nothing;
 
 -- Sincronización automática de las filas principales. Las tablas fuente siguen
 -- siendo editables; el portafolio recibe el formulario completo con to_jsonb.
