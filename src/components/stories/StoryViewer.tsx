@@ -71,7 +71,7 @@ export default function StoryViewer({ story, hasPrevious, hasNext, onPrevious, o
   const item = story.items[itemIndex]
   const interactionPaused = paused || commentFocused || emojiOpen
   const shareUrl = useMemo(
-    () => typeof window === 'undefined' ? '' : `${window.location.origin}/comunidad?historia=${story.id}`,
+    () => typeof window === 'undefined' ? '' : `${window.location.origin}/historia/${story.id}`,
     [story.id],
   )
 

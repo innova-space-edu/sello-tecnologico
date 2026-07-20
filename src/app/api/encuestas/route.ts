@@ -83,6 +83,7 @@ export async function POST(request: Request) {
   const title = String(body.title ?? '').trim()
   const description = String(body.description ?? '').trim()
   const courseId = body.course_id ? String(body.course_id) : null
+  const projectId = body.project_id ? String(body.project_id) : null
   const isActive = body.is_active !== false
   const allowAnonymous = body.allow_anonymous !== false
   const questions = Array.isArray(body.questions) ? body.questions : []
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
 
   if (!title) return NextResponse.json({ error: 'El título es obligatorio.' }, { status: 400 })
   if (!courseId) return NextResponse.json({ error: 'Selecciona un curso.' }, { status: 400 })
+  if (!projectId) return NextResponse.json({ error: 'Selecciona un proyecto.' }, { status: 400 })
   if (questions.length === 0) return NextResponse.json({ error: 'Agrega al menos una pregunta.' }, { status: 400 })
 
   const normalizedQuestions = normalizeQuestions(questions)
@@ -98,9 +100,11 @@ export async function POST(request: Request) {
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
 
   const admin = createAdminSupabaseClient()
+  const { data: project } = await admin.from('projects').select('id, course_id').eq('id', projectId).eq('course_id', courseId).maybeSingle()
+  if (!project) return NextResponse.json({ error: 'El proyecto no pertenece al curso seleccionado.' }, { status: 400 })
   const { data: survey, error } = await admin
     .from('surveys')
-    .insert({ title, description: description || null, slug: makeSlug(title), course_id: courseId, creator_id: actor!.id, is_active: isActive, allow_anonymous: allowAnonymous })
+    .insert({ title, description: description || null, slug: makeSlug(title), course_id: courseId, project_id: projectId, creator_id: actor!.id, is_active: isActive, allow_anonymous: allowAnonymous })
     .select('id, slug')
     .single()
 

@@ -52,6 +52,16 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
     .eq('portfolio_id', portafolio.id)
     .order('order_index', { ascending: true })
 
+  const [{ data: proyectosPropios }, { data: colaboraciones }] = await Promise.all([
+    supabase.from('projects').select('*').eq('owner_id', portafolio.user_id).order('updated_at', { ascending: false }),
+    supabase.from('project_collaborators').select('project_id').eq('user_id', portafolio.user_id).eq('status', 'accepted'),
+  ])
+  const sharedIds = [...new Set((colaboraciones ?? []).map(row => row.project_id).filter(Boolean))]
+  const { data: proyectosCompartidos } = sharedIds.length
+    ? await supabase.from('projects').select('*').in('id', sharedIds).order('updated_at', { ascending: false })
+    : { data: [] as any[] }
+  const proyectos = Array.from(new Map([...(proyectosPropios ?? []), ...(proyectosCompartidos ?? [])].map(project => [project.id, project])).values())
+
   const estudiante = portafolio.profiles
   const evInicial = evidencias?.filter(e => e.evidencia_tipo === 'inicial') ?? []
   const evIntermedia = evidencias?.filter(e => e.evidencia_tipo === 'intermedia') ?? []
@@ -77,7 +87,7 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
                     portafolio={portafolio}
                     estudiante={estudiante}
                     evidencias={evidencias ?? []}
-                    proyectos={[]}
+                    proyectos={proyectos}
                     secciones={secciones ?? []}
                   />
                 </div>
@@ -114,6 +124,19 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
                 <Campo label="¿Qué espero mejorar este año?" value={portafolio.que_espero_mejorar} />
               </div>
             )}
+
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h2 className="font-bold text-blue-900">C. Expedientes de proyectos ({proyectos.length})</h2>
+                <p className="mt-1 text-xs text-gray-400">Cada expediente reúne formulario, evidencias, seguimiento, encuestas, autoevaluación, página web e informe.</p>
+              </div>
+              {proyectos.length > 0 ? <div className="divide-y divide-gray-100">{proyectos.map((project: any) => (
+                <Link key={project.id} href={`/portafolio/proyecto/${project.id}?estudiante=${portafolio.user_id}&portafolio=${portafolio.id}`} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-blue-50">
+                  <div><p className="font-semibold text-gray-800">{project.title}</p><p className="mt-1 text-xs text-gray-400">{project.status ?? 'Sin estado'} · actualizado {project.updated_at ? new Date(project.updated_at).toLocaleDateString('es-CL') : '—'}</p></div>
+                  <span className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Ver todo →</span>
+                </Link>
+              ))}</div> : <div className="p-8 text-center text-sm text-gray-400">Sin proyectos vinculados.</div>}
+            </div>
 
             {/* C — Evidencias */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">

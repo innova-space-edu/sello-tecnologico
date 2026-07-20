@@ -35,6 +35,8 @@ type Props = {
   onCommentChange: (value: string) => void
   onAddComment: () => void
   onResolveComment: (id: string) => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
   onRemove?: () => void
 }
 
@@ -51,7 +53,7 @@ function ResourcePreview({ resource }: { resource: ReportResource }) {
   return <div className="rounded-xl border border-gray-200 bg-gray-50 p-4"><p className="text-sm font-bold text-gray-800">{resource.kind === 'survey' ? '🗳️' : resource.kind === 'page' ? '🌐' : resource.kind === 'project' ? '🗂️' : '📎'} {resource.title}</p>{resource.description && <p className="mt-1 text-sm text-gray-500">{resource.description}</p>}{resource.url && <a href={resource.url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-bold text-blue-600 hover:underline">Abrir recurso →</a>}</div>
 }
 
-export default function ReportSectionCard({ section, index, active, canEdit, isStaff, comments, commentValue, onActivate, onChange, onCommentChange, onAddComment, onResolveComment, onRemove }: Props) {
+export default function ReportSectionCard({ section, index, active, canEdit, isStaff, comments, commentValue, onActivate, onChange, onCommentChange, onAddComment, onResolveComment, onMoveUp, onMoveDown, onRemove }: Props) {
   const content = section.content ?? {}
   const table = Array.isArray(content.table) ? content.table : []
   const resources = Array.isArray(content.resources) ? content.resources : []
@@ -80,7 +82,11 @@ export default function ReportSectionCard({ section, index, active, canEdit, isS
           <p className="mt-1 text-xs font-bold uppercase tracking-wide text-gray-400">{section.section_type.replaceAll('_', ' ')}</p>
         </div>
       </div>
-      {canEdit && onRemove && <button type="button" onClick={event => { event.stopPropagation(); onRemove() }} className="rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50">Eliminar sección</button>}
+      {canEdit && <div className="flex items-center gap-1">
+        {onMoveUp && <button type="button" onClick={event => { event.stopPropagation(); onMoveUp() }} className="rounded-lg px-2.5 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100" title="Mover hacia arriba">↑</button>}
+        {onMoveDown && <button type="button" onClick={event => { event.stopPropagation(); onMoveDown() }} className="rounded-lg px-2.5 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100" title="Mover hacia abajo">↓</button>}
+        {onRemove && <button type="button" onClick={event => { event.stopPropagation(); onRemove() }} className="rounded-lg px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50">Eliminar</button>}
+      </div>}
     </header>
 
     <div className="space-y-4 p-5">
@@ -93,7 +99,7 @@ export default function ReportSectionCard({ section, index, active, canEdit, isS
         <p className="mt-2 text-sm leading-relaxed text-purple-700">{section.teacher_example}</p>
       </details>}
 
-      {canEdit ? <textarea value={String(content.text ?? '')} onChange={event => onChange({ content: { ...content, text: event.target.value } })} rows={section.section_type === 'summary' ? 5 : 8} placeholder="Escribe aquí el contenido de esta sección…" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-300" /> : content.text ? <div className="whitespace-pre-wrap text-sm leading-7 text-gray-700">{String(content.text)}</div> : <p className="rounded-xl border border-dashed border-gray-200 p-5 text-center text-sm text-gray-400">Esta sección todavía no tiene texto.</p>}
+      {canEdit ? <textarea value={String(content.text ?? '')} onChange={event => onChange({ content: { ...content, text: event.target.value } })} rows={section.section_type === 'title' ? 3 : section.section_type === 'summary' ? 5 : 8} placeholder={section.section_type === 'title' ? 'Escribe el título, subtítulo o encabezado…' : 'Escribe aquí el contenido de esta sección…'} className={`w-full rounded-xl border border-gray-200 px-4 py-3 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-300 ${section.section_type === 'title' ? 'text-xl font-bold' : 'text-sm'}`} /> : content.text ? <div className="whitespace-pre-wrap text-sm leading-7 text-gray-700">{String(content.text)}</div> : <p className="rounded-xl border border-dashed border-gray-200 p-5 text-center text-sm text-gray-400">Esta sección todavía no tiene texto.</p>}
 
       {(section.section_type === 'results' || table.length > 0) && <div className="overflow-x-auto rounded-xl border border-gray-200">
         <table className="min-w-full border-collapse text-sm"><tbody>{table.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, columnIndex) => <td key={columnIndex} className={`border border-gray-200 p-1 ${rowIndex === 0 ? 'bg-gray-100' : 'bg-white'}`}>{canEdit ? <input value={cell} onChange={event => updateTableCell(rowIndex, columnIndex, event.target.value)} className={`min-w-28 w-full bg-transparent px-2 py-2 focus:outline-none ${rowIndex === 0 ? 'font-bold' : ''}`} /> : <span className={`block px-2 py-2 ${rowIndex === 0 ? 'font-bold' : ''}`}>{cell}</span>}</td>)}</tr>)}</tbody></table>
