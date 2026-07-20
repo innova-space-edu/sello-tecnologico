@@ -27,19 +27,19 @@ export default async function FeriaPage() {
   const { data: evidencias } = await supabase.from('evidences').select('*')
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 to-blue-800">
+    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-sky-50">
 
       {/* Header feria */}
       <div className="text-center py-12 px-8">
         {settings?.logo_url && (
           <img src={settings.logo_url} alt="Logo" className="h-16 object-contain mx-auto mb-4" />
         )}
-        <h1 className="text-4xl font-bold text-white mb-2">
+        <h1 className="mb-2 text-4xl font-black text-slate-900">
           {settings?.repo_name ?? 'Sello Tecnológico'}
         </h1>
-        <p className="text-blue-300 text-lg">{settings?.school_name ?? 'Colegio Providencia'} · {settings?.year_active ?? 2026}</p>
+        <p className="text-lg text-slate-600">{settings?.school_name ?? 'Colegio Providencia'} · {settings?.year_active ?? 2026}</p>
         <Link href="/portafolio"
-          className="inline-block mt-4 text-blue-300 hover:text-white text-sm transition-colors">
+          className="mt-4 inline-block text-sm font-bold text-violet-700 transition-colors hover:text-violet-900">
           ← Volver al portafolio
         </Link>
       </div>
@@ -83,9 +83,9 @@ export default async function FeriaPage() {
           return (
             <div key={curso.id}>
               <div className="flex items-center gap-4 mb-6">
-                <div className="h-px flex-1 bg-blue-700" />
-                <h2 className="text-xl font-bold text-white px-4">{curso.name}</h2>
-                <div className="h-px flex-1 bg-blue-700" />
+                <div className="h-px flex-1 bg-violet-200" />
+                <h2 className="px-4 text-xl font-black text-slate-800">{curso.name}</h2>
+                <div className="h-px flex-1 bg-violet-200" />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -96,14 +96,14 @@ export default async function FeriaPage() {
                     : (evidencias?.filter(ev => ev.project_id === p.id) ?? [])
 
                   return (
-                    <div key={p.id} className="bg-white bg-opacity-10 backdrop-blur rounded-2xl p-6 border border-blue-700 border-opacity-50 relative">
+                    <div key={p.id} className="relative rounded-3xl border border-violet-100 bg-white/90 p-6 shadow-lg shadow-violet-100/50 backdrop-blur">
 
                       {/* Badge de grupo */}
                       {esGrupo && (
                         <div className="absolute top-3 right-3">
                           <Link
                             href={`/proyectos/grupo/${groupId}`}
-                            className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-full font-semibold hover:bg-blue-500 transition-colors"
+                            className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-200"
                           >
                             🔗 {grupoCopias.length} proyectos
                           </Link>
@@ -111,7 +111,7 @@ export default async function FeriaPage() {
                       )}
 
                       <div className="flex justify-between items-start mb-3 pr-20">
-                        <h3 className="font-bold text-white text-lg leading-tight">{p.title}</h3>
+                        <h3 className="text-lg font-bold leading-tight text-slate-900">{p.title}</h3>
                         <span className={`text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 ml-2 ${statusColor[p.status]}`}>
                           {p.status}
                         </span>
@@ -119,29 +119,29 @@ export default async function FeriaPage() {
 
                       {/* Nombre del grupo si existe */}
                       {esGrupo && p.project_groups?.group_name && (
-                        <p className="text-blue-300 text-xs mb-2 font-semibold">
+                        <p className="mb-2 text-xs font-semibold text-violet-600">
                           Grupo: {p.project_groups.group_name}
                         </p>
                       )}
 
                       {p.description && (
-                        <p className="text-blue-200 text-sm mb-4 leading-relaxed line-clamp-3">{p.description}</p>
+                        <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-slate-600">{p.description}</p>
                       )}
 
                       {evProyecto.length > 0 && (
                         <div>
-                          <p className="text-blue-300 text-xs font-semibold uppercase tracking-wide mb-2">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-700">
                             Evidencias ({evProyecto.length})
                           </p>
                           <div className="flex flex-wrap gap-1.5">
                             {evProyecto.slice(0, 6).map(ev => (
                               <span key={ev.id}
-                                className="flex items-center gap-1 bg-blue-800 bg-opacity-60 text-blue-100 text-xs px-2.5 py-1 rounded-full">
+                                className="flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs text-sky-700 ring-1 ring-sky-100">
                                 {typeIcon[ev.type] ?? '📎'} {ev.title.length > 12 ? ev.title.slice(0, 12) + '…' : ev.title}
                               </span>
                             ))}
                             {evProyecto.length > 6 && (
-                              <span className="bg-blue-800 bg-opacity-40 text-blue-300 text-xs px-2.5 py-1 rounded-full">
+                              <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs text-violet-600">
                                 +{evProyecto.length - 6} más
                               </span>
                             )}
@@ -150,7 +150,7 @@ export default async function FeriaPage() {
                       )}
 
                       {p.end_date && (
-                        <p className="text-blue-400 text-xs mt-4">📅 Hasta: {p.end_date}</p>
+                        <p className="mt-4 text-xs text-slate-500">📅 Hasta: {p.end_date}</p>
                       )}
                     </div>
                   )
@@ -162,8 +162,8 @@ export default async function FeriaPage() {
       </div>
 
       {/* Footer feria */}
-      <div className="text-center py-6 border-t border-blue-800">
-        <p className="text-blue-400 text-sm">Innova Space Education {new Date().getFullYear()}</p>
+      <div className="border-t border-violet-100 py-6 text-center">
+        <p className="text-sm text-slate-500">Innova Space Education {new Date().getFullYear()}</p>
       </div>
     </div>
   )
