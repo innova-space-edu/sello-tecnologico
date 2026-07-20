@@ -1,4 +1,5 @@
 -- Portafolio unificado por proyecto.
+-- VERSION 4: UPSERT de actualización eliminado por completo (2026-07-20).
 -- Vincula datos históricos y mantiene una copia completa de cada formulario
 -- sin duplicar los archivos almacenados en Storage.
 
@@ -188,13 +189,31 @@ begin
   where po.user_id = target_user_id and po.year = project_year
   order by po.created_at desc limit 1;
 
-  insert into public.project_portfolios(portfolio_id, project_id, user_id, member_role)
-  values (linked_portfolio_id, target_project_id, target_user_id, coalesce(target_role, 'student'))
-  on conflict (project_id, user_id) do update
-    set portfolio_id = coalesce(excluded.portfolio_id, public.project_portfolios.portfolio_id),
-        member_role = excluded.member_role,
+  select pp.id into result_id
+  from public.project_portfolios pp
+  where pp.project_id = target_project_id and pp.user_id = target_user_id
+  limit 1;
+
+  if result_id is null then
+    insert into public.project_portfolios(portfolio_id, project_id, user_id, member_role)
+    values (linked_portfolio_id, target_project_id, target_user_id, coalesce(target_role, 'student'))
+    on conflict (project_id, user_id) do nothing
+    returning id into result_id;
+
+    -- Otra transacción pudo insertar la misma relación en paralelo.
+    if result_id is null then
+      select pp.id into result_id
+      from public.project_portfolios pp
+      where pp.project_id = target_project_id and pp.user_id = target_user_id
+      limit 1;
+    end if;
+  else
+    update public.project_portfolios
+    set portfolio_id = coalesce(linked_portfolio_id, portfolio_id),
+        member_role = coalesce(target_role, member_role),
         updated_at = now()
-  returning id into result_id;
+    where id = result_id;
+  end if;
   return result_id;
 end;
 $$;
@@ -216,19 +235,26 @@ declare target_portfolio_id uuid;
 begin
   target_portfolio_id := private.ensure_project_portfolio(target_project_id, target_user_id, 'student');
   if target_portfolio_id is null then return; end if;
-  insert into public.project_portfolio_items(
-    project_portfolio_id, source_type, source_id, title, snapshot, source_created_at
-  ) values (
-    target_portfolio_id, target_source_type, target_source_id,
-    coalesce(nullif(target_title, ''), 'Registro de portafolio'),
-    coalesce(target_snapshot, '{}'::jsonb), target_created_at
-  )
-  on conflict (project_portfolio_id, source_type, source_id) do update
-    set title = excluded.title,
-        snapshot = excluded.snapshot,
-        source_created_at = excluded.source_created_at,
-        captured_at = now(),
-        updated_at = now();
+  update public.project_portfolio_items
+  set title = coalesce(nullif(target_title, ''), 'Registro de portafolio'),
+      snapshot = coalesce(target_snapshot, '{}'::jsonb),
+      source_created_at = target_created_at,
+      captured_at = now(),
+      updated_at = now()
+  where project_portfolio_id = target_portfolio_id
+    and source_type = target_source_type
+    and source_id = target_source_id;
+
+  if not found then
+    insert into public.project_portfolio_items(
+      project_portfolio_id, source_type, source_id, title, snapshot, source_created_at
+    ) values (
+      target_portfolio_id, target_source_type, target_source_id,
+      coalesce(nullif(target_title, ''), 'Registro de portafolio'),
+      coalesce(target_snapshot, '{}'::jsonb), target_created_at
+    )
+    on conflict (project_portfolio_id, source_type, source_id) do nothing;
+  end if;
 end;
 $$;
 
