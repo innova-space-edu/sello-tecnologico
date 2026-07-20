@@ -90,9 +90,13 @@ export default function VitrinaInlineInteraction({ slug, targetType, targetId, t
   }, [supabase])
 
   useEffect(() => {
-    const baseUrl = window.location.href.split('#')[0]
-    setShareUrl(anchorId ? `${baseUrl}#${anchorId}` : baseUrl)
-  }, [anchorId])
+    const origin = window.location.origin
+    if (targetType === 'page' || !targetId) {
+      setShareUrl(`${origin}/p/${slug}`)
+      return
+    }
+    setShareUrl(`${origin}/publicacion/${targetType}/${targetId}`)
+  }, [slug, targetId, targetType])
 
   useEffect(() => {
     if (!visitorKey) return

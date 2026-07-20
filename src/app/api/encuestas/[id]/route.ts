@@ -98,6 +98,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const title = String(body.title ?? '').trim()
   const description = String(body.description ?? '').trim()
   const courseId = body.course_id ? String(body.course_id) : null
+  const projectId = body.project_id ? String(body.project_id) : null
   const questions = Array.isArray(body.questions) ? body.questions : []
   const staffIds = Array.isArray(body.staff_ids) ? body.staff_ids.map(String) : []
 
@@ -114,10 +115,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
   const normalizedQuestions = normalizeQuestions(questions, id)
   const validationError = validateQuestions(normalizedQuestions)
-  if (!title || !courseId) return NextResponse.json({ error: 'Completa título y curso.' }, { status: 400 })
+  if (!title || !courseId || !projectId) return NextResponse.json({ error: 'Completa título, curso y proyecto.' }, { status: 400 })
   if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
 
-  const { error: updateError } = await admin.from('surveys').update({ title, description: description || null, course_id: courseId, is_active: body.is_active !== false, allow_anonymous: body.allow_anonymous !== false, updated_at: new Date().toISOString() }).eq('id', id)
+  const { data: project } = await admin.from('projects').select('id').eq('id', projectId).eq('course_id', courseId).maybeSingle()
+  if (!project) return NextResponse.json({ error: 'El proyecto no pertenece al curso seleccionado.' }, { status: 400 })
+  const { error: updateError } = await admin.from('surveys').update({ title, description: description || null, course_id: courseId, project_id: projectId, is_active: body.is_active !== false, allow_anonymous: body.allow_anonymous !== false, updated_at: new Date().toISOString() }).eq('id', id)
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 })
 
   const { error: deleteQuestionError } = await admin.from('survey_questions').delete().eq('survey_id', id)

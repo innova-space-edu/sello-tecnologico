@@ -1,4 +1,6 @@
+import type { Metadata } from 'next'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
+import { absoluteUrl, getPageSharePreview } from '@/lib/share-preview'
 import VitrinaSocialPanel from '@/components/vitrinas/VitrinaSocialPanel'
 import VitrinaInlineInteraction from '@/components/vitrinas/VitrinaInlineInteraction'
 import Link from 'next/link'
@@ -50,7 +52,8 @@ type Asset = {
 type EmbedInfo = {
   url: string
   embedUrl?: string
-  provider: 'YouTube' | 'Vimeo' | 'Enlace'
+  kind: 'iframe' | 'video' | 'link'
+  provider: string
 }
 
 function cleanTitle(title: string) {
@@ -90,48 +93,37 @@ function postIcon(type: string) {
 }
 
 function extractFirstUrl(text?: string | null) {
-  const match = String(text ?? '').match(/https?:\/\/[^\s)]+/i)
-  return match?.[0]?.replace(/[.,;!?]+$/, '') ?? ''
+  const value = String(text ?? '')
+  return value.match(/\/api\/vitrinas\/assets\/[a-zA-Z0-9-]+/)?.[0] ?? value.match(/https?:\/\/[^\s)]+/i)?.[0]?.replace(/[.,;!?]+$/, '') ?? ''
 }
-
+function extractUploadedAssetId(text?: string | null) {
+  return String(text ?? '').match(/\/api\/vitrinas\/assets\/([a-zA-Z0-9-]+)/)?.[1] ?? ''
+}
 function getEmbedInfo(text?: string | null): EmbedInfo | null {
-  const rawUrl = extractFirstUrl(text)
-  if (!rawUrl) return null
-
+  const raw = extractFirstUrl(text)
+  if (!raw) return null
+  if (raw.startsWith('/api/vitrinas/assets/')) return { url: raw, embedUrl: raw, kind: 'video', provider: 'Video subido' }
   try {
-    const url = new URL(rawUrl)
-    const host = url.hostname.replace(/^www\./, '')
-
-    if (host === 'youtu.be') {
-      const id = url.pathname.split('/').filter(Boolean)[0]
-      if (id) return { url: rawUrl, embedUrl: `https://www.youtube.com/embed/${id}`, provider: 'YouTube' }
+    const url = new URL(raw), host = url.hostname.replace(/^www\./, ''), parts = url.pathname.split('/').filter(Boolean)
+    if (host === 'youtu.be' && parts[0]) return { url: raw, embedUrl: 'https://www.youtube.com/embed/' + parts[0], kind: 'iframe', provider: 'YouTube' }
+    if (['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) {
+      const id = url.searchParams.get('v') || (parts[0] === 'shorts' || parts[0] === 'embed' ? parts[1] : '')
+      if (id) return { url: raw, embedUrl: 'https://www.youtube.com/embed/' + id, kind: 'iframe', provider: 'YouTube' }
     }
-
-    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
-      const watchId = url.searchParams.get('v')
-      const parts = url.pathname.split('/').filter(Boolean)
-      const shortId = parts[0] === 'shorts' ? parts[1] : ''
-      const embedId = parts[0] === 'embed' ? parts[1] : ''
-      const id = watchId || shortId || embedId
-      if (id) return { url: rawUrl, embedUrl: `https://www.youtube.com/embed/${id}`, provider: 'YouTube' }
-    }
-
     if (host === 'vimeo.com' || host === 'player.vimeo.com') {
-      const parts = url.pathname.split('/').filter(Boolean)
-      const id = parts.find(part => /^\d+$/.test(part))
-      if (id) return { url: rawUrl, embedUrl: `https://player.vimeo.com/video/${id}`, provider: 'Vimeo' }
+      const id = parts.find(part => /^\d+$/.test(part)); if (id) return { url: raw, embedUrl: 'https://player.vimeo.com/video/' + id, kind: 'iframe', provider: 'Vimeo' }
     }
-
-    return { url: rawUrl, provider: 'Enlace' }
-  } catch {
-    return { url: rawUrl, provider: 'Enlace' }
-  }
+    if (host === 'drive.google.com') {
+      const d = parts.indexOf('d'), id = d >= 0 ? parts[d + 1] : url.searchParams.get('id')
+      if (id) return { url: raw, embedUrl: 'https://drive.google.com/file/d/' + id + '/preview', kind: 'iframe', provider: 'Google Drive' }
+    }
+    if (/\.(mp4|webm|ogg|mov)$/i.test(url.pathname)) return { url: raw, embedUrl: raw, kind: 'video', provider: 'Video directo' }
+    return { url: raw, kind: 'link', provider: 'Enlace' }
+  } catch { return { url: raw, kind: 'link', provider: 'Enlace' } }
 }
-
 function contentWithoutFirstUrl(text?: string | null) {
   const url = extractFirstUrl(text)
-  if (!url) return String(text ?? '').trim()
-  return String(text ?? '').replace(url, '').trim()
+  return url ? String(text ?? '').replace(url, '').trim() : String(text ?? '').trim()
 }
 
 function buildBackground(page: PublicPage, theme: string, accent: string) {
@@ -246,34 +238,9 @@ function FeedPost({
 }
 
 function renderEmbed(embed: EmbedInfo, page: PublicPage, theme: string, accent: string, textColor: string) {
-  if (embed.embedUrl) {
-    return (
-      <div className="bg-black">
-        <iframe
-          src={embed.embedUrl}
-          title={`${embed.provider} incrustado`}
-          className="aspect-video w-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="px-5 pb-2">
-      <a
-        href={embed.url}
-        target="_blank"
-        rel="noreferrer"
-        className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 font-black transition hover:opacity-90"
-        style={{ background: `${accent}10`, borderColor: `${accent}22`, color: textColor }}
-      >
-        <span className="min-w-0 truncate">🔗 {embed.url}</span>
-        <span className="shrink-0 rounded-full px-3 py-1 text-xs text-white" style={{ background: buttonBackground(theme, accent, page.button_style) }}>Abrir</span>
-      </a>
-    </div>
-  )
+  if (embed.kind === 'video' && embed.embedUrl) return <div className="bg-black"><video controls playsInline preload="metadata" className="aspect-video w-full bg-black object-contain" src={embed.embedUrl} /></div>
+  if (embed.kind === 'iframe' && embed.embedUrl) return <div className="bg-black"><iframe src={embed.embedUrl} title={embed.provider + ' incrustado'} className="aspect-video w-full border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /></div>
+  return <div className="px-5 pb-2"><a href={embed.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 font-black" style={{ background: accent + '10', borderColor: accent + '22', color: textColor }}><span className="truncate">🔗 {embed.url}</span><span className="rounded-full px-3 py-1 text-xs text-white" style={{ background: buttonBackground(theme, accent, page.button_style) }}>Abrir</span></a></div>
 }
 
 function renderAssetPost(asset: Asset, page: PublicPage, theme: string, accent: string, textColor: string, cardColor: string) {
@@ -353,6 +320,33 @@ function renderBlockPost(block: Block, page: PublicPage, theme: string, accent: 
   )
 }
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const preview = await getPageSharePreview(slug)
+  if (!preview) return { title: 'Página no disponible' }
+  const imagePath = `/p/${slug}/opengraph-image`
+  return {
+    title: preview.title,
+    description: preview.description,
+    alternates: { canonical: preview.destination },
+    openGraph: {
+      type: 'website',
+      locale: 'es_CL',
+      siteName: 'Sello Tecnológico — Colegio Providencia',
+      url: absoluteUrl(preview.destination),
+      title: preview.title,
+      description: preview.description,
+      images: [{ url: imagePath, width: 1200, height: 630, alt: preview.title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: preview.title,
+      description: preview.description,
+      images: [imagePath],
+    },
+  }
+}
+
 export default async function PublicProjectPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const admin = createAdminSupabaseClient()
@@ -388,8 +382,9 @@ export default async function PublicProjectPage({ params }: { params: Promise<{ 
   const textColor = currentPage.background_style === 'dark' ? '#f8fafc' : (currentPage.text_color ?? '#0f172a')
   const cardColor = currentPage.background_style === 'dark' ? '#111827' : (currentPage.card_color ?? '#ffffff')
   const title = cleanTitle(currentPage.title)
-  const allAssets = (assets ?? []) as Asset[]
   const allBlocks = (blocks ?? []) as Block[]
+  const referencedAssetIds = new Set(allBlocks.map(block => extractUploadedAssetId(block.content)).filter(Boolean))
+  const allAssets = ((assets ?? []) as Asset[]).filter(asset => !referencedAssetIds.has(asset.id))
   const background = buildBackground(currentPage, theme, accent)
   const fontClass = currentPage.font_style === 'classic' ? 'font-serif' : 'font-sans'
   const heroSize = currentPage.header_style === 'compact' ? 'py-10 md:py-14' : currentPage.header_style === 'cover' ? 'py-20 md:py-28' : 'py-14 md:py-20'

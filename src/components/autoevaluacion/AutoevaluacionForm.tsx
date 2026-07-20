@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
 type Course = { id: string; name: string }
+type Project = { id: string; title: string; course_id?: string | null }
 
 type Actor = {
   id: string
@@ -17,6 +18,7 @@ type Actor = {
 type Props = {
   actor: Actor
   courses: Course[]
+  projects: Project[]
   selectedFormat?: AutoevaluacionFormat
 }
 
@@ -28,7 +30,7 @@ function buildInitialAnswers(questions: AutoevaluacionQuestion[]) {
   ) as Record<string, AnswerValue>
 }
 
-export default function AutoevaluacionForm({ actor, courses, selectedFormat = DEFAULT_AUTOEVALUACION_FORMAT }: Props) {
+export default function AutoevaluacionForm({ actor, courses, projects, selectedFormat = DEFAULT_AUTOEVALUACION_FORMAT }: Props) {
   const router = useRouter()
   const questions = selectedFormat.questions?.length ? selectedFormat.questions : DEFAULT_AUTOEVALUACION_FORMAT.questions
   const guessedCourse = useMemo(() => {
@@ -39,7 +41,8 @@ export default function AutoevaluacionForm({ actor, courses, selectedFormat = DE
   const [form, setForm] = useState({
     student_name: actor.full_name ?? '',
     course_id: guessedCourse,
-    project_name: '',
+    project_id: projects.length === 1 ? projects[0].id : '',
+    project_name: projects.length === 1 ? projects[0].title : '',
     intervention_place: '',
   })
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>(() => buildInitialAnswers(questions))
@@ -62,7 +65,7 @@ export default function AutoevaluacionForm({ actor, courses, selectedFormat = DE
   const validate = () => {
     if (!form.student_name.trim()) return 'Debes escribir tu nombre completo.'
     if (!form.course_id) return 'Debes seleccionar tu curso.'
-    if (!form.project_name.trim()) return 'Debes escribir el nombre del proyecto o intervención.'
+    if (!form.project_id) return 'Debes seleccionar el proyecto.'
     if (!form.intervention_place.trim()) return 'Debes escribir el lugar intervenido en el colegio.'
     for (const question of questions) {
       if (!question.required) continue
@@ -140,8 +143,11 @@ export default function AutoevaluacionForm({ actor, courses, selectedFormat = DE
               {courses.map(course => <option key={course.id} value={course.id}>{course.name}</option>)}
             </select>
           </label>
-          <label className="text-sm font-medium text-gray-700">Nombre del proyecto o intervención *
-            <input value={form.project_name} onChange={e => setForm({ ...form, project_name: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5" placeholder="Ej: Punto limpio, panel reciclable, sitio verde" />
+          <label className="text-sm font-medium text-gray-700">Proyecto asociado *
+            <select value={form.project_id} onChange={e => { const project = projects.find(item => item.id === e.target.value); setForm({ ...form, project_id: e.target.value, project_name: project?.title ?? '', course_id: project?.course_id ?? form.course_id }) }} className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5 bg-white">
+              <option value="">Selecciona tu proyecto</option>
+              {projects.map(project => <option key={project.id} value={project.id}>{project.title}</option>)}
+            </select>
           </label>
           <label className="text-sm font-medium text-gray-700">Lugar intervenido *
             <input value={form.intervention_place} onChange={e => setForm({ ...form, intervention_place: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-xl px-3 py-2.5" placeholder="Ej: patio central, pasillo, sala, jardín" />

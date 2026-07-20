@@ -104,13 +104,19 @@ export default function PortafolioPage() {
         .order('created_at', { ascending: true })
       setEvidencias(evs ?? [])
 
-      // Cargar TODOS los proyectos del usuario (no solo los que tienen evidencia)
-      const { data: proys } = await supabase
-        .from('projects')
-        .select('id, title, status, tipo_proyecto, metodologia, start_date, end_date, description, pregunta_guia, objetivos_aprendizaje, habilidades, organizacion_trabajo, herramientas_tecnologicas, etapas_metodologia, uso_ia, aprendizajes_logrados, dificultades, mejoras, impacto_comunidad, updated_at')
-        .eq('owner_id', user.id)
-        .order('updated_at', { ascending: false })
-      setProyectos(proys ?? [])
+      // Cargar proyectos propios y colaborativos. Cada uno abre un expediente
+      // automático con todos los módulos del recorrido.
+      const projectSelect = 'id, title, status, tipo_proyecto, metodologia, start_date, end_date, description, pregunta_guia, objetivos_aprendizaje, habilidades, organizacion_trabajo, herramientas_tecnologicas, etapas_metodologia, uso_ia, aprendizajes_logrados, dificultades, mejoras, impacto_comunidad, updated_at'
+      const [{ data: propios }, { data: colaboraciones }] = await Promise.all([
+        supabase.from('projects').select(projectSelect).eq('owner_id', user.id).order('updated_at', { ascending: false }),
+        supabase.from('project_collaborators').select('project_id').eq('user_id', user.id).eq('status', 'accepted'),
+      ])
+      const sharedIds = [...new Set((colaboraciones ?? []).map(row => row.project_id).filter(Boolean))]
+      const { data: compartidos } = sharedIds.length
+        ? await supabase.from('projects').select(projectSelect).in('id', sharedIds).order('updated_at', { ascending: false })
+        : { data: [] as any[] }
+      const mergedProjects = Array.from(new Map([...(propios ?? []), ...(compartidos ?? [])].map(project => [project.id, project])).values())
+      setProyectos(mergedProjects)
 
       setLoading(false)
     }
@@ -346,7 +352,7 @@ export default function PortafolioPage() {
                   <div className="space-y-4">
                     {proyectos.map((p: any) => (
                       <div key={p.id} className="border border-gray-100 rounded-xl p-5 hover:border-blue-200 transition-colors">
-                        <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex-1 min-w-0">
                             <Link href={`/proyectos/${p.id}`} className="font-semibold text-blue-800 hover:underline truncate block">{p.title}</Link>
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -354,7 +360,10 @@ export default function PortafolioPage() {
                               {p.metodologia && <span className="text-xs text-gray-400">{p.metodologia}</span>}
                             </div>
                           </div>
-                          <Link href={`/proyectos/${p.id}/editar`} className="ml-3 text-xs text-blue-600 hover:underline shrink-0">✏️ Editar</Link>
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <Link href={`/portafolio/proyecto/${p.id}`} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">📂 Ver expediente completo</Link>
+                            <Link href={`/proyectos/${p.id}/editar`} className="text-xs text-blue-600 hover:underline">✏️ Editar proyecto</Link>
+                          </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                           {p.description && <div className="col-span-2 bg-gray-50 rounded-lg p-3"><p className="text-xs font-semibold text-gray-400 mb-1">DESCRIPCIÓN</p><p className="text-xs text-gray-700">{p.description}</p></div>}

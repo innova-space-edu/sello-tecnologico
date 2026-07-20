@@ -282,12 +282,18 @@ export default function ReportEditorFinal({ reportId }: { reportId: string }) {
     setMessage(`Se agregó “${resource.title}” a la sección activa.`)
   }
 
-  const addSection = async (sectionType: 'text' | 'table' | 'resources') => {
+  const addSection = async (sectionType: 'title' | 'text' | 'table' | 'resources') => {
     if (!canEdit) return
     const content = sectionType === 'table'
       ? { text: '', table: [['Columna 1', 'Columna 2'], ['', '']] }
       : sectionType === 'resources' ? { text: '', resources: [] } : { text: '' }
-    const title = sectionType === 'table' ? 'Nueva tabla o cuadro' : sectionType === 'resources' ? 'Nueva sección de recursos' : 'Nueva sección'
+    const title = sectionType === 'title'
+      ? 'Nuevo título'
+      : sectionType === 'table'
+        ? 'Nueva tabla o cuadro'
+        : sectionType === 'resources'
+          ? 'Imágenes, videos y otros recursos'
+          : 'Nueva sección de texto'
     const { data, error: insertError } = await supabase.from('project_report_sections').insert({
       report_id: reportId,
       section_type: sectionType,
@@ -300,12 +306,29 @@ export default function ReportEditorFinal({ reportId }: { reportId: string }) {
       updated_by: userId,
     }).select('*').single()
     if (insertError || !data) { setError(insertError?.message ?? 'No se pudo agregar la sección.'); return }
-    setSections(prev => [...prev, data as ReportSection])
+    setSections(prev => prev.some(section => section.id === data.id) ? prev : [...prev, data as ReportSection].sort((a, b) => a.sort_order - b.sort_order))
     setActiveSectionId(data.id)
   }
 
+  const moveSection = async (id: string, direction: -1 | 1) => {
+    if (!canEdit) return
+    const currentIndex = sectionsRef.current.findIndex(section => section.id === id)
+    const targetIndex = currentIndex + direction
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= sectionsRef.current.length) return
+    const next = [...sectionsRef.current]
+    const [moved] = next.splice(currentIndex, 1)
+    next.splice(targetIndex, 0, moved)
+    const reordered = next.map((section, index) => ({ ...section, sort_order: index }))
+    setSections(reordered)
+    sectionsRef.current = reordered
+    const updates = reordered.map(section => supabase.from('project_report_sections').update({ sort_order: section.sort_order, updated_by: userId, updated_at: new Date().toISOString() }).eq('id', section.id))
+    const results = await Promise.all(updates)
+    const moveError = results.find(result => result.error)?.error
+    if (moveError) setError(moveError.message)
+  }
+
   const removeSection = async (id: string) => {
-    if (!canEdit || sections.length <= 1) return
+    if (!canEdit) return
     if (!window.confirm('¿Eliminar esta sección del informe?')) return
     const { error: deleteError } = await supabase.from('project_report_sections').delete().eq('id', id)
     if (deleteError) { setError(deleteError.message); return }
@@ -344,6 +367,14 @@ export default function ReportEditorFinal({ reportId }: { reportId: string }) {
 
   const reportAction = async (action: string, actionMessage?: string) => {
     setError('')
+    if (action === 'submit') {
+      while (savingRef.current) await new Promise(resolve => window.setTimeout(resolve, 100))
+      await saveDirty()
+      if (dirtyIdsRef.current.size || titleDirtyRef.current || savingRef.current) {
+        setError('El informe todavía tiene cambios pendientes. Revisa el estado de guardado e intenta enviarlo nuevamente.')
+        return
+      }
+    }
     const response = await fetch(`/api/informes/${reportId}/actions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -378,6 +409,10 @@ export default function ReportEditorFinal({ reportId }: { reportId: string }) {
 
   const calculateAndSaveGrade = async () => {
     if (!isStaff || !rubric || !criteria.length) return
+    if (!['submitted', 'in_review', 'evaluated'].includes(report?.status)) {
+      setError('El informe debe estar enviado o en revisión antes de calcular la nota.')
+      return
+    }
     const total = criteria.reduce((sum, criterion) => sum + Number(criterion.max_points), 0)
     const earned = criteria.reduce((sum, criterion) => sum + Math.min(Math.max(Number(scores[criterion.id] ?? 0), 0), Number(criterion.max_points)), 0)
     const finalGrade = calculateChileanGrade(earned, total, 60)
@@ -442,18 +477,14 @@ export default function ReportEditorFinal({ reportId }: { reportId: string }) {
       </div>
     </header>
 
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[280px_minmax(0,1fr)_340px]">
-      <div className="space-y-5 xl:sticky xl:top-5 xl:self-start">
-        <ReportTeamPanel members={members} classmates={classmates} isLeader={isLeader} onlineUserIds={onlineUserIds} onAdd={classmateId => void addMember(classmateId)} onRemove={memberId => void removeMember(memberId)} />
-        <ReportResourceLibrary resources={resources} onInsert={insertResource} />
-      </div>
-
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <main className="min-w-0 space-y-4">
         {canEdit && <div className="flex flex-wrap gap-2 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <span className="mr-1 self-center text-sm font-bold text-gray-700">Agregar:</span>
-          <button type="button" onClick={() => void addSection('text')} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">+ Sección de texto</button>
-          <button type="button" onClick={() => void addSection('table')} className="rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 hover:bg-green-100">+ Tabla o cuadro</button>
-          <button type="button" onClick={() => void addSection('resources')} className="rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100">+ Imágenes, videos o encuestas</button>
+          <span className="mr-1 self-center text-sm font-bold text-gray-700">Agregar bloque:</span>
+          <button type="button" onClick={() => void addSection('title')} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-200">+ Título</button>
+          <button type="button" onClick={() => void addSection('text')} className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100">+ Texto</button>
+          <button type="button" onClick={() => void addSection('table')} className="rounded-lg bg-green-50 px-3 py-2 text-xs font-bold text-green-700 hover:bg-green-100">+ Tabla</button>
+          <button type="button" onClick={() => void addSection('resources')} className="rounded-lg bg-purple-50 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100">+ Recursos</button>
         </div>}
 
         {sections.map((section, index) => <ReportSectionCard
@@ -470,12 +501,23 @@ export default function ReportEditorFinal({ reportId }: { reportId: string }) {
           onCommentChange={value => setCommentDrafts(prev => ({ ...prev, [section.id]: value }))}
           onAddComment={() => void addComment(section.id)}
           onResolveComment={commentId => void resolveComment(commentId)}
+          onMoveUp={index > 0 ? () => void moveSection(section.id, -1) : undefined}
+          onMoveDown={index < sections.length - 1 ? () => void moveSection(section.id, 1) : undefined}
           onRemove={() => void removeSection(section.id)}
         />)}
         {!sections.length && <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center text-gray-400">El informe todavía no tiene secciones.</div>}
       </main>
 
       <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
+        <details className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm" open>
+          <summary className="cursor-pointer font-bold text-blue-900">👥 Integrantes del informe</summary>
+          <div className="mt-4"><ReportTeamPanel members={members} classmates={classmates} isLeader={isLeader && canEdit} onlineUserIds={onlineUserIds} onAdd={classmateId => void addMember(classmateId)} onRemove={memberId => void removeMember(memberId)} /></div>
+        </details>
+        <details className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <summary className="cursor-pointer font-bold text-blue-900">📚 Información adicional del proyecto</summary>
+          <p className="mt-2 text-xs leading-relaxed text-gray-500">Este contenido es opcional. Selecciona una sección del informe y agrega solo la información que el grupo quiera utilizar.</p>
+          <div className="mt-4"><ReportResourceLibrary resources={resources} onInsert={insertResource} /></div>
+        </details>
         {activeSection && <section className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
           <p className="font-bold">Sección activa</p>
           <p className="mt-1">{activeSection.title}</p>

@@ -15,6 +15,7 @@ type SearchParams = Promise<{ formato?: string }>
 
 type Course = { id: string; name: string }
 type Student = { id: string; full_name?: string | null; email?: string | null; curso?: string | null }
+type Project = { id: string; title: string; course_id?: string | null }
 
 type SavedFormatRow = {
   id: string
@@ -33,7 +34,7 @@ export default async function AutoevaluacionPage({ searchParams }: { searchParam
   const requestedFormatId = params?.formato ?? DEFAULT_AUTOEVALUACION_FORMAT_ID
 
   const admin = createAdminSupabaseClient()
-  const [{ data: courses }, { data: savedFormats }, { data: students }] = await Promise.all([
+  const [{ data: courses }, { data: savedFormats }, { data: students }, { data: ownProjects }, { data: collaborations }] = await Promise.all([
     admin
       .from('courses')
       .select('id, name')
@@ -48,7 +49,15 @@ export default async function AutoevaluacionPage({ searchParams }: { searchParam
       .select('id, full_name, email, curso')
       .eq('role', 'estudiante')
       .order('full_name', { ascending: true }),
+    admin.from('projects').select('id, title, course_id').eq('owner_id', actor.id).order('updated_at', { ascending: false }),
+    admin.from('project_collaborators').select('project_id').eq('user_id', actor.id).eq('status', 'accepted'),
   ])
+
+  const sharedProjectIds = [...new Set((collaborations ?? []).map(row => row.project_id).filter(Boolean))]
+  const { data: sharedProjects } = sharedProjectIds.length
+    ? await admin.from('projects').select('id, title, course_id').in('id', sharedProjectIds).order('updated_at', { ascending: false })
+    : { data: [] as Project[] }
+  const projects = Array.from(new Map([...(ownProjects ?? []), ...(sharedProjects ?? [])].map(project => [project.id, project])).values()) as Project[]
 
   const canManageFormats = ['admin', 'docente', 'coordinador'].includes(actor.role)
   const canReview = ['admin', 'docente'].includes(actor.role)
@@ -114,6 +123,7 @@ export default async function AutoevaluacionPage({ searchParams }: { searchParam
           <AutoevaluacionForm
             actor={actor}
             courses={(courses ?? []) as Course[]}
+            projects={projects}
             selectedFormat={selectedFormat}
           />
         </div>

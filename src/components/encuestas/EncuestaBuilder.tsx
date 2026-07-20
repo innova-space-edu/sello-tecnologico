@@ -20,6 +20,7 @@ type Question = {
 }
 
 type Course = { id: string; name: string }
+type Project = { id: string; title: string; course_id?: string | null }
 type Teacher = { id: string; full_name?: string | null; email?: string | null; role?: string | null }
 
 const questionTypes: { value: QuestionType; label: string; description: string }[] = [
@@ -74,10 +75,11 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [courses, setCourses] = useState<Course[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [staffIds, setStaffIds] = useState<string[]>([])
   const [responseCount, setResponseCount] = useState(0)
-  const [form, setForm] = useState({ title: '', description: '', course_id: '', is_active: true, allow_anonymous: true })
+  const [form, setForm] = useState({ title: '', description: '', course_id: '', project_id: '', is_active: true, allow_anonymous: true })
   const [questions, setQuestions] = useState<Question[]>([emptyQuestion()])
   const locked = responseCount > 0
   const totalPoints = questions.reduce((total, question) => total + (Number(question.max_points) || 0), 0)
@@ -87,14 +89,16 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
     const load = async () => {
       const { data: auth } = await supabase.auth.getUser()
       const userId = auth.user?.id ?? ''
-      const [{ data: courseRows }, { data: teacherRows }, { data: memberRow }, { data: profile }] = await Promise.all([
+      const [{ data: courseRows }, { data: projectRows }, { data: teacherRows }, { data: memberRow }, { data: profile }] = await Promise.all([
         supabase.from('courses').select('id, name').order('name'),
+        supabase.from('projects').select('id, title, course_id').order('updated_at', { ascending: false }),
         supabase.from('profiles').select('id, full_name, email, role').in('role', ['docente', 'admin']).order('full_name'),
         userId ? supabase.from('course_members').select('course_id').eq('user_id', userId).limit(1).maybeSingle() : Promise.resolve({ data: null }),
         userId ? supabase.from('profiles').select('curso').eq('id', userId).maybeSingle() : Promise.resolve({ data: null }),
       ])
       const normalizedCourses = (courseRows ?? []) as Course[]
       setCourses(normalizedCourses)
+      setProjects((projectRows ?? []) as Project[])
       setTeachers((teacherRows ?? []) as Teacher[])
 
       if (surveyId) {
@@ -102,7 +106,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
         const data = await response.json()
         if (!response.ok) setError(data.error ?? 'No fue posible cargar la encuesta.')
         else {
-          setForm({ title: data.title ?? '', description: data.description ?? '', course_id: data.course_id ?? '', is_active: data.is_active !== false, allow_anonymous: data.allow_anonymous !== false })
+          setForm({ title: data.title ?? '', description: data.description ?? '', course_id: data.course_id ?? '', project_id: data.project_id ?? '', is_active: data.is_active !== false, allow_anonymous: data.allow_anonymous !== false })
           setStaffIds(data.staff_ids ?? [])
           setResponseCount(data.response_count ?? 0)
           setQuestions((data.questions ?? []).map((question: any) => ({
@@ -163,7 +167,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); setError('')
-    if (!form.title.trim() || !form.course_id) return setError('Completa el título y selecciona un curso.')
+    if (!form.title.trim() || !form.course_id || !form.project_id) return setError('Completa el título y selecciona un curso y proyecto.')
     if (!locked && (questions.length === 0 || questions.some(question => !question.prompt.trim()))) return setError('Cada pregunta debe tener un enunciado.')
     setSaving(true)
     const response = await fetch(surveyId ? `/api/encuestas/${surveyId}` : '/api/encuestas', { method: surveyId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...form, questions, staff_ids: staffIds }) })
@@ -184,6 +188,7 @@ export default function EncuestaBuilder({ surveyId }: { surveyId?: string }) {
         <label className="text-sm font-medium text-gray-700 md:col-span-2">Título *<input disabled={locked} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100" /></label>
         <label className="text-sm font-medium text-gray-700 md:col-span-2">Descripción<textarea disabled={locked} rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100" /></label>
         <label className="text-sm font-medium text-gray-700">Curso asociado *<select disabled={locked} value={form.course_id} onChange={e => setForm({ ...form, course_id: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100"><option value="">Selecciona un curso</option>{courses.map(course => <option key={course.id} value={course.id}>{course.name}</option>)}</select></label>
+        <label className="text-sm font-medium text-gray-700">Proyecto asociado *<select disabled={locked} value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2.5 disabled:bg-gray-100"><option value="">Selecciona un proyecto</option>{projects.filter(project => !form.course_id || project.course_id === form.course_id).map(project => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
         <div className="space-y-2 pt-6"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} /> Encuesta activa</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.allow_anonymous} onChange={e => setForm({ ...form, allow_anonymous: e.target.checked })} /> Permitir respuestas anónimas</label></div>
       </div>
     </section>

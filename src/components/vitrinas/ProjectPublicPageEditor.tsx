@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import VideoBlockEditor from '@/components/vitrinas/VideoBlockEditor'
 
 type Project = {
   id: string
@@ -96,6 +97,12 @@ const QUICK_BLOCKS: Record<string, Block> = {
     type: 'post',
     title: 'Nueva publicación del equipo',
     content: 'Cuenta qué realizaron, qué aprendieron y qué evidencia agregaron.',
+    sort_order: 0,
+  },
+  video: {
+    type: 'video',
+    title: 'Video del proyecto',
+    content: '',
     sort_order: 0,
   },
   gallery: {
@@ -337,6 +344,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingVideoBlock, setUploadingVideoBlock] = useState<number | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [userId, setUserId] = useState('')
@@ -663,6 +671,36 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
     }
   }
 
+  const uploadVideoForBlock = async (index: number, files: FileList | null) => {
+    const file = files?.[0]
+    if (!file) return
+    setUploadingVideoBlock(index)
+    setMessage('')
+    setError('')
+    try {
+      if (!file.type.startsWith('video/')) throw new Error('Selecciona un video válido.')
+      if (file.size > 500 * 1024 * 1024) throw new Error('El video supera el máximo de 500 MB.')
+      const currentPage = await ensurePage()
+      const name = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-')
+      const storagePath = currentPage.id + '/' + Date.now() + '-' + name
+      const { error: uploadError } = await supabase.storage.from('project-public-assets').upload(storagePath, file, { contentType: file.type, upsert: false })
+      if (uploadError) throw uploadError
+      const { data: asset, error: assetError } = await supabase.from('project_public_assets').insert({
+        page_id: currentPage.id, project_id: project?.id ?? null, uploaded_by: userId, file_name: file.name, file_type: 'video',
+        mime_type: file.type, file_size: file.size, storage_bucket: 'project-public-assets', storage_path: storagePath, title: file.name, description: null,
+      }).select('id').single()
+      if (assetError || !asset) throw assetError ?? new Error('No se pudo registrar el video.')
+      updateBlock(index, { content: '/api/vitrinas/assets/' + asset.id, title: blocks[index]?.title.trim() || file.name })
+      const { data } = await supabase.from('project_public_assets').select('*').eq('page_id', currentPage.id).order('created_at', { ascending: false })
+      setAssets((data ?? []) as Asset[])
+      setMessage('Video subido. Guarda la página para conservar el bloque.')
+    } catch (err: any) {
+      setError(err?.message ?? 'No fue posible subir el video.')
+    } finally {
+      setUploadingVideoBlock(null)
+    }
+  }
+
   const applyPreset = (preset: PagePreset) => {
     setSelectedPresetName(preset.name)
     setForm(prev => ({
@@ -985,6 +1023,7 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
         <div className="flex flex-wrap gap-2 mb-5">
           <button type="button" onClick={() => addBlock('podcast')} className="px-3 py-2 rounded-lg bg-purple-50 text-purple-700 text-sm font-semibold">+ Episodio podcast</button>
           <button type="button" onClick={() => addBlock('post')} className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-semibold">+ Post</button>
+          <button type="button" onClick={() => addBlock('video')} className="px-3 py-2 rounded-lg bg-red-50 text-red-700 text-sm font-semibold">+ Video</button>
           <button type="button" onClick={() => addBlock('gallery')} className="px-3 py-2 rounded-lg bg-green-50 text-green-700 text-sm font-semibold">+ Galería</button>
           <button type="button" onClick={() => addBlock('cta')} className="px-3 py-2 rounded-lg bg-orange-50 text-orange-700 text-sm font-semibold">+ Botón/enlace</button>
         </div>
@@ -1004,10 +1043,21 @@ export default function ProjectPublicPageEditor({ projectId }: { projectId: stri
                   Eliminar
                 </button>
               </div>
-              <textarea value={block.content} onChange={event => updateBlock(index, { content: event.target.value })}
-                placeholder="Contenido, resumen, guion, descripción del episodio, URL o mensaje para visitantes."
-                rows={4}
-                className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              {block.type === 'video' ? (
+                <VideoBlockEditor
+                  value={block.content}
+                  title={block.title}
+                  uploading={uploadingVideoBlock === index}
+                  onLinkChange={content => updateBlock(index, { content })}
+                  onUpload={files => void uploadVideoForBlock(index, files)}
+                  onClear={() => updateBlock(index, { content: '' })}
+                />
+              ) : (
+                <textarea value={block.content} onChange={event => updateBlock(index, { content: event.target.value })}
+                  placeholder="Contenido, resumen, guion, descripción del episodio, URL o mensaje para visitantes."
+                  rows={4}
+                  className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
+              )}
             </div>
           ))}
         </div>
