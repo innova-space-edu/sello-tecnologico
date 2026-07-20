@@ -233,21 +233,21 @@ export default function PortafolioPage() {
         })()}
 
         {/* Portada visual del portafolio editable */}
-        <header className="relative mb-6 overflow-hidden rounded-[32px] bg-slate-950 px-6 py-7 text-white shadow-2xl shadow-violet-200/40 sm:px-8">
-          <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-fuchsia-500/35 blur-3xl" />
-          <div className="absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-cyan-400/20 blur-3xl" />
+        <header className="relative mb-6 overflow-hidden rounded-[32px] border border-violet-100 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-sky-100 px-6 py-7 text-slate-900 shadow-xl shadow-violet-100/70 sm:px-8">
+          <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-fuchsia-300/40 blur-3xl" />
+          <div className="absolute -bottom-24 left-1/3 h-60 w-60 rounded-full bg-cyan-200/50 blur-3xl" />
           <div className="relative flex flex-wrap items-start justify-between gap-6">
             <div className="flex items-center gap-4">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400 to-fuchsia-500 text-2xl font-black shadow-lg">{perfil?.full_name?.[0]?.toUpperCase() ?? '?'}</div>
-              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200">Mi espacio creativo · {new Date().getFullYear()}</p><h1 className="mt-1 text-2xl font-black sm:text-3xl">Portafolio de {perfil?.full_name ?? perfil?.email}</h1><p className="mt-1 text-sm text-slate-300">Organiza tu historia, presenta tus proyectos y muestra cómo has mejorado.</p></div>
+              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-600">Mi espacio creativo · {new Date().getFullYear()}</p><h1 className="mt-1 text-2xl font-black text-slate-900 sm:text-3xl">Portafolio de {perfil?.full_name ?? perfil?.email}</h1><p className="mt-1 text-sm text-slate-600">Organiza tu historia, presenta tus proyectos y muestra cómo has mejorado.</p></div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link href="/portafolio/feria" className="rounded-full bg-white/10 px-4 py-2.5 text-sm font-bold text-white ring-1 ring-white/15 transition hover:bg-white/20">🎪 Modo Feria</Link>
+              <Link href="/portafolio/feria" className="rounded-full border border-violet-200 bg-white/80 px-4 py-2.5 text-sm font-bold text-violet-700 shadow-sm transition hover:bg-white">🎪 Modo Feria</Link>
               <ExportPortafolioPDF portafolio={portafolio} estudiante={perfil} evidencias={evidencias} proyectos={proyectos} secciones={portfolioSections} />
               <button onClick={handleSave} disabled={saving} className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-emerald-400 disabled:opacity-50">{saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}</button>
             </div>
           </div>
-          <div className="relative mt-6 grid grid-cols-3 gap-3 sm:max-w-lg"><div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p className="text-2xl font-black">{proyectos.length}</p><p className="text-[10px] text-slate-300">Proyectos</p></div><div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p className="text-2xl font-black">{evidencias.length}</p><p className="text-[10px] text-slate-300">Evidencias</p></div><div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/10"><p className="text-2xl font-black">{portfolioSections.length}</p><p className="text-[10px] text-slate-300">Secciones propias</p></div></div>
+          <div className="relative mt-6 grid grid-cols-3 gap-3 sm:max-w-lg"><div className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-white"><p className="text-2xl font-black text-violet-700">{proyectos.length}</p><p className="text-[10px] text-slate-500">Proyectos</p></div><div className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-white"><p className="text-2xl font-black text-blue-700">{evidencias.length}</p><p className="text-[10px] text-slate-500">Evidencias</p></div><div className="rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-white"><p className="text-2xl font-black text-fuchsia-700">{portfolioSections.length}</p><p className="text-[10px] text-slate-500">Secciones propias</p></div></div>
         </header>
 
         {/* Tabs */}
@@ -255,7 +255,7 @@ export default function PortafolioPage() {
           {TABS.map((t, i) => (
             <button key={i} onClick={() => setTab(i)}
               className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${
-                tab === i ? 'bg-slate-950 text-white shadow-md' : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'
+                tab === i ? 'bg-violet-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'
               }`}>
               <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-[10px] ${tab === i ? 'bg-white/15' : 'bg-slate-100'}`}>{i + 1}</span>{t.replace(/^[A-G]\.\s*/, '')}
             </button>
