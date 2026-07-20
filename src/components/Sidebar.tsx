@@ -17,6 +17,7 @@ const menu = [
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
   { href: '/informes', label: 'Informes', icon: '📘' },
+  { href: '/portafolio', label: 'Portafolio', icon: '📂' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
   { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
   { href: '/calendario', label: 'Calendario', icon: '📅' },
