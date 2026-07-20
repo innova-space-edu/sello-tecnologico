@@ -371,7 +371,7 @@ export default function ExportPortafolioPDF({ portafolio, estudiante, evidencias
     <button
       onClick={handleExport}
       disabled={loading}
-      className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 text-sm"
+      className="flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 shadow-sm transition-colors hover:bg-violet-50 disabled:opacity-50"
       title="Exportar portafolio completo como PDF con imágenes">
       {loading
         ? <><span className="animate-spin">⏳</span> {progreso || 'Generando PDF...'}</>
