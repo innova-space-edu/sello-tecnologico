@@ -368,7 +368,12 @@ insert into public.project_portfolio_items(project_portfolio_id, source_type, so
 select pp.id, 'followup', f.id, concat('Seguimiento ', coalesce(f.followup_date::text, '')),
   jsonb_build_object('followup', to_jsonb(f), 'participants', coalesce((select jsonb_agg(to_jsonb(fp)) from public.followup_participants fp where fp.followup_id = f.id), '[]'::jsonb), 'items', coalesce((select jsonb_agg(to_jsonb(fi) order by fi.sort_order) from public.followup_items fi where fi.followup_id = f.id), '[]'::jsonb), 'photos', coalesce((select jsonb_agg(to_jsonb(ph) order by ph.created_at) from public.followup_photos ph where ph.followup_id = f.id), '[]'::jsonb)), f.created_at
 from public.project_followups f
-join public.followup_participants participant on participant.followup_id = f.id
+join (
+  -- Algunos seguimientos históricos contienen al mismo usuario más de una
+  -- vez. Se deduplica la participación antes de construir la clave del ítem.
+  select distinct followup_id, user_id
+  from public.followup_participants
+) participant on participant.followup_id = f.id
 join public.project_portfolios pp on pp.project_id = f.project_id and pp.user_id = participant.user_id
 on conflict (project_portfolio_id, source_type, source_id) do update set snapshot = excluded.snapshot, updated_at = now();
 
