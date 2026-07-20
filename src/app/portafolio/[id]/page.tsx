@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
 import PortfolioSections from '@/components/PortfolioSections'
 import ExportPortafolioPDF from '@/components/ExportPortafolioPDF'
+import { PortfolioAction, PortfolioEmpty, PortfolioField } from '@/components/portafolio/PortfolioValue'
 
 const etapaColor: Record<string, string> = {
   inicial: 'bg-yellow-100 text-yellow-700',
@@ -12,16 +14,6 @@ const etapaColor: Record<string, string> = {
 
 const etapaIcon: Record<string, string> = {
   inicial: '🟡', intermedia: '🔵', final: '🟢',
-}
-
-const Campo = ({ label, value }: { label: string, value?: string | null }) => {
-  if (!value) return null
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 rounded-lg p-3">{value}</p>
-    </div>
-  )
 }
 
 export default async function PortafolioEstudiantePage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,7 +27,7 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
   if (!portafolio) return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="lg:ml-64 flex-1 p-8 pt-16 lg:pt-8">
+      <main className="flex-1 p-8 pt-16 lg:pt-8">
         <p className="text-gray-500">Portafolio no encontrado.</p>
       </main>
     </div>
@@ -67,216 +59,46 @@ export default async function PortafolioEstudiantePage({ params }: { params: Pro
   const evIntermedia = evidencias?.filter(e => e.evidencia_tipo === 'intermedia') ?? []
   const evFinal = evidencias?.filter(e => e.evidencia_tipo === 'final') ?? []
 
+  const evidenceProgress = Math.min(100, Math.round(((evidencias?.length ?? 0) / 9) * 100))
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-[#f5f6fb]">
       <Sidebar />
-      <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
+      <main className="min-w-0 flex-1 px-3 pb-14 pt-16 sm:px-5 lg:px-8 lg:pt-7">
+        <div className="mx-auto max-w-7xl">
+          <Link href="/portafolio" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-violet-700">← Volver a portafolios</Link>
 
-        {/* Header */}
-        <div className="mb-6">
-          <Link href="/portafolio" className="text-blue-600 text-sm hover:underline">← Volver</Link>
-          <div className="mt-3 bg-gradient-to-r from-blue-800 to-blue-600 rounded-2xl p-6 text-white">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-3xl font-bold shrink-0">
-                {estudiante?.full_name?.[0]?.toUpperCase() ?? '?'}
+          <header className="relative mt-4 overflow-hidden rounded-[34px] bg-slate-950 p-6 text-white shadow-2xl shadow-violet-200/50 sm:p-9">
+            <div className="absolute -right-12 -top-24 h-72 w-72 rounded-full bg-fuchsia-500/35 blur-3xl" />
+            <div className="absolute -bottom-28 left-1/4 h-72 w-72 rounded-full bg-cyan-400/25 blur-3xl" />
+            <div className="relative flex flex-wrap items-center justify-between gap-7">
+              <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[26px] bg-gradient-to-br from-violet-400 to-fuchsia-500 text-3xl font-black shadow-xl ring-4 ring-white/10 sm:h-24 sm:w-24">{estudiante?.full_name?.[0]?.toUpperCase() ?? '?'}</div>
+                <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-200">Portafolio personal · {portafolio.year}</p><h1 className="mt-2 truncate text-2xl font-black sm:text-4xl">{estudiante?.full_name ?? estudiante?.email}</h1><p className="mt-2 text-sm text-slate-300">{estudiante?.curso ?? 'Curso no indicado'} · Una colección viva de proyectos y aprendizajes</p></div>
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl font-bold">📂 {estudiante?.full_name ?? estudiante?.email}</h1>
-                  <ExportPortafolioPDF
-                    portafolio={portafolio}
-                    estudiante={estudiante}
-                    evidencias={evidencias ?? []}
-                    proyectos={proyectos}
-                    secciones={secciones ?? []}
-                  />
-                </div>
-                <p className="text-blue-200 mt-0.5">Portafolio Tecnológico · {portafolio.year}</p>
-                {estudiante?.curso && <p className="text-blue-200 text-sm">{estudiante.curso}</p>}
-              </div>
-              <div className="flex gap-3 text-center">
-                <div className="bg-white bg-opacity-10 rounded-xl px-4 py-2">
-                  <div className="text-xl font-bold">{evidencias?.length ?? 0}</div>
-                  <div className="text-blue-200 text-xs">Evidencias</div>
-                </div>
-                <div className="bg-white bg-opacity-10 rounded-xl px-4 py-2">
-                  <div className="text-xl font-bold">{secciones?.length ?? 0}</div>
-                  <div className="text-blue-200 text-xs">Secciones</div>
-                </div>
-                <div className="bg-white bg-opacity-10 rounded-xl px-4 py-2">
-                  <div className="text-xl font-bold">{evFinal.length}</div>
-                  <div className="text-blue-200 text-xs">Finales</div>
-                </div>
-              </div>
+              <ExportPortafolioPDF portafolio={portafolio} estudiante={estudiante} evidencias={evidencias ?? []} proyectos={proyectos} secciones={secciones ?? []} />
             </div>
-          </div>
-        </div>
+            <div className="relative mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4"><div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{proyectos.length}</p><p className="text-xs text-slate-300">Proyectos</p></div><div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{evidencias?.length ?? 0}</p><p className="text-xs text-slate-300">Evidencias</p></div><div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{evFinal.length}</p><p className="text-xs text-slate-300">Resultados finales</p></div><div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10"><p className="text-3xl font-black">{secciones?.length ?? 0}</p><p className="text-xs text-slate-300">Secciones propias</p></div></div>
+          </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-5">
+          <div className="mt-7 grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="min-w-0 space-y-6">
+              {(portafolio.quien_soy || portafolio.que_interesa_aprender || portafolio.que_espero_mejorar) && <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"><div className="bg-gradient-to-r from-violet-600 to-fuchsia-500 px-6 py-5 text-white"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-100">Mi identidad</p><h2 className="mt-1 text-2xl font-black">Así comienza mi historia</h2></div><div className="grid gap-4 p-5 md:grid-cols-2 sm:p-7"><PortfolioField label="¿Quién soy?" value={portafolio.quien_soy} accent="violet" /><PortfolioField label="¿Qué me interesa aprender?" value={portafolio.que_interesa_aprender} accent="blue" /><PortfolioField label="¿Qué espero mejorar este año?" value={portafolio.que_espero_mejorar} accent="emerald" /></div></section>}
 
-            {/* B — Presentación */}
-            {(portafolio.quien_soy || portafolio.que_interesa_aprender || portafolio.que_espero_mejorar) && (
-              <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-                <h2 className="font-bold text-blue-900 border-b pb-2">B. Presentación personal</h2>
-                <Campo label="¿Quién soy?" value={portafolio.quien_soy} />
-                <Campo label="¿Qué me interesa aprender?" value={portafolio.que_interesa_aprender} />
-                <Campo label="¿Qué espero mejorar este año?" value={portafolio.que_espero_mejorar} />
-              </div>
-            )}
+              <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 px-6 py-5"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-500">Colección de proyectos</p><h2 className="mt-1 text-2xl font-black text-slate-900">Expedientes completos</h2><p className="mt-1 text-sm text-slate-500">Cada portada abre el recorrido completo, desde la plantilla hasta el informe final.</p></div><span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-black text-white">{proyectos.length}</span></div>{proyectos.length ? <div className="grid gap-4 p-5 md:grid-cols-2 sm:p-7">{proyectos.map((project: any, index: number) => <Link key={project.id} href={`/portafolio/proyecto/${project.id}?estudiante=${portafolio.user_id}&portafolio=${portafolio.id}`} className={`group relative min-h-64 overflow-hidden rounded-[26px] p-6 text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl ${index % 3 === 0 ? 'bg-gradient-to-br from-violet-700 via-fuchsia-600 to-rose-500' : index % 3 === 1 ? 'bg-gradient-to-br from-blue-700 via-cyan-600 to-emerald-500' : 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500'}`}><div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/15 blur-xl" /><div className="relative flex h-full flex-col"><div className="flex items-center justify-between"><span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-wide ring-1 ring-white/20">{project.tipo_proyecto ?? 'Proyecto'}</span><span className="text-2xl">✦</span></div><h3 className="mt-8 text-2xl font-black leading-tight">{project.title}</h3><p className="mt-3 line-clamp-3 text-sm leading-6 text-white/80">{project.description ?? project.pregunta_guia ?? 'Explora todo el proceso y los resultados de este proyecto.'}</p><div className="mt-auto flex items-end justify-between pt-7"><div><p className="text-[10px] uppercase tracking-wide text-white/60">Actualizado</p><p className="text-xs font-bold">{project.updated_at ? new Date(project.updated_at).toLocaleDateString('es-CL') : 'Sin fecha'}</p></div><span className="rounded-full bg-white px-4 py-2 text-xs font-black text-slate-900 transition group-hover:scale-105">Explorar →</span></div></div></Link>)}</div> : <div className="p-5 sm:p-7"><PortfolioEmpty icon="🗂️" title="Aún no hay proyectos vinculados" description="Cuando el estudiante cree o se incorpore a un proyecto, su expediente aparecerá aquí como una nueva portada." /></div>}</section>
 
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="font-bold text-blue-900">C. Expedientes de proyectos ({proyectos.length})</h2>
-                <p className="mt-1 text-xs text-gray-400">Cada expediente reúne formulario, evidencias, seguimiento, encuestas, autoevaluación, página web e informe.</p>
-              </div>
-              {proyectos.length > 0 ? <div className="divide-y divide-gray-100">{proyectos.map((project: any) => (
-                <Link key={project.id} href={`/portafolio/proyecto/${project.id}?estudiante=${portafolio.user_id}&portafolio=${portafolio.id}`} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-blue-50">
-                  <div><p className="font-semibold text-gray-800">{project.title}</p><p className="mt-1 text-xs text-gray-400">{project.status ?? 'Sin estado'} · actualizado {project.updated_at ? new Date(project.updated_at).toLocaleDateString('es-CL') : '—'}</p></div>
-                  <span className="shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Ver todo →</span>
-                </Link>
-              ))}</div> : <div className="p-8 text-center text-sm text-gray-400">Sin proyectos vinculados.</div>}
+              <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"><div className="flex items-center justify-between border-b border-slate-100 px-6 py-5"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Galería del proceso</p><h2 className="mt-1 text-2xl font-black text-slate-900">Evidencias destacadas</h2></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{evidencias?.length ?? 0}</span></div>{evidencias?.length ? <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-7">{evidencias.map(ev => <Link key={ev.id} href={`/evidencias/${ev.id}`} className="group overflow-hidden rounded-3xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-lg">{ev.file_url && ev.file_type?.startsWith('image/') ? <div className="h-44 overflow-hidden bg-slate-100"><img src={ev.file_url} alt={ev.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /></div> : <div className="flex h-32 items-center justify-center bg-gradient-to-br from-emerald-50 to-cyan-50 text-5xl">{ev.file_type?.startsWith('video/') ? '🎥' : '📎'}</div>}<div className="p-4"><div className="flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-black capitalize ${etapaColor[ev.evidencia_tipo] ?? 'bg-slate-100 text-slate-600'}`}>{etapaIcon[ev.evidencia_tipo] ?? '✦'} {ev.evidencia_tipo ?? 'evidencia'}</span><span className="text-[10px] text-slate-400">{new Date(ev.created_at).toLocaleDateString('es-CL')}</span></div><h3 className="mt-3 font-black text-slate-900">{ev.title}</h3><p className="mt-1 text-xs text-slate-500">{ev.projects?.title ?? 'Proyecto'}</p>{ev.reflexion_aprendizaje && <p className="mt-3 line-clamp-2 text-sm italic leading-6 text-slate-600">“{ev.reflexion_aprendizaje}”</p>}</div></Link>)}</div> : <div className="p-5 sm:p-7"><PortfolioEmpty icon="📎" title="Sin evidencias todavía" description="Las imágenes, videos y documentos importantes formarán una galería visual en esta sección." /></div>}</section>
+
+              {(portafolio.lo_que_aprendi || portafolio.lo_que_mejore || portafolio.quiero_aprender || portafolio.tecnologia_ayudo) && <section className="rounded-[28px] bg-gradient-to-br from-slate-950 via-violet-950 to-fuchsia-900 p-6 text-white shadow-xl sm:p-8"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-fuchsia-200">Cierre del año</p><h2 className="mt-2 text-3xl font-black">Lo que me llevo de este recorrido</h2><div className="mt-6 grid gap-4 md:grid-cols-2"><PortfolioField label="Lo que más aprendí" value={portafolio.lo_que_aprendi} accent="violet" /><PortfolioField label="Lo que mejoré" value={portafolio.lo_que_mejore} accent="emerald" /><PortfolioField label="Lo próximo que quiero aprender" value={portafolio.quiero_aprender} accent="blue" /><PortfolioField label="Cómo me ayudó la tecnología" value={portafolio.tecnologia_ayudo} accent="rose" /></div></section>}
+
+              {secciones && secciones.length > 0 && <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-500">Contenido personal</p><h2 className="mb-5 mt-1 text-2xl font-black text-slate-900">Secciones creadas por el estudiante</h2><PortfolioSections portfolioId={portafolio.id} initialSections={secciones} editable={false} /></section>}
             </div>
 
-            {/* C — Evidencias */}
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100">
-                <h2 className="font-bold text-blue-900">C. Evidencias ({evidencias?.length ?? 0})</h2>
-              </div>
-              {evidencias && evidencias.length > 0 ? (
-                <div className="divide-y divide-gray-100">
-                  {evidencias.map(ev => (
-                    <Link key={ev.id} href={`/evidencias/${ev.id}`}
-                      className="flex items-start gap-4 px-6 py-4 hover:bg-blue-50 transition-colors">
-                      {ev.file_url && ev.file_type?.startsWith('image/') ? (
-                        <img src={ev.file_url} className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                      ) : (
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center text-xl shrink-0">
-                          {ev.file_type?.startsWith('video/') ? '🎥' : '📎'}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 text-sm">{ev.title}</p>
-                        <p className="text-xs text-gray-400">{ev.projects?.title ?? '—'}</p>
-                        <div className="flex gap-2 mt-1.5 flex-wrap">
-                          {ev.evidencia_tipo && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${etapaColor[ev.evidencia_tipo]}`}>
-                              {etapaIcon[ev.evidencia_tipo]} {ev.evidencia_tipo}
-                            </span>
-                          )}
-                        </div>
-                        {ev.reflexion_aprendizaje && (
-                          <p className="text-xs text-gray-500 mt-1 italic line-clamp-1">"{ev.reflexion_aprendizaje}"</p>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 shrink-0">
-                        {new Date(ev.created_at).toLocaleDateString('es-CL')}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-gray-400 text-sm">Sin evidencias aún</div>
-              )}
-            </div>
-
-            {/* E — Progreso */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">E. Progreso en el tiempo</h2>
-              <div className="grid grid-cols-3 gap-4 text-center mb-4">
-                <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
-                  <div className="text-2xl font-bold text-yellow-600">{evInicial.length}</div>
-                  <div className="text-xs text-gray-500 mt-1">🟡 Iniciales</div>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-600">{evIntermedia.length}</div>
-                  <div className="text-xs text-gray-500 mt-1">🔵 Intermedias</div>
-                </div>
-                <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-                  <div className="text-2xl font-bold text-green-600">{evFinal.length}</div>
-                  <div className="text-xs text-gray-500 mt-1">🟢 Finales</div>
-                </div>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-3">
-                <div className="bg-gradient-to-r from-yellow-400 via-blue-400 to-green-500 h-3 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, ((evidencias?.length ?? 0) / 9) * 100)}%` }} />
-              </div>
-            </div>
-
-            {/* F — Reflexión final */}
-            {(portafolio.lo_que_aprendi || portafolio.lo_que_mejore || portafolio.quiero_aprender || portafolio.tecnologia_ayudo) && (
-              <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-                <h2 className="font-bold text-blue-900 border-b pb-2">F. Reflexión final anual</h2>
-                <Campo label="Lo que más aprendí" value={portafolio.lo_que_aprendi} />
-                <Campo label="Lo que mejoré" value={portafolio.lo_que_mejore} />
-                <Campo label="Lo que quiero aprender el próximo año" value={portafolio.quiero_aprender} />
-                <Campo label="Cómo la tecnología me ayudó a aprender mejor" value={portafolio.tecnologia_ayudo} />
-              </div>
-            )}
-
-            {/* Secciones personalizadas — solo lectura para el docente */}
-            {secciones && secciones.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="font-bold text-blue-900 border-b pb-2 mb-4">➕ Secciones personalizadas</h2>
-                <PortfolioSections
-                  portfolioId={portafolio.id}
-                  initialSections={secciones}
-                  editable={false}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Panel lateral */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h3 className="font-semibold text-blue-900 mb-3">A. Información</h3>
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Nombre</span>
-                  <span className="font-medium text-gray-800 text-right max-w-32 truncate">{estudiante?.full_name ?? '—'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Curso</span>
-                  <span className="font-medium text-gray-800">{estudiante?.curso ?? '—'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">RUT</span>
-                  <span className="font-medium text-gray-800">{estudiante?.rut ?? '—'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Año</span>
-                  <span className="font-medium text-gray-800">{portafolio.year}</span>
-                </div>
-                {portafolio.asignaturas?.length > 0 && (
-                  <div>
-                    <span className="text-gray-400 block mb-1">Asignaturas</span>
-                    <span className="text-gray-700 text-xs">{portafolio.asignaturas.join(', ')}</span>
-                  </div>
-                )}
-                {portafolio.docentes?.length > 0 && (
-                  <div>
-                    <span className="text-gray-400 block mb-1">Docentes</span>
-                    <span className="text-gray-700 text-xs">{portafolio.docentes.join(', ')}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Resumen secciones */}
-            {secciones && secciones.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm p-5">
-                <h3 className="font-semibold text-blue-900 mb-3">Secciones personalizadas</h3>
-                <div className="space-y-1.5">
-                  {secciones.map((s: any) => (
-                    <div key={s.id} className="flex items-center gap-2 text-xs text-gray-600">
-                      <span>{s.type === 'texto' ? '📝' : s.type === 'alternativas' ? '☑️' : '🖼️'}</span>
-                      <span className="truncate">{s.title}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <aside className="space-y-5 xl:sticky xl:top-6">
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-xl">👤</span><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Ficha personal</p><h3 className="font-black text-slate-900">Información</h3></div></div><dl className="mt-5 space-y-3 text-sm">{[['Nombre', estudiante?.full_name], ['Curso', estudiante?.curso], ['RUT', estudiante?.rut], ['Año', portafolio.year]].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4 border-b border-slate-100 pb-3"><dt className="text-slate-400">{label}</dt><dd className="text-right font-bold text-slate-800">{value ?? '—'}</dd></div>)}</dl><div className="mt-4 space-y-3"><PortfolioField label="Asignaturas" value={portafolio.asignaturas} accent="blue" /><PortfolioField label="Docentes" value={portafolio.docentes} accent="violet" /></div></div>
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-end justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600">Progreso visual</p><h3 className="mt-1 text-xl font-black text-slate-900">Evidencias</h3></div><span className="text-3xl font-black text-slate-900">{evidenceProgress}%</span></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-blue-500 to-emerald-500" style={{ width: `${evidenceProgress}%` }} /></div><div className="mt-5 grid grid-cols-3 gap-2 text-center"><div className="rounded-2xl bg-amber-50 p-3"><p className="text-xl font-black text-amber-600">{evInicial.length}</p><p className="text-[10px] text-amber-700">Iniciales</p></div><div className="rounded-2xl bg-blue-50 p-3"><p className="text-xl font-black text-blue-600">{evIntermedia.length}</p><p className="text-[10px] text-blue-700">Proceso</p></div><div className="rounded-2xl bg-emerald-50 p-3"><p className="text-xl font-black text-emerald-600">{evFinal.length}</p><p className="text-[10px] text-emerald-700">Finales</p></div></div></div>
+              {proyectos[0] && <div className="rounded-[28px] bg-gradient-to-br from-violet-600 to-fuchsia-600 p-6 text-white shadow-lg"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-100">Continuar explorando</p><h3 className="mt-2 text-xl font-black">Abre el expediente más reciente</h3><p className="mt-2 text-sm leading-6 text-white/75">Revisa la historia completa del proyecto y todo lo que se ha guardado.</p><div className="mt-5"><PortfolioAction href={`/portafolio/proyecto/${proyectos[0].id}?estudiante=${portafolio.user_id}&portafolio=${portafolio.id}`}>Ver expediente →</PortfolioAction></div></div>}
+            </aside>
           </div>
         </div>
       </main>
