@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏫 Sello Tecnológico — Colegio Providencia
+# 🏫 Ecosistema Multi-Tarea Basado en Proyectos
 
 **Ecosistema escolar para crear, desarrollar, documentar, evaluar y publicar proyectos tecnológicos, científicos y STEAM.**
 
@@ -21,7 +21,7 @@ Desarrollado con **Next.js 16 · React 19 · Supabase · Tailwind CSS 4 · Verce
 
 ## 📋 Descripción
 
-**Sello Tecnológico** es una plataforma educativa integral para el **Colegio Providencia**. Centraliza el ciclo completo de los proyectos escolares:
+**Sello Tecnológico** es una plataforma educativa integral creada por la empresa Innova Space Edu SpA. Centraliza el ciclo completo de los proyectos escolares:
 
 1. Creación y distribución de proyectos.
 2. Organización individual o colaborativa de estudiantes.
@@ -781,7 +781,7 @@ Fundador y desarrollador: **Esthefano Morales Campaña**
 Sitio institucional: [innova-space-edu.cl](https://www.innova-space-edu.cl/)  
 Correo: [contacto@innova-space-edu.cl](mailto:contacto@innova-space-edu.cl)
 
-Plataforma desarrollada para el **Colegio Providencia**.
+Plataforma desarrollada **Ecosistema Multi-Tarea Basado en Proyectos**.
 
 ---
 
@@ -793,7 +793,7 @@ Este repositorio es de **uso privado**. Su código, base de datos, recursos, con
 
 <div align="center">
 
-**Colegio Providencia · Sello Tecnológico · 2026**
+**Ecosistema Multi-Tarea Basado en Proyectos · Innova Space Edu SpA · 2026**
 
 <sub>Proyectos, ciencia, tecnología, creatividad y comunidad educativa.</sub>
 
