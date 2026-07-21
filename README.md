@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏫 Ecosistema Multi-Tarea Basado en Proyectos
+# 🌐 Ecosistema Educativo Inteligente Basado en Proyectos
 
 **Ecosistema escolar para crear, desarrollar, documentar, evaluar y publicar proyectos tecnológicos, científicos y STEAM.**
 
@@ -21,7 +21,7 @@ Desarrollado con **Next.js 16 · React 19 · Supabase · Tailwind CSS 4 · Verce
 
 ## 📋 Descripción
 
-**Sello Tecnológico** es una plataforma educativa integral creada por la empresa Innova Space Edu SpA. Centraliza el ciclo completo de los proyectos escolares:
+**Ecosistema Educativo Inteligente Basado en Proyectos** es una plataforma educativa integral creada por la empresa Innova Space Edu SpA. Centraliza el ciclo completo de los proyectos escolares:
 
 1. Creación y distribución de proyectos.
 2. Organización individual o colaborativa de estudiantes.
