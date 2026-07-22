@@ -85,13 +85,11 @@ async function pageAuthor(createdBy?: string | null) {
 
 export async function getStorySharePreview(id: string): Promise<SharePreview | null> {
   const admin = createAdminSupabaseClient()
-  const now = new Date().toISOString()
   const { data: story } = await admin
     .from('community_stories')
     .select('id, title, caption, author_id, visibility_status, is_featured, expires_at')
     .eq('id', id)
     .eq('visibility_status', 'published')
-    .or(`is_featured.eq.true,expires_at.gt.${now}`)
     .maybeSingle()
 
   if (!story) return null

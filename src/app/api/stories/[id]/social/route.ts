@@ -74,7 +74,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const admin = createAdminSupabaseClient()
   const { data: story } = await admin.from('community_stories').select('id, visibility_status, is_featured, expires_at, comments_enabled').eq('id', id).maybeSingle()
-  const active = story?.visibility_status === 'published' && (story.is_featured || new Date(story.expires_at).getTime() > Date.now())
+  const active = story?.visibility_status === 'published'
   if (!story?.id || !active) return NextResponse.json({ error: 'La historia ya no está disponible.' }, { status: 404 })
 
   if (body.action === 'view') {

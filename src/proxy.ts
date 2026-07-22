@@ -21,8 +21,9 @@ export async function proxy(request: NextRequest) {
     '/api/vitrinas/assets',
   ]
   const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(`${path}/`))
-  if (isPublicPath) return response
 
+  // También refresca la sesión en rutas públicas. Así /comunidad puede
+  // reconocer al usuario conectado sin convertir la página en privada.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,6 +41,8 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+
+  if (isPublicPath) return response
 
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
