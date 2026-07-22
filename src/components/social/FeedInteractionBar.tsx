@@ -56,14 +56,20 @@ export default function FeedInteractionBar({ post }: { post: FeedPost }) {
   useEffect(() => {
     const currentKey = visitorKey()
     setKey(currentKey)
-    setSaved(window.localStorage.getItem(`sello_saved_${post.item_key}`) === '1')
-    setFollowing(window.localStorage.getItem(`sello_following_${post.page_slug}`) === '1')
 
     const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setAuthChecked(true); return }
+      if (!user) {
+        setCurrentUser(null)
+        setSaved(window.localStorage.getItem(`sello_saved_visitor_${currentKey}_${post.item_key}`) === '1')
+        setFollowing(false)
+        setAuthChecked(true)
+        return
+      }
       const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle()
       setCurrentUser({ id: user.id, name: profile?.full_name || user.email || 'Usuario' })
+      setSaved(window.localStorage.getItem(`sello_saved_user_${user.id}_${post.item_key}`) === '1')
+      setFollowing(window.localStorage.getItem(`sello_following_user_${user.id}_${post.page_slug}`) === '1')
       setAuthChecked(true)
     }
     loadUser()
@@ -115,17 +121,27 @@ export default function FeedInteractionBar({ post }: { post: FeedPost }) {
   }
 
   const toggleSave = () => {
+    if (!key) return
     const next = !saved
+    const ownerKey = currentUser ? `user_${currentUser.id}` : `visitor_${key}`
+    const storageKey = `sello_saved_${ownerKey}_${post.item_key}`
     setSaved(next)
-    if (next) window.localStorage.setItem(`sello_saved_${post.item_key}`, '1')
-    else window.localStorage.removeItem(`sello_saved_${post.item_key}`)
+    if (next) window.localStorage.setItem(storageKey, '1')
+    else window.localStorage.removeItem(storageKey)
   }
 
   const toggleFollow = () => {
+    if (!authChecked) return
+    if (!currentUser) {
+      setNotice('Debes iniciar sesión para seguir páginas.')
+      window.setTimeout(() => setNotice(''), 1800)
+      return
+    }
     const next = !following
+    const storageKey = `sello_following_user_${currentUser.id}_${post.page_slug}`
     setFollowing(next)
-    if (next) window.localStorage.setItem(`sello_following_${post.page_slug}`, '1')
-    else window.localStorage.removeItem(`sello_following_${post.page_slug}`)
+    if (next) window.localStorage.setItem(storageKey, '1')
+    else window.localStorage.removeItem(storageKey)
   }
 
   const share = async () => {
@@ -160,7 +176,7 @@ export default function FeedInteractionBar({ post }: { post: FeedPost }) {
     <div className="border-t border-slate-100 px-4 pb-4 pt-3 sm:px-5">
       <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
         <div className="flex items-center gap-3"><span>✨ {stats.likes}</span><button type="button" onClick={toggleComments} className="hover:text-slate-800">💬 {stats.comments}</button><span>👁️ {stats.views}</span></div>
-        <button type="button" onClick={toggleFollow} className="rounded-full px-3 py-1 transition hover:bg-slate-100">{following ? '✓ Siguiendo' : '+ Seguir página'}</button>
+        <button type="button" onClick={toggleFollow} disabled={!authChecked} className="rounded-full px-3 py-1 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-50" title={currentUser ? 'Seguir esta página con tu cuenta' : 'Inicia sesión para seguir páginas'}>{following ? '✓ Siguiendo' : '+ Seguir página'}</button>
       </div>
 
       <div className="mt-3 grid grid-cols-4 items-center border-y border-slate-100 py-1 text-sm font-bold text-slate-600">
