@@ -35,13 +35,11 @@ export async function GET(request: Request) {
   const requestedId = clean(url.searchParams.get('id'), 80)
   const visitorKey = clean(url.searchParams.get('visitorKey'), 120)
   const user = await getOptionalUser()
-  const now = new Date().toISOString()
 
   let query = admin
     .from('community_stories')
     .select('id, author_id, project_id, page_id, course_id, title, caption, visibility_status, review_status, is_featured, comments_enabled, expires_at, published_at')
     .eq('visibility_status', 'published')
-    .or(`is_featured.eq.true,expires_at.gt.${now}`)
     .order('is_featured', { ascending: false })
     .order('published_at', { ascending: false })
     .limit(limit)
@@ -223,7 +221,6 @@ export async function POST(request: Request) {
     visibility_status: 'published',
     review_status: 'pending',
     published_at: new Date().toISOString(),
-    expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
   }
 
   const { error: storyError } = await admin.from('community_stories').insert(storyRow)
