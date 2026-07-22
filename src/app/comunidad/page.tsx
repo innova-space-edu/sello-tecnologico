@@ -2,6 +2,7 @@ import Link from 'next/link'
 import CommunityFeed from '@/components/social/CommunityFeed'
 import CommunityTrending from '@/components/social/CommunityTrending'
 import StoriesRail from '@/components/stories/StoriesRail'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +14,36 @@ const NAV = [
   { href: '/vitrinas', icon: '🌐', label: 'Administrar páginas' },
 ]
 
-export default function ComunidadPage() {
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  coordinador: 'Coordinación',
+  utp: 'UTP',
+  docente: 'Docente',
+  estudiante: 'Estudiante',
+}
+
+export default async function ComunidadPage() {
+  const supabase = await createServerSupabaseClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase
+      .from('profiles')
+      .select('id, full_name, role, curso')
+      .eq('id', user.id)
+      .maybeSingle()
+    : { data: null }
+
+  const viewer = user ? {
+    id: user.id,
+    name: profile?.full_name || user.email || 'Usuario',
+    role: profile?.role || '',
+    course: profile?.curso || null,
+  } : null
+  const viewerInitial = viewer?.name.trim().charAt(0).toUpperCase() || 'U'
+  const viewerDetail = viewer
+    ? [ROLE_LABELS[viewer.role] || viewer.role, viewer.course].filter(Boolean).join(' · ')
+    : ''
+
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
@@ -27,7 +57,18 @@ export default function ComunidadPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/vitrinas" className="hidden rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-100 sm:block">Crear publicación</Link>
-            <Link href="/login" className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">Ingresar</Link>
+            {viewer ? (
+              <Link href="/portafolio" className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm transition hover:border-blue-200 hover:bg-blue-50" aria-label={`Abrir el perfil de ${viewer.name}`}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-sm font-black text-white">{viewerInitial}</span>
+                <span className="hidden min-w-0 text-left sm:block">
+                  <span className="block max-w-40 truncate text-sm font-black text-slate-800">{viewer.name}</span>
+                  <span className="block max-w-40 truncate text-[11px] font-semibold text-slate-500">{viewerDetail || 'Mi perfil'}</span>
+                </span>
+                <span className="text-xs font-black text-blue-700 sm:hidden">Mi perfil</span>
+              </Link>
+            ) : (
+              <Link href="/login" className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-black text-white hover:bg-blue-700">Ingresar</Link>
+            )}
           </div>
         </div>
       </header>
@@ -49,7 +90,7 @@ export default function ComunidadPage() {
         </aside>
 
         <section className="min-w-0">
-          <StoriesRail />
+          <StoriesRail viewer={viewer} />
           <CommunityFeed />
         </section>
 
