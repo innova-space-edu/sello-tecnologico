@@ -31,11 +31,13 @@ function asignaturasDe(ev: any): string[] {
 }
 
 function cursoDe(ev: any): string {
-  return ev.projects?.courses?.name ?? ev.profiles?.curso ?? 'Sin curso asignado'
+  const raw = ev.projects?.courses?.name ?? ev.profiles?.curso
+  if (!raw) return 'Sin curso asignado'
+  return String(raw).trim().replace(/º/g, '°').replace(/\s+/g, ' ') || 'Sin curso asignado'
 }
 
 function nivelDe(ev: any): string {
-  const curso = cursoDe(ev).trim().replace(/º/g, '°')
+  const curso = cursoDe(ev)
   if (!curso || curso === 'Sin curso asignado') return 'Sin nivel asignado'
 
   const match = curso.match(/(\d+)\s*°?\s*(b[aá]sico|medio)/i)
@@ -75,6 +77,12 @@ function ordenarNivel(a: string, b: string): number {
   return diff || a.localeCompare(b, 'es')
 }
 
+function ordenarCurso(a: string, b: string): number {
+  if (a === 'Sin curso asignado') return 1
+  if (b === 'Sin curso asignado') return -1
+  return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' })
+}
+
 function fechaCorta(value: string): string {
   const fecha = new Date(value)
   if (Number.isNaN(fecha.getTime())) return 'Sin fecha'
@@ -91,6 +99,7 @@ export default function EvidenciasPage() {
 
   const [busqueda, setBusqueda] = useState('')
   const [filtroNivel, setFiltroNivel] = useState('todos')
+  const [filtroCurso, setFiltroCurso] = useState('todos')
   const [filtroAsignatura, setFiltroAsignatura] = useState('todas')
   const [filtroAnio, setFiltroAnio] = useState('todos')
   const [filtroTipo, setFiltroTipo] = useState('todos')
@@ -147,6 +156,18 @@ export default function EvidenciasPage() {
     [evidencias]
   )
 
+  const cursos = useMemo(
+    () => Array.from(new Set(evidencias.map(cursoDe))).sort(ordenarCurso),
+    [evidencias]
+  )
+
+  const cursosDisponibles = useMemo(() => {
+    const base = filtroNivel === 'todos'
+      ? evidencias
+      : evidencias.filter(ev => nivelDe(ev) === filtroNivel)
+    return Array.from(new Set(base.map(cursoDe))).sort(ordenarCurso)
+  }, [evidencias, filtroNivel])
+
   const asignaturas = useMemo(
     () => Array.from(new Set(evidencias.flatMap(asignaturasDe))).sort((a, b) => a.localeCompare(b, 'es')),
     [evidencias]
@@ -166,32 +187,36 @@ export default function EvidenciasPage() {
     return evidencias.filter(ev => {
       const materias = asignaturasDe(ev)
       const nivel = nivelDe(ev)
+      const curso = cursoDe(ev)
       const anio = anioDe(ev)
       const texto = [
         ev.title, ev.description, ev.projects?.title, ev.profiles?.full_name,
-        ev.profiles?.email, cursoDe(ev), nivel, anio, ...materias,
+        ev.profiles?.email, curso, nivel, anio, ...materias,
         ...(Array.isArray(ev.tags) ? ev.tags : []),
       ].map(x => String(x ?? '').toLowerCase())
 
       return (!q || texto.some(x => x.includes(q))) &&
         (filtroNivel === 'todos' || nivel === filtroNivel) &&
+        (filtroCurso === 'todos' || curso === filtroCurso) &&
         (filtroAsignatura === 'todas' || materias.includes(filtroAsignatura)) &&
         (filtroAnio === 'todos' || anio === filtroAnio) &&
         (filtroTipo === 'todos' || ev.type === filtroTipo) &&
         (filtroEtapa === 'todas' || ev.evidencia_tipo === filtroEtapa)
     })
-  }, [evidencias, busqueda, filtroNivel, filtroAsignatura, filtroAnio, filtroTipo, filtroEtapa])
+  }, [evidencias, busqueda, filtroNivel, filtroCurso, filtroAsignatura, filtroAnio, filtroTipo, filtroEtapa])
 
   const estructura = useMemo(() => {
-    const result: Record<string, Record<string, Record<string, any[]>>> = {}
+    const result: Record<string, Record<string, Record<string, Record<string, any[]>>>> = {}
     for (const ev of filtradas) {
       const nivel = nivelDe(ev)
+      const curso = cursoDe(ev)
       const asignatura = grupoAsignaturaDe(ev)
       const anio = anioDe(ev)
       result[nivel] ??= {}
-      result[nivel][asignatura] ??= {}
-      result[nivel][asignatura][anio] ??= []
-      result[nivel][asignatura][anio].push(ev)
+      result[nivel][curso] ??= {}
+      result[nivel][curso][asignatura] ??= {}
+      result[nivel][curso][asignatura][anio] ??= []
+      result[nivel][curso][asignatura][anio].push(ev)
     }
     return result
   }, [filtradas])
@@ -203,6 +228,7 @@ export default function EvidenciasPage() {
   const limpiar = () => {
     setBusqueda('')
     setFiltroNivel('todos')
+    setFiltroCurso('todos')
     setFiltroAsignatura('todas')
     setFiltroAnio('todos')
     setFiltroTipo('todos')
@@ -275,16 +301,17 @@ export default function EvidenciasPage() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold text-blue-950">Evidencias</h1>
-              <span className="text-xs font-semibold bg-blue-100 text-blue-800 rounded-full px-2.5 py-1">Nivel → Asignatura → Año</span>
+              <span className="text-xs font-semibold bg-blue-100 text-blue-800 rounded-full px-2.5 py-1">Nivel → Curso → Asignatura → Año</span>
             </div>
             <p className="text-slate-500 mt-1">Archivo organizado del Sello Tecnológico.</p>
           </div>
           <Link href="/evidencias/nueva" className="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 rounded-xl w-fit">📎 + Nueva evidencia</Link>
         </header>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-5">
           <div className="bg-blue-950 text-white rounded-xl p-4"><p className="text-xs text-blue-200">EVIDENCIAS</p><p className="text-2xl font-bold">{evidencias.length}</p></div>
           <div className="bg-slate-900 text-white rounded-xl p-4"><p className="text-xs text-slate-300">NIVELES</p><p className="text-2xl font-bold">{niveles.length}</p></div>
+          <div className="bg-blue-900 text-white rounded-xl p-4"><p className="text-xs text-blue-200">CURSOS</p><p className="text-2xl font-bold">{cursos.length}</p></div>
           <div className="bg-indigo-950 text-white rounded-xl p-4"><p className="text-xs text-indigo-200">ASIGNATURAS</p><p className="text-2xl font-bold">{asignaturas.length}</p></div>
           <div className="bg-cyan-950 text-white rounded-xl p-4"><p className="text-xs text-cyan-200">AÑOS</p><p className="text-2xl font-bold">{anios.length}</p></div>
         </div>
@@ -297,11 +324,25 @@ export default function EvidenciasPage() {
         )}
 
         <section className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mb-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3">
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="🔍 Buscar evidencia, proyecto, alumno..." className="md:col-span-2 border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
-            <select value={filtroNivel} onChange={e => setFiltroNivel(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todos">Todos los niveles</option>{niveles.map(x => <option key={x}>{x}</option>)}</select>
-            <select value={filtroAsignatura} onChange={e => setFiltroAsignatura(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todas">Todas las asignaturas</option>{asignaturas.map(x => <option key={x}>{x}</option>)}</select>
-            <select value={filtroAnio} onChange={e => setFiltroAnio(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todos">Todos los años</option>{anios.map(x => <option key={x}>{x}</option>)}</select>
+            <select
+              value={filtroNivel}
+              onChange={e => {
+                setFiltroNivel(e.target.value)
+                setFiltroCurso('todos')
+              }}
+              className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+            >
+              <option value="todos">Todos los niveles</option>
+              {niveles.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+            <select value={filtroCurso} onChange={e => setFiltroCurso(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+              <option value="todos">Todos los cursos</option>
+              {cursosDisponibles.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
+            <select value={filtroAsignatura} onChange={e => setFiltroAsignatura(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todas">Todas las asignaturas</option>{asignaturas.map(x => <option key={x} value={x}>{x}</option>)}</select>
+            <select value={filtroAnio} onChange={e => setFiltroAnio(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todos">Todos los años</option>{anios.map(x => <option key={x} value={x}>{x}</option>)}</select>
             <div className="flex gap-2">
               <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="min-w-0 flex-1 border border-slate-200 rounded-lg px-2 py-2.5 text-sm"><option value="todos">Tipo</option>{Object.keys(typeIcon).map(x => <option key={x} value={x}>{typeIcon[x]} {x}</option>)}</select>
               <select value={filtroEtapa} onChange={e => setFiltroEtapa(e.target.value)} className="min-w-0 flex-1 border border-slate-200 rounded-lg px-2 py-2.5 text-sm"><option value="todas">Etapa</option><option value="inicial">Inicial</option><option value="intermedia">Intermedia</option><option value="final">Final</option></select>
@@ -326,7 +367,7 @@ export default function EvidenciasPage() {
               {imagenes.map(ev => (
                 <Link key={ev.id} href={`/evidencias/${ev.id}`} className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
                   <div className="h-52 bg-slate-900"><img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover" /></div>
-                  <div className="p-4"><div className="flex gap-1.5 flex-wrap mb-2"><span className="text-[11px] bg-blue-100 text-blue-800 rounded-full px-2 py-0.5">{nivelDe(ev)}</span><span className="text-[11px] bg-slate-100 text-slate-700 rounded-full px-2 py-0.5">{anioDe(ev)}</span></div><h3 className="font-semibold text-slate-900 line-clamp-2">{ev.title}</h3><p className="text-xs text-slate-500 mt-1">{asignaturasDe(ev).join(' · ')}</p></div>
+                  <div className="p-4"><div className="flex gap-1.5 flex-wrap mb-2"><span className="text-[11px] bg-blue-100 text-blue-800 rounded-full px-2 py-0.5">{cursoDe(ev)}</span><span className="text-[11px] bg-slate-100 text-slate-700 rounded-full px-2 py-0.5">{anioDe(ev)}</span></div><h3 className="font-semibold text-slate-900 line-clamp-2">{ev.title}</h3><p className="text-xs text-slate-500 mt-1">{asignaturasDe(ev).join(' · ')}</p></div>
                 </Link>
               ))}
             </div>
@@ -337,15 +378,22 @@ export default function EvidenciasPage() {
               <details key={nivel} open className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                 <summary className="cursor-pointer list-none bg-blue-950 text-white px-5 py-4 font-bold text-lg">🎓 {nivel}</summary>
                 <div className="p-4 space-y-4">
-                  {Object.keys(estructura[nivel]).sort((a, b) => a.localeCompare(b, 'es')).map(asignatura => (
-                    <details key={asignatura} open className="border border-slate-200 rounded-xl overflow-hidden">
-                      <summary className="cursor-pointer list-none bg-slate-900 text-white px-4 py-3 font-semibold">📘 {asignatura}</summary>
-                      <div className="divide-y divide-slate-100">
-                        {Object.keys(estructura[nivel][asignatura]).sort((a, b) => Number(b) - Number(a)).map(anio => (
-                          <section key={anio} className="p-3 lg:p-4">
-                            <div className="flex items-center gap-3 mb-3"><span className="bg-blue-100 text-blue-900 font-bold text-sm px-3 py-1 rounded-lg">📅 {anio}</span><span className="text-xs text-slate-400">{estructura[nivel][asignatura][anio].length} evidencia(s)</span></div>
-                            <div className="space-y-2">{estructura[nivel][asignatura][anio].map(renderEvidencia)}</div>
-                          </section>
+                  {Object.keys(estructura[nivel]).sort(ordenarCurso).map(curso => (
+                    <details key={curso} open className="border border-blue-100 rounded-xl overflow-hidden bg-blue-50/30">
+                      <summary className="cursor-pointer list-none bg-blue-100 text-blue-950 px-4 py-3 font-bold">🏫 {curso}</summary>
+                      <div className="p-3 space-y-3">
+                        {Object.keys(estructura[nivel][curso]).sort((a, b) => a.localeCompare(b, 'es')).map(asignatura => (
+                          <details key={asignatura} open className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                            <summary className="cursor-pointer list-none bg-slate-900 text-white px-4 py-3 font-semibold">📘 {asignatura}</summary>
+                            <div className="divide-y divide-slate-100">
+                              {Object.keys(estructura[nivel][curso][asignatura]).sort((a, b) => Number(b) - Number(a)).map(anio => (
+                                <section key={anio} className="p-3 lg:p-4">
+                                  <div className="flex items-center gap-3 mb-3"><span className="bg-blue-100 text-blue-900 font-bold text-sm px-3 py-1 rounded-lg">📅 {anio}</span><span className="text-xs text-slate-400">{estructura[nivel][curso][asignatura][anio].length} evidencia(s)</span></div>
+                                  <div className="space-y-2">{estructura[nivel][curso][asignatura][anio].map(renderEvidencia)}</div>
+                                </section>
+                              ))}
+                            </div>
+                          </details>
                         ))}
                       </div>
                     </details>
