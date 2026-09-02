@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 
 const TIPOS = ['documento', 'foto', 'video', 'enlace', 'presentación', 'código']
+const MAX_FILE_SIZE = 50 * 1024 * 1024
 
 export default function EditarEvidenciaPage() {
   const router = useRouter()
@@ -85,6 +86,13 @@ export default function EditarEvidenciaPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > MAX_FILE_SIZE) {
+      alert('El archivo supera el máximo permitido de 50 MB.')
+      e.target.value = ''
+      setArchivoSeleccionado(null)
+      setPreview(null)
+      return
+    }
     setArchivoSeleccionado(file)
     if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
       setPreview(URL.createObjectURL(file))
@@ -294,14 +302,14 @@ export default function EditarEvidenciaPage() {
                         </div>
                       )}
                       <p className="font-medium text-gray-800 text-sm">{archivoSeleccionado.name}</p>
-                      <p className="text-gray-400 text-xs mt-1">{formatSize(archivoSeleccionado.size)}</p>
+                      <p className="text-gray-400 text-xs mt-1">{formatSize(archivoSeleccionado.size)} · máximo 50 MB</p>
                       <p className="text-blue-500 text-xs mt-2">Clic para cambiar archivo</p>
                     </div>
                   ) : (
                     <div>
                       <div className="text-4xl mb-3">☁️</div>
                       <p className="font-medium text-gray-700">Clic para reemplazar archivo</p>
-                      <p className="text-gray-400 text-xs mt-1">Si no seleccionas uno, se conserva el archivo actual</p>
+                      <p className="text-gray-400 text-xs mt-1">Si no seleccionas uno, se conserva el archivo actual · máx. 50 MB</p>
                     </div>
                   )}
                 </div>
