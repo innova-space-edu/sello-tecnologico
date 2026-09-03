@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import OnlyOfficeSpreadsheet from '@/components/promedios/OnlyOfficeSpreadsheet'
+import LightSpreadsheet from '@/components/promedios/LightSpreadsheet'
 import PromediosHistory from '@/components/promedios/PromediosHistory'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getPromediosActor } from '@/lib/promedios-auth'
@@ -27,7 +27,7 @@ export default async function PromediosEditorPage({ params }: Props) {
   return (
     <div className="min-h-screen bg-slate-100 lg:flex">
       <Sidebar />
-      <OnlyOfficeSpreadsheet workbookId={workbook.id} title={workbook.title} />
+      <LightSpreadsheet workbookId={workbook.id} title={workbook.title} />
       <PromediosHistory workbookId={workbook.id} />
     </div>
   )
