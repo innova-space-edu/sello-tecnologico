@@ -13,6 +13,7 @@ export async function proxy(request: NextRequest) {
     '/formularios',
     '/auth/callback',
     '/api/register-profile',
+    '/api/promedios/editor/callback',
     '/comunidad',
     '/p',
     '/api/feed',
@@ -64,6 +65,7 @@ export async function proxy(request: NextRequest) {
     '/notificaciones',
     '/admin',
     '/usuarios',
+    '/promedios',
   ]
 
   if (perfil?.role === 'estudiante') {
