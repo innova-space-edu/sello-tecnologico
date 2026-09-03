@@ -17,6 +17,7 @@ const menu = [
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
   { href: '/informes', label: 'Informes', icon: '📘' },
+  { href: '/promedios', label: 'Promedios', icon: '🧮' },
   { href: '/portafolio', label: 'Portafolio', icon: '📂' },
   { href: '/usuarios', label: 'Usuarios', icon: '👥' },
   { href: '/usuarios/importar', label: 'Importar alumnos', icon: '⬆️' },
@@ -140,6 +141,7 @@ export default function Sidebar() {
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null
             if (item.href === '/usuarios' && esEstudianteRol) return null
             if (item.href === '/reportes' && esEstudianteRol) return null
+            if (item.href === '/promedios' && esEstudianteRol) return null
             if (item.href === '/encuestas' && !['admin', 'docente'].includes(rol)) return null
             if (item.href === '/autoevaluacion/respuestas' && !['admin', 'docente'].includes(rol)) return null
 
