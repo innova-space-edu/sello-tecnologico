@@ -51,16 +51,55 @@ function nivelDe(ev: any): string {
   return curso.replace(/\s+[A-Z]$/i, '').trim() || curso
 }
 
-function anioDe(ev: any): string {
-  const candidato = ev.projects?.start_date || ev.projects?.created_at || ev.created_at
-  if (!candidato) return 'Sin año'
-  const fecha = new Date(candidato)
-  return Number.isNaN(fecha.getTime()) ? 'Sin año' : String(fecha.getFullYear())
+function fechaValida(value: string | null | undefined): Date | null {
+  if (!value) return null
+  const fecha = new Date(value)
+  return Number.isNaN(fecha.getTime()) ? null : fecha
 }
 
-function grupoAsignaturaDe(ev: any): string {
-  const items = asignaturasDe(ev)
-  return items.length === 1 ? items[0] : items.join(' + ')
+function anioDe(ev: any): string {
+  const fecha = fechaValida(ev.created_at)
+  return fecha ? String(fecha.getFullYear()) : 'Sin año'
+}
+
+function fechaClaveDe(ev: any): string {
+  const fecha = fechaValida(ev.created_at)
+  if (!fecha) return 'sin-fecha'
+  const y = fecha.getFullYear()
+  const m = String(fecha.getMonth() + 1).padStart(2, '0')
+  const d = String(fecha.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function fechaCorta(value: string): string {
+  const fecha = fechaValida(value)
+  if (!fecha) return 'Sin fecha'
+  return fecha.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function fechaGrupo(clave: string): string {
+  if (clave === 'sin-fecha') return 'Sin fecha'
+  const fecha = new Date(`${clave}T12:00:00`)
+  if (Number.isNaN(fecha.getTime())) return clave
+  return fecha.toLocaleDateString('es-CL', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  })
+}
+
+function usuarioIdDe(ev: any): string {
+  return String(ev.profiles?.id ?? ev.created_by ?? ev.profiles?.email ?? 'sin-usuario')
+}
+
+function usuarioDe(ev: any): string {
+  return String(ev.profiles?.full_name ?? ev.profiles?.email ?? 'Usuario sin identificar').trim()
+}
+
+function usuarioEmailDe(ev: any): string {
+  return String(ev.profiles?.email ?? '').trim()
+}
+
+function esImagen(ev: any): boolean {
+  return Boolean(ev.file_url) && (ev.file_type?.startsWith('image/') || ev.type === 'foto')
 }
 
 function rankNivel(nivel: string): number {
@@ -83,10 +122,17 @@ function ordenarCurso(a: string, b: string): number {
   return a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' })
 }
 
-function fechaCorta(value: string): string {
-  const fecha = new Date(value)
-  if (Number.isNaN(fecha.getTime())) return 'Sin fecha'
-  return fecha.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
+function ordenarAnio(a: string, b: string): number {
+  if (a === 'Sin año') return 1
+  if (b === 'Sin año') return -1
+  return Number(b) - Number(a)
+}
+
+function contarNodo(nodo: any): number {
+  if (Array.isArray(nodo)) return nodo.length
+  if (!nodo || typeof nodo !== 'object') return 0
+  if (nodo.fechas) return (Object.values(nodo.fechas) as any[]).reduce((acc: number, value: any) => acc + contarNodo(value), 0)
+  return (Object.values(nodo) as any[]).reduce((acc: number, value: any) => acc + contarNodo(value), 0)
 }
 
 export default function EvidenciasPage() {
@@ -98,12 +144,10 @@ export default function EvidenciasPage() {
   const [errorCarga, setErrorCarga] = useState('')
 
   const [busqueda, setBusqueda] = useState('')
+  const [filtroAnio, setFiltroAnio] = useState('todos')
   const [filtroNivel, setFiltroNivel] = useState('todos')
   const [filtroCurso, setFiltroCurso] = useState('todos')
-  const [filtroAsignatura, setFiltroAsignatura] = useState('todas')
-  const [filtroAnio, setFiltroAnio] = useState('todos')
-  const [filtroTipo, setFiltroTipo] = useState('todos')
-  const [filtroEtapa, setFiltroEtapa] = useState('todas')
+  const [filtroUsuario, setFiltroUsuario] = useState('todos')
   const [vista, setVista] = useState<'archivo' | 'galeria'>('archivo')
 
   const cargarEvidencias = async (userRole: string, uid: string) => {
@@ -151,6 +195,11 @@ export default function EvidenciasPage() {
 
   const esEstudiante = rol === 'estudiante'
 
+  const anios = useMemo(
+    () => Array.from(new Set(evidencias.map(anioDe))).sort(ordenarAnio),
+    [evidencias]
+  )
+
   const niveles = useMemo(
     () => Array.from(new Set(evidencias.map(nivelDe))).sort(ordenarNivel),
     [evidencias]
@@ -161,78 +210,98 @@ export default function EvidenciasPage() {
     [evidencias]
   )
 
+  const usuarios = useMemo(() => {
+    const mapa = new Map<string, string>()
+    evidencias.forEach(ev => mapa.set(usuarioIdDe(ev), usuarioDe(ev)))
+    return Array.from(mapa.entries())
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
+  }, [evidencias])
+
+  const nivelesDisponibles = useMemo(() => {
+    const base = filtroAnio === 'todos' ? evidencias : evidencias.filter(ev => anioDe(ev) === filtroAnio)
+    return Array.from(new Set(base.map(nivelDe))).sort(ordenarNivel)
+  }, [evidencias, filtroAnio])
+
   const cursosDisponibles = useMemo(() => {
-    const base = filtroNivel === 'todos'
-      ? evidencias
-      : evidencias.filter(ev => nivelDe(ev) === filtroNivel)
+    const base = evidencias.filter(ev =>
+      (filtroAnio === 'todos' || anioDe(ev) === filtroAnio) &&
+      (filtroNivel === 'todos' || nivelDe(ev) === filtroNivel)
+    )
     return Array.from(new Set(base.map(cursoDe))).sort(ordenarCurso)
-  }, [evidencias, filtroNivel])
+  }, [evidencias, filtroAnio, filtroNivel])
 
-  const asignaturas = useMemo(
-    () => Array.from(new Set(evidencias.flatMap(asignaturasDe))).sort((a, b) => a.localeCompare(b, 'es')),
-    [evidencias]
-  )
+  const usuariosDisponibles = useMemo(() => {
+    const mapa = new Map<string, string>()
+    evidencias
+      .filter(ev =>
+        (filtroAnio === 'todos' || anioDe(ev) === filtroAnio) &&
+        (filtroNivel === 'todos' || nivelDe(ev) === filtroNivel) &&
+        (filtroCurso === 'todos' || cursoDe(ev) === filtroCurso)
+      )
+      .forEach(ev => mapa.set(usuarioIdDe(ev), usuarioDe(ev)))
 
-  const anios = useMemo(
-    () => Array.from(new Set(evidencias.map(anioDe))).sort((a, b) => {
-      if (a === 'Sin año') return 1
-      if (b === 'Sin año') return -1
-      return Number(b) - Number(a)
-    }),
-    [evidencias]
-  )
+    return Array.from(mapa.entries())
+      .map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
+  }, [evidencias, filtroAnio, filtroNivel, filtroCurso])
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     return evidencias.filter(ev => {
-      const materias = asignaturasDe(ev)
       const nivel = nivelDe(ev)
       const curso = cursoDe(ev)
       const anio = anioDe(ev)
+      const usuario = usuarioDe(ev)
+      const materias = asignaturasDe(ev)
       const texto = [
-        ev.title, ev.description, ev.projects?.title, ev.profiles?.full_name,
-        ev.profiles?.email, curso, nivel, anio, ...materias,
-        ...(Array.isArray(ev.tags) ? ev.tags : []),
+        ev.title, ev.description, ev.projects?.title, usuario, ev.profiles?.email,
+        curso, nivel, anio, ...materias, ...(Array.isArray(ev.tags) ? ev.tags : []),
       ].map(x => String(x ?? '').toLowerCase())
 
       return (!q || texto.some(x => x.includes(q))) &&
+        (filtroAnio === 'todos' || anio === filtroAnio) &&
         (filtroNivel === 'todos' || nivel === filtroNivel) &&
         (filtroCurso === 'todos' || curso === filtroCurso) &&
-        (filtroAsignatura === 'todas' || materias.includes(filtroAsignatura)) &&
-        (filtroAnio === 'todos' || anio === filtroAnio) &&
-        (filtroTipo === 'todos' || ev.type === filtroTipo) &&
-        (filtroEtapa === 'todas' || ev.evidencia_tipo === filtroEtapa)
+        (filtroUsuario === 'todos' || usuarioIdDe(ev) === filtroUsuario)
     })
-  }, [evidencias, busqueda, filtroNivel, filtroCurso, filtroAsignatura, filtroAnio, filtroTipo, filtroEtapa])
+  }, [evidencias, busqueda, filtroAnio, filtroNivel, filtroCurso, filtroUsuario])
 
   const estructura = useMemo(() => {
-    const result: Record<string, Record<string, Record<string, Record<string, any[]>>>> = {}
+    const result: Record<string, Record<string, Record<string, Record<string, {
+      nombre: string
+      email: string
+      fechas: Record<string, any[]>
+    }>>>> = {}
+
     for (const ev of filtradas) {
+      const anio = anioDe(ev)
       const nivel = nivelDe(ev)
       const curso = cursoDe(ev)
-      const asignatura = grupoAsignaturaDe(ev)
-      const anio = anioDe(ev)
-      result[nivel] ??= {}
-      result[nivel][curso] ??= {}
-      result[nivel][curso][asignatura] ??= {}
-      result[nivel][curso][asignatura][anio] ??= []
-      result[nivel][curso][asignatura][anio].push(ev)
+      const usuarioId = usuarioIdDe(ev)
+      const fecha = fechaClaveDe(ev)
+
+      result[anio] ??= {}
+      result[anio][nivel] ??= {}
+      result[anio][nivel][curso] ??= {}
+      result[anio][nivel][curso][usuarioId] ??= {
+        nombre: usuarioDe(ev),
+        email: usuarioEmailDe(ev),
+        fechas: {},
+      }
+      result[anio][nivel][curso][usuarioId].fechas[fecha] ??= []
+      result[anio][nivel][curso][usuarioId].fechas[fecha].push(ev)
     }
+
     return result
   }, [filtradas])
 
-  const imagenes = filtradas.filter(ev =>
-    Boolean(ev.file_url) && (ev.file_type?.startsWith('image/') || ev.type === 'foto')
-  )
-
   const limpiar = () => {
     setBusqueda('')
+    setFiltroAnio('todos')
     setFiltroNivel('todos')
     setFiltroCurso('todos')
-    setFiltroAsignatura('todas')
-    setFiltroAnio('todos')
-    setFiltroTipo('todos')
-    setFiltroEtapa('todas')
+    setFiltroUsuario('todos')
   }
 
   const eliminar = async (ev: any) => {
@@ -246,7 +315,7 @@ export default function EvidenciasPage() {
   }
 
   const renderEvidencia = (ev: any) => {
-    const isImage = ev.file_url && (ev.file_type?.startsWith('image/') || ev.type === 'foto')
+    const isImage = esImagen(ev)
     return (
       <article key={ev.id} className="border border-slate-200 rounded-xl bg-white p-3 hover:border-blue-300 hover:shadow-sm transition-all">
         <div className="flex gap-3 items-start">
@@ -273,9 +342,10 @@ export default function EvidenciasPage() {
             </div>
 
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-slate-500">
+              <span>🎓 {nivelDe(ev)}</span>
               <span>🏫 {cursoDe(ev)}</span>
               {ev.projects?.title && <span>📌 {ev.projects.title}</span>}
-              {ev.profiles && <span>👤 {ev.profiles.full_name ?? ev.profiles.email ?? 'Sin nombre'}</span>}
+              {!esEstudiante && <span>👤 {usuarioDe(ev)}</span>}
               <span>📅 {fechaCorta(ev.created_at)}</span>
             </div>
 
@@ -293,6 +363,48 @@ export default function EvidenciasPage() {
     )
   }
 
+  const renderGaleria = () => {
+    if (!filtradas.length) {
+      return <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">No hay evidencias para los filtros seleccionados.</div>
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+        {filtradas.map(ev => {
+          const isImage = esImagen(ev)
+          return (
+            <Link key={ev.id} href={`/evidencias/${ev.id}`} className="group bg-white rounded-2xl border border-slate-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all">
+              {isImage ? (
+                <div className="h-48 bg-slate-900 overflow-hidden">
+                  <img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
+                </div>
+              ) : (
+                <div className="h-48 bg-slate-100 flex flex-col items-center justify-center text-slate-500">
+                  <span className="text-5xl">{typeIcon[ev.type] ?? '📎'}</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide mt-3">{ev.type ?? 'archivo'}</span>
+                </div>
+              )}
+
+              <div className="p-4">
+                <div className="flex gap-1.5 flex-wrap mb-2">
+                  <span className="text-[11px] bg-slate-900 text-white rounded-full px-2 py-0.5">{anioDe(ev)}</span>
+                  <span className="text-[11px] bg-blue-100 text-blue-800 rounded-full px-2 py-0.5">{nivelDe(ev)}</span>
+                  <span className="text-[11px] bg-slate-100 text-slate-700 rounded-full px-2 py-0.5">{cursoDe(ev)}</span>
+                </div>
+                <h3 className="font-semibold text-slate-900 line-clamp-2">{ev.title}</h3>
+                <p className="text-xs text-slate-500 mt-1 line-clamp-1">{asignaturasDe(ev).join(' · ')}</p>
+                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1 text-xs text-slate-500">
+                  {!esEstudiante && <p className="truncate">👤 {usuarioDe(ev)}</p>}
+                  <p>📅 {fechaCorta(ev.created_at)}</p>
+                </div>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
@@ -300,20 +412,24 @@ export default function EvidenciasPage() {
         <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-blue-950">Evidencias</h1>
-              <span className="text-xs font-semibold bg-blue-100 text-blue-800 rounded-full px-2.5 py-1">Nivel → Curso → Asignatura → Año</span>
+              <h1 className="text-2xl font-bold text-blue-950">{esEstudiante ? 'Mis evidencias' : 'Evidencias'}</h1>
+              {!esEstudiante && (
+                <span className="text-xs font-semibold bg-blue-100 text-blue-800 rounded-full px-2.5 py-1">Año → Nivel → Curso → Usuario → Fecha</span>
+              )}
             </div>
-            <p className="text-slate-500 mt-1">Archivo organizado del Sello Tecnológico.</p>
+            <p className="text-slate-500 mt-1">
+              {esEstudiante ? 'Revisa tus evidencias y archivos.' : 'Archivo institucional organizado como árbol de carpetas.'}
+            </p>
           </div>
           <Link href="/evidencias/nueva" className="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 rounded-xl w-fit">📎 + Nueva evidencia</Link>
         </header>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-5">
           <div className="bg-blue-950 text-white rounded-xl p-4"><p className="text-xs text-blue-200">EVIDENCIAS</p><p className="text-2xl font-bold">{evidencias.length}</p></div>
-          <div className="bg-slate-900 text-white rounded-xl p-4"><p className="text-xs text-slate-300">NIVELES</p><p className="text-2xl font-bold">{niveles.length}</p></div>
-          <div className="bg-blue-900 text-white rounded-xl p-4"><p className="text-xs text-blue-200">CURSOS</p><p className="text-2xl font-bold">{cursos.length}</p></div>
-          <div className="bg-indigo-950 text-white rounded-xl p-4"><p className="text-xs text-indigo-200">ASIGNATURAS</p><p className="text-2xl font-bold">{asignaturas.length}</p></div>
-          <div className="bg-cyan-950 text-white rounded-xl p-4"><p className="text-xs text-cyan-200">AÑOS</p><p className="text-2xl font-bold">{anios.length}</p></div>
+          <div className="bg-slate-900 text-white rounded-xl p-4"><p className="text-xs text-slate-300">AÑOS</p><p className="text-2xl font-bold">{anios.length}</p></div>
+          <div className="bg-blue-900 text-white rounded-xl p-4"><p className="text-xs text-blue-200">NIVELES</p><p className="text-2xl font-bold">{niveles.length}</p></div>
+          <div className="bg-indigo-950 text-white rounded-xl p-4"><p className="text-xs text-indigo-200">CURSOS</p><p className="text-2xl font-bold">{cursos.length}</p></div>
+          <div className="bg-cyan-950 text-white rounded-xl p-4"><p className="text-xs text-cyan-200">{esEstudiante ? 'RESULTADOS' : 'USUARIOS'}</p><p className="text-2xl font-bold">{esEstudiante ? filtradas.length : usuarios.length}</p></div>
         </div>
 
         {errorCarga && (
@@ -324,83 +440,174 @@ export default function EvidenciasPage() {
         )}
 
         <section className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mb-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3">
-            <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="🔍 Buscar evidencia, proyecto, alumno..." className="md:col-span-2 border border-slate-200 rounded-lg px-3 py-2.5 text-sm" />
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 ${esEstudiante ? 'xl:grid-cols-5' : 'xl:grid-cols-7'}`}>
+            <input
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder="🔍 Buscar evidencia, proyecto, usuario..."
+              className="md:col-span-2 border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+            />
+            <select
+              value={filtroAnio}
+              onChange={e => {
+                setFiltroAnio(e.target.value)
+                setFiltroNivel('todos')
+                setFiltroCurso('todos')
+                setFiltroUsuario('todos')
+              }}
+              className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+            >
+              <option value="todos">Todos los años</option>
+              {anios.map(x => <option key={x} value={x}>{x}</option>)}
+            </select>
             <select
               value={filtroNivel}
               onChange={e => {
                 setFiltroNivel(e.target.value)
                 setFiltroCurso('todos')
+                setFiltroUsuario('todos')
               }}
               className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
             >
               <option value="todos">Todos los niveles</option>
-              {niveles.map(x => <option key={x} value={x}>{x}</option>)}
+              {nivelesDisponibles.map(x => <option key={x} value={x}>{x}</option>)}
             </select>
-            <select value={filtroCurso} onChange={e => setFiltroCurso(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm">
+            <select
+              value={filtroCurso}
+              onChange={e => {
+                setFiltroCurso(e.target.value)
+                setFiltroUsuario('todos')
+              }}
+              className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"
+            >
               <option value="todos">Todos los cursos</option>
               {cursosDisponibles.map(x => <option key={x} value={x}>{x}</option>)}
             </select>
-            <select value={filtroAsignatura} onChange={e => setFiltroAsignatura(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todas">Todas las asignaturas</option>{asignaturas.map(x => <option key={x} value={x}>{x}</option>)}</select>
-            <select value={filtroAnio} onChange={e => setFiltroAnio(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm"><option value="todos">Todos los años</option>{anios.map(x => <option key={x} value={x}>{x}</option>)}</select>
-            <div className="flex gap-2">
-              <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="min-w-0 flex-1 border border-slate-200 rounded-lg px-2 py-2.5 text-sm"><option value="todos">Tipo</option>{Object.keys(typeIcon).map(x => <option key={x} value={x}>{typeIcon[x]} {x}</option>)}</select>
-              <select value={filtroEtapa} onChange={e => setFiltroEtapa(e.target.value)} className="min-w-0 flex-1 border border-slate-200 rounded-lg px-2 py-2.5 text-sm"><option value="todas">Etapa</option><option value="inicial">Inicial</option><option value="intermedia">Intermedia</option><option value="final">Final</option></select>
-            </div>
+            {!esEstudiante && (
+              <select value={filtroUsuario} onChange={e => setFiltroUsuario(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2.5 text-sm xl:col-span-2">
+                <option value="todos">Todos los usuarios</option>
+                {usuariosDisponibles.map(x => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+              </select>
+            )}
           </div>
-          <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mt-3 pt-3 border-t border-slate-100">
             <p className="text-xs text-slate-500">Mostrando <b>{filtradas.length}</b> de {evidencias.length}</p>
-            <button onClick={limpiar} className="text-sm text-blue-700 hover:underline">Limpiar filtros</button>
+            <div className="flex items-center gap-3">
+              {!esEstudiante && <span className="text-xs text-slate-400">Filtros: año · nivel · curso · usuario</span>}
+              <button onClick={limpiar} className="text-sm text-blue-700 hover:underline">Limpiar filtros</button>
+            </div>
           </div>
         </section>
 
         <div className="bg-white border border-slate-200 rounded-xl p-1 inline-flex gap-1 mb-5 shadow-sm">
-          <button onClick={() => setVista('archivo')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${vista === 'archivo' ? 'bg-blue-700 text-white' : 'text-slate-600'}`}>🗂️ Archivo organizado</button>
-          <button onClick={() => setVista('galeria')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${vista === 'galeria' ? 'bg-blue-700 text-white' : 'text-slate-600'}`}>🖼️ Galería ({imagenes.length})</button>
+          <button onClick={() => setVista('archivo')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${vista === 'archivo' ? 'bg-blue-700 text-white' : 'text-slate-600'}`}>
+            {esEstudiante ? '📋 Mis evidencias' : '🗂️ Archivo por carpetas'}
+          </button>
+          <button onClick={() => setVista('galeria')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${vista === 'galeria' ? 'bg-blue-700 text-white' : 'text-slate-600'}`}>
+            🖼️ Galería ({filtradas.length})
+          </button>
         </div>
 
         {cargando ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">Cargando evidencias...</div>
         ) : vista === 'galeria' ? (
-          imagenes.length ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-              {imagenes.map(ev => (
-                <Link key={ev.id} href={`/evidencias/${ev.id}`} className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="h-52 bg-slate-900"><img src={ev.file_url} alt={ev.title} className="w-full h-full object-cover" /></div>
-                  <div className="p-4"><div className="flex gap-1.5 flex-wrap mb-2"><span className="text-[11px] bg-blue-100 text-blue-800 rounded-full px-2 py-0.5">{cursoDe(ev)}</span><span className="text-[11px] bg-slate-100 text-slate-700 rounded-full px-2 py-0.5">{anioDe(ev)}</span></div><h3 className="font-semibold text-slate-900 line-clamp-2">{ev.title}</h3><p className="text-xs text-slate-500 mt-1">{asignaturasDe(ev).join(' · ')}</p></div>
-                </Link>
+          renderGaleria()
+        ) : esEstudiante ? (
+          filtradas.length ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2">
+              {filtradas.map(renderEvidencia)}
+            </div>
+          ) : !errorCarga ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center"><div className="text-4xl mb-3">📎</div><h3 className="font-semibold text-slate-800">No hay evidencias con estos filtros</h3><button onClick={limpiar} className="text-blue-700 hover:underline mt-2 text-sm">Limpiar filtros</button></div>
+          ) : null
+        ) : filtradas.length ? (
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h2 className="font-bold text-blue-950">Explorador de evidencias</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Abre las carpetas para navegar por año, nivel, curso, usuario y fecha.</p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1">{filtradas.length} evidencia(s)</span>
+            </div>
+
+            <div className="p-4 lg:p-5 space-y-4">
+              {Object.keys(estructura).sort(ordenarAnio).map(anio => (
+                <details key={anio} open={Object.keys(estructura).length === 1} className="group/year border border-slate-200 rounded-xl overflow-hidden">
+                  <summary className="cursor-pointer list-none bg-blue-950 text-white px-4 py-3 flex items-center justify-between gap-3">
+                    <span className="font-bold flex items-center gap-2"><span>📁</span><span>{anio}</span></span>
+                    <span className="text-xs bg-white/15 rounded-full px-2.5 py-1">{contarNodo(estructura[anio])} evidencia(s)</span>
+                  </summary>
+
+                  <div className="p-4 bg-white">
+                    <div className="ml-2 border-l-2 border-blue-200 pl-5 space-y-3">
+                      {Object.keys(estructura[anio]).sort(ordenarNivel).map(nivel => (
+                        <details key={nivel} className="relative group/nivel">
+                          <span className="absolute -left-[1.45rem] top-5 w-5 border-t-2 border-blue-200" />
+                          <summary className="cursor-pointer list-none border border-blue-100 bg-blue-50 rounded-lg px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-100/70">
+                            <span className="font-semibold text-blue-950 flex items-center gap-2"><span>📂</span><span>{nivel}</span></span>
+                            <span className="text-xs text-blue-800">{contarNodo(estructura[anio][nivel])}</span>
+                          </summary>
+
+                          <div className="ml-5 mt-3 border-l-2 border-indigo-100 pl-5 space-y-3">
+                            {Object.keys(estructura[anio][nivel]).sort(ordenarCurso).map(curso => (
+                              <details key={curso} className="relative group/curso">
+                                <span className="absolute -left-[1.45rem] top-5 w-5 border-t-2 border-indigo-100" />
+                                <summary className="cursor-pointer list-none border border-slate-200 bg-white rounded-lg px-4 py-3 flex items-center justify-between gap-3 hover:border-blue-300 hover:bg-slate-50">
+                                  <span className="font-semibold text-slate-900 flex items-center gap-2"><span>🏫</span><span>{curso}</span></span>
+                                  <span className="text-xs text-slate-500">{contarNodo(estructura[anio][nivel][curso])}</span>
+                                </summary>
+
+                                <div className="ml-5 mt-3 border-l-2 border-slate-200 pl-5 space-y-3">
+                                  {Object.keys(estructura[anio][nivel][curso])
+                                    .sort((a, b) => estructura[anio][nivel][curso][a].nombre.localeCompare(estructura[anio][nivel][curso][b].nombre, 'es', { sensitivity: 'base' }))
+                                    .map(usuarioId => {
+                                      const usuario = estructura[anio][nivel][curso][usuarioId]
+                                      return (
+                                        <details key={usuarioId} className="relative group/usuario">
+                                          <span className="absolute -left-[1.45rem] top-5 w-5 border-t-2 border-slate-200" />
+                                          <summary className="cursor-pointer list-none border border-slate-200 bg-slate-50 rounded-lg px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-100">
+                                            <span className="min-w-0 flex items-center gap-2">
+                                              <span>👤</span>
+                                              <span className="min-w-0">
+                                                <span className="font-semibold text-slate-900 block truncate">{usuario.nombre}</span>
+                                                {usuario.email && usuario.email !== usuario.nombre && <span className="text-[11px] text-slate-500 block truncate">{usuario.email}</span>}
+                                              </span>
+                                            </span>
+                                            <span className="text-xs text-slate-500 shrink-0">{contarNodo(usuario)} evidencia(s)</span>
+                                          </summary>
+
+                                          <div className="ml-5 mt-3 border-l-2 border-emerald-100 pl-5 space-y-3">
+                                            {Object.keys(usuario.fechas).sort((a, b) => {
+                                              if (a === 'sin-fecha') return 1
+                                              if (b === 'sin-fecha') return -1
+                                              return b.localeCompare(a)
+                                            }).map(fecha => (
+                                              <section key={fecha} className="relative">
+                                                <span className="absolute -left-[1.45rem] top-5 w-5 border-t-2 border-emerald-100" />
+                                                <div className="border border-emerald-100 rounded-xl overflow-hidden bg-white">
+                                                  <div className="bg-emerald-50 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                                                    <span className="font-semibold text-emerald-950 text-sm">📅 {fechaGrupo(fecha)}</span>
+                                                    <span className="text-xs text-emerald-800">{usuario.fechas[fecha].length} evidencia(s)</span>
+                                                  </div>
+                                                  <div className="p-3 space-y-2">{usuario.fechas[fecha].map(renderEvidencia)}</div>
+                                                </div>
+                                              </section>
+                                            ))}
+                                          </div>
+                                        </details>
+                                      )
+                                    })}
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+                </details>
               ))}
             </div>
-          ) : <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">No hay imágenes para los filtros seleccionados.</div>
-        ) : filtradas.length ? (
-          <div className="space-y-5">
-            {Object.keys(estructura).sort(ordenarNivel).map(nivel => (
-              <details key={nivel} open className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <summary className="cursor-pointer list-none bg-blue-950 text-white px-5 py-4 font-bold text-lg">🎓 {nivel}</summary>
-                <div className="p-4 space-y-4">
-                  {Object.keys(estructura[nivel]).sort(ordenarCurso).map(curso => (
-                    <details key={curso} open className="border border-blue-100 rounded-xl overflow-hidden bg-blue-50/30">
-                      <summary className="cursor-pointer list-none bg-blue-100 text-blue-950 px-4 py-3 font-bold">🏫 {curso}</summary>
-                      <div className="p-3 space-y-3">
-                        {Object.keys(estructura[nivel][curso]).sort((a, b) => a.localeCompare(b, 'es')).map(asignatura => (
-                          <details key={asignatura} open className="border border-slate-200 rounded-xl overflow-hidden bg-white">
-                            <summary className="cursor-pointer list-none bg-slate-900 text-white px-4 py-3 font-semibold">📘 {asignatura}</summary>
-                            <div className="divide-y divide-slate-100">
-                              {Object.keys(estructura[nivel][curso][asignatura]).sort((a, b) => Number(b) - Number(a)).map(anio => (
-                                <section key={anio} className="p-3 lg:p-4">
-                                  <div className="flex items-center gap-3 mb-3"><span className="bg-blue-100 text-blue-900 font-bold text-sm px-3 py-1 rounded-lg">📅 {anio}</span><span className="text-xs text-slate-400">{estructura[nivel][curso][asignatura][anio].length} evidencia(s)</span></div>
-                                  <div className="space-y-2">{estructura[nivel][curso][asignatura][anio].map(renderEvidencia)}</div>
-                                </section>
-                              ))}
-                            </div>
-                          </details>
-                        ))}
-                      </div>
-                    </details>
-                  ))}
-                </div>
-              </details>
-            ))}
           </div>
         ) : !errorCarga ? (
           <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center"><div className="text-4xl mb-3">📎</div><h3 className="font-semibold text-slate-800">No hay evidencias con estos filtros</h3><button onClick={limpiar} className="text-blue-700 hover:underline mt-2 text-sm">Limpiar filtros</button></div>
