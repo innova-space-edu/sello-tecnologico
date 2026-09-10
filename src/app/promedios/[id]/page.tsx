@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import NativeSpreadsheetRanges from '@/components/promedios/NativeSpreadsheetRanges'
+import NativeSpreadsheetSelectionFixed from '@/components/promedios/NativeSpreadsheetSelectionFixed'
 import PromediosHistory from '@/components/promedios/PromediosHistory'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { getPromediosActor } from '@/lib/promedios-auth'
@@ -28,7 +28,7 @@ export default async function PromediosEditorPage({ params }: Props) {
     <div className="min-h-screen bg-slate-100 lg:flex">
       <Sidebar />
       <div className="min-w-0 flex-1">
-        <NativeSpreadsheetRanges workbookId={workbook.id} title={workbook.title} />
+        <NativeSpreadsheetSelectionFixed workbookId={workbook.id} title={workbook.title} />
       </div>
       <PromediosHistory workbookId={workbook.id} />
     </div>
