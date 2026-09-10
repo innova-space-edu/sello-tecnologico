@@ -1,16 +1,16 @@
 'use client'
 
-import LightSpreadsheet from '@/components/promedios/LightSpreadsheet'
+import NativeSpreadsheet from '@/components/promedios/NativeSpreadsheet'
 
 type Props = { workbookId: string; title: string }
 
 /**
  * Punto de entrada histórico de Promedios.
  *
- * Desde ahora la aplicación utiliza siempre el editor nativo del Sello
- * Tecnológico. Se conserva este componente para no romper las rutas que ya
- * lo importan, pero ONLYOFFICE deja de ser una dependencia de ejecución.
+ * Promedios utiliza el editor nativo del Sello Tecnológico. Se conserva el
+ * nombre de este componente para no romper rutas antiguas, pero ONLYOFFICE ya
+ * no participa en la ejecución del módulo.
  */
 export default function OnlyOfficeSpreadsheet({ workbookId, title }: Props) {
-  return <LightSpreadsheet workbookId={workbookId} title={title} />
+  return <NativeSpreadsheet workbookId={workbookId} title={title} />
 }
