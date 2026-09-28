@@ -61,7 +61,7 @@ type GradebookPayload = {
   grades: GradeEntry[]
 }
 
-const YEAR = 2026
+const YEAR = new Date().getFullYear()
 const GRADE_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 function keyOf(assessmentId: string, studentId: string) {
