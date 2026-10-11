@@ -16,6 +16,7 @@ export const EDUAI_FAMILY_PURPOSES = [
 ] as const
 
 export const SELLO_FAMILY_PURPOSES = [
+  { key: "platform_access", title: "Ingreso del estudiante menor de edad", description: "Autorizar el acceso a las funciones básicas de la plataforma bajo supervisión del establecimiento; las opciones adicionales se deciden separadamente." },
   { key: "projects", title: "Participación y registro de proyectos", description: "Registrar proyectos y trabajos opcionales dentro de los espacios institucionales." },
   { key: "evidences", title: "Evidencias y archivos de aprendizaje", description: "Almacenar informes, imágenes, documentos y evidencias de actividades, con permisos restringidos." },
   { key: "images_internal", title: "Fotografías y videos internos", description: "Tomar o cargar imágenes en espacios limitados a docentes y equipo autorizado." },
