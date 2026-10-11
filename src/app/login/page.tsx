@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useState } from 'react'
 
 const CURSOS = [
@@ -239,6 +240,10 @@ export default function LoginPage() {
               </button>
             </form>
           )}
+          <div className="mt-4 text-center text-xs leading-5 text-gray-600">
+            <p>Estudiantes menores de edad: la institución podrá requerir un formulario familiar con firma electrónica simple y verificación de representación, antes de habilitar las funciones correspondientes.</p>
+            <Link href="/proteccion-datos" className="mt-2 inline-block font-semibold text-blue-700 underline">Protección de datos y autorizaciones familiares</Link>
+          </div>
           <p className="text-gray-400 text-xs text-center mt-4">Solo usuarios autorizados del Colegio Providencia</p>
         </div>
       </div>
