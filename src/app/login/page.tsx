@@ -76,7 +76,10 @@ export default function LoginPage() {
     }
     if (accountMinor) {
       const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
-      if (!result?.ok) setNotice('Pendiente: el correo al representante no pudo confirmarse. Contacta a administración.')
+      if (result?.ok) {
+        const state = await result.json().catch(() => ({}))
+        if (state.status === 'approved') { router.push('/dashboard'); setLoading(false); return }
+      } else setNotice('Pendiente: el correo al representante no pudo confirmarse. Contacta a administración.')
       router.push('/autorizacion-pendiente'); setLoading(false); return
     }
     await fetch('/api/access-log', {
