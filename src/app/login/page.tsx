@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
 import SelloConsentPanel, { selloChoices } from '@/components/legal/SelloConsentPanel'
+import { hasLegacyConsentGrace } from '@/lib/family-consent/transition'
 
 const CURSOS = [
   '1° Básico A', '1° Básico B',
@@ -56,16 +57,20 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true); setError(''); setNotice('')
-    if (!consentExpanded || !acceptedTerms) {
-      setError('Despliega las condiciones y confirma su lectura antes de ingresar.')
-      setLoading(false); return
-    }
     const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
       email: form.email.trim().toLowerCase(), password: form.password,
     })
     if (loginError) { setError('Correo o contraseña incorrectos'); setLoading(false); return }
+    // La cuenta existente mantiene acceso durante la transición.
+    const legacyGrace = hasLegacyConsentGrace(loginData.user?.created_at)
+    if (!legacyGrace && (!consentExpanded || !acceptedTerms)) {
+      await supabase.auth.signOut({scope:'local'})
+      setError('Revisa las condiciones de privacidad y confirma su lectura para continuar.')
+      setLoading(false); return
+    }
     const accountMinor = isMinor(String(loginData.user?.user_metadata?.birth_date || ''))
-    const { error: consentError } = await supabase.rpc('record_sello_privacy_choices', {
+    if (!legacyGrace) {
+      const { error: consentError } = await supabase.rpc('record_sello_privacy_choices', {
       p_policy_version: 'sello-2026-10-v1', p_terms_acknowledged: true,
       p_choices: accountMinor ? Object.fromEntries(Object.keys(choices).map(key => [key,false])) : choices,
     })
@@ -74,7 +79,8 @@ export default function LoginPage() {
       setError('No se pudo guardar el registro de privacidad. El acceso sigue restringido.')
       setLoading(false); return
     }
-    if (accountMinor) {
+    }
+    if (accountMinor && !legacyGrace) {
       const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
       if (result?.ok) {
         const state = await result.json().catch(() => ({}))
@@ -230,6 +236,7 @@ export default function LoginPage() {
                 <input type="password" required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••" className={inputClass} />
               </div>
+              <p className="text-xs text-gray-600">Las cuentas inscritas hasta el 11 de octubre de 2026 mantienen su acceso durante el plazo de transición, sin completar todavía el nuevo formulario.</p>
               <SelloConsentPanel expanded={consentExpanded} setExpanded={setConsentExpanded}
                 terms={acceptedTerms} setTerms={setAcceptedTerms} choices={choices} setChoices={setChoices}
                 minor={false} guardianEmail={guardianEmail} setGuardianEmail={setGuardianEmail}/>
