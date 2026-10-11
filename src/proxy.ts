@@ -63,14 +63,19 @@ export async function proxy(request: NextRequest) {
   // Staged enforcement: activate only after the migration, onboarding and privacy
   // review. An invitation signature is insufficient; only institution-approved
   // records may unlock a student's protected dashboard and API access.
-  if (process.env.SELLO_FAMILY_CONSENT_ENFORCE === 'true' && perfil?.role === 'estudiante') {
+  const rawDob = String(user.user_metadata?.birth_date || '')
+  const dob = new Date(rawDob + 'T00:00:00')
+  const now = new Date()
+  const under18 = !rawDob || Number.isNaN(dob.getTime()) ||
+    dob > new Date(now.getFullYear() - 18, now.getMonth(), now.getDate())
+  if (process.env.SELLO_FAMILY_CONSENT_ENFORCE === 'true' && under18 && perfil?.role !== 'admin') {
     try {
       const db = createFamilyAdminClient()
       const { data: permission, error: familyError } = await db.from('family_authorization_requests')
-        .select('id,status,decisions').eq('student_user_id', user.id)
+        .select('id,status,decisions,document_version').eq('student_user_id', user.id)
         .eq('platform', 'sello').in('status', ['approved','revoked'])
         .order('updated_at', { ascending: false }).limit(1).maybeSingle()
-      if (familyError || !permission || permission.status !== 'approved') {
+      if (familyError || !permission || permission.status !== 'approved' || permission.document_version !== 'family-2026-10-v1' || permission.decisions?.platform_access !== true) {
         if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Autorización familiar pendiente de verificación institucional' }, { status: 403 })
         return NextResponse.redirect(new URL('/autorizacion-pendiente', request.url))
       }
