@@ -36,7 +36,7 @@ begin
  'public_disclosure','ai_assistance','optional_analytics','educational_messages')) then
    raise exception 'Finalidad desconocida';
  end if;
- select raw_user_meta_data->>'birth_date' into v_birth from auth.users where id=v_uid;
+ select declared_birth_date::text into v_birth from public.family_age_status where user_id=v_uid;
  if v_birth ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
    begin
      v_minor := (v_birth::date > (current_date - interval '18 years')::date);
