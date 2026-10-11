@@ -15,6 +15,7 @@ export async function proxy(request: NextRequest) {
     '/autorizacion-familiar',
     '/autorizacion-pendiente',
     '/api/family-consent',
+    '/proteccion-datos',
     '/auth/callback',
     '/api/register-profile',
     '/api/promedios/editor/callback',
