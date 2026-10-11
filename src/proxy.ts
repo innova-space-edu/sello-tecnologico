@@ -48,7 +48,12 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (isPublicPath) return response
+  // Public content remains available to unauthenticated visitors. Authenticated
+  // minors must not bypass the guardian gate by navigating to public app surfaces.
+  const legalOrAuthorizationPath = ['/login','/registro','/autorizacion-familiar',
+    '/autorizacion-pendiente','/proteccion-datos','/auth/callback','/api/family-consent',
+    '/api/register-profile','/bloqueado'].some(p => pathname === p || pathname.startsWith(p + '/'))
+  if (isPublicPath && (!user || legalOrAuthorizationPath)) return response
 
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
@@ -88,6 +93,8 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/autorizacion-pendiente', request.url))
     }
   }
+
+  if (isPublicPath) return response
 
   if (perfil?.blocked && perfil?.role !== 'admin') {
     return NextResponse.redirect(new URL('/bloqueado', request.url))
