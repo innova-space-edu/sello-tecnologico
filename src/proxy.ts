@@ -66,10 +66,10 @@ export async function proxy(request: NextRequest) {
     try {
       const db = createFamilyAdminClient()
       const { data: permission, error: familyError } = await db.from('family_authorization_requests')
-        .select('id,decisions').eq('student_user_id', user.id)
-        .eq('platform', 'sello').eq('status', 'approved')
-        .order('reviewed_at', { ascending: false }).limit(1).maybeSingle()
-      if (familyError || !permission) {
+        .select('id,status,decisions').eq('student_user_id', user.id)
+        .eq('platform', 'sello').in('status', ['approved','revoked'])
+        .order('updated_at', { ascending: false }).limit(1).maybeSingle()
+      if (familyError || !permission || permission.status !== 'approved') {
         if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Autorización familiar pendiente de verificación institucional' }, { status: 403 })
         return NextResponse.redirect(new URL('/autorizacion-pendiente', request.url))
       }
