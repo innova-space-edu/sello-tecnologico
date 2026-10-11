@@ -63,7 +63,11 @@ export async function proxy(request: NextRequest) {
   // Staged enforcement: activate only after the migration, onboarding and privacy
   // review. An invitation signature is insufficient; only institution-approved
   // records may unlock a student's protected dashboard and API access.
-  const rawDob = String(user.user_metadata?.birth_date || '')
+  const { data: lockedAge, error: ageError } = process.env.SELLO_FAMILY_CONSENT_ENFORCE === 'true'
+    ? await createFamilyAdminClient().from('family_age_status').select('declared_birth_date')
+        .eq('user_id', user.id).maybeSingle()
+    : { data: null, error: null }
+  const rawDob = ageError ? '' : String(lockedAge?.declared_birth_date || '')
   const dob = new Date(rawDob + 'T00:00:00')
   const now = new Date()
   const under18 = !rawDob || Number.isNaN(dob.getTime()) ||
