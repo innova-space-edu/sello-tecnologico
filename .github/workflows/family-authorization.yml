@@ -20,5 +20,9 @@ jobs:
       - name: Parsear archivos modificados sin errores de sintaxis
         run: |
           node -e "const ts=require('typescript');const fs=require('fs');for(const p of ['src/proxy.ts','src/lib/family-consent/transition.ts','src/app/autorizacion-pendiente/page.tsx']){const a=ts.transpileModule(fs.readFileSync(p,'utf8'),{fileName:p,reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.Preserve}});const errs=a.diagnostics.filter(x=>x.category===ts.DiagnosticCategory.Error);if(errs.length)throw Error(p+': '+errs.map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')).join(', '))}console.log('Sintaxis correcta')"
-      - name: Compilar Next.js
+      - name: Compilar Next.js con configuración de prueba
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ci-server-placeholder
         run: npm run build
