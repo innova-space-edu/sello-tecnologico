@@ -18,6 +18,9 @@ jobs:
       - name: Estadísticas y aprobación institucional
         run: node scripts/test-family-admin-stats.mjs src/lib/family-consent/admin-stats.ts src/app/api/family-consent/admin/route.ts src/app/admin/autorizaciones-familiares/page.tsx
 
+      - name: Actas y consentimiento persistente
+        run: node scripts/test-sello-actas-consent-once.mjs
+
       - name: Validar autorizaciones familiares y transición
         run: node scripts/test-family-enforcement.mjs src/lib/family-consent/transition.ts src/proxy.ts src/app/autorizacion-pendiente/page.tsx
       - name: Parsear archivos modificados sin errores de sintaxis
