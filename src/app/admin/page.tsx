@@ -65,6 +65,15 @@ export default async function AdminPage() {
         <div className="mb-6">
           <AdminAlertas />
         </div>
+        <Link href="/admin/autorizaciones-familiares"
+          className="mb-6 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900 hover:bg-blue-100">
+          <span className="text-2xl">🛡️</span>
+          <span className="flex-1">
+            <strong className="block">Autorizaciones familiares</strong>
+            <span className="block text-sm">Revisar formularios, Sí/No, solicitudes pendientes y aprobar acceso tras verificar al apoderado</span>
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 lg:mb-8">
           {[

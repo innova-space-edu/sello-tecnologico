@@ -8,6 +8,7 @@ const menu = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/mis-encuestas', label: 'Mis encuestas', icon: '🗳️' },
   { href: '/admin', label: 'Panel Admin', icon: '👑' },
+  { href: '/admin/autorizaciones-familiares', label: 'Autorizaciones', icon: '🛡️' },
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
@@ -135,6 +136,7 @@ export default function Sidebar() {
             const esEstudianteRol = rol === 'estudiante'
 
             if (item.href === '/admin' && !esAdmin) return null
+            if (item.href === '/admin/autorizaciones-familiares' && !esAdmin) return null
             if (item.href === '/admin/moderacion' && !esAdmin) return null
             if (item.href === '/notificaciones' && !esAdmin) return null
             if (item.href === '/mis-encuestas' && !esEstudianteRol) return null
