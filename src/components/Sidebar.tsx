@@ -106,7 +106,7 @@ export default function Sidebar() {
   return (
     <>
       <button onClick={() => setOpen(!open)}
-        className="lg:hidden fixed top-4 left-4 z-50 bg-blue-900 text-white p-2.5 rounded-xl shadow-lg">
+        className="lg:hidden fixed top-[calc(var(--legacy-consent-banner-height,0px)+1rem)] left-4 z-50 bg-blue-900 text-white p-2.5 rounded-xl shadow-lg">
         {open ? '✕' : '☰'}
         {(alertasMod > 0 || unreadMessages > 0) && (
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
@@ -119,7 +119,7 @@ export default function Sidebar() {
       )}
 
       <aside className={`
-        fixed left-0 top-0 h-full bg-blue-900 text-white flex flex-col z-40 transition-transform duration-300
+        fixed left-0 top-[var(--legacy-consent-banner-height,0px)] h-[calc(100dvh-var(--legacy-consent-banner-height,0px))] bg-blue-900 text-white flex flex-col z-40 transition-transform duration-300
         w-64
         ${open ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
