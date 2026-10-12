@@ -65,6 +65,13 @@ export default async function AdminPage() {
         <div className="mb-6">
           <AdminAlertas />
         </div>
+        <Link href="/admin/actas-familiares"
+          className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950 hover:bg-amber-100">
+          <span className="text-2xl">📜</span>
+          <span className="flex-1"><strong className="block">Archivo de actas familiares</strong>
+            <span className="block text-sm">Folios, fecha y hora, estudiante, apoderado, administrador y borradores separados</span></span>
+          <span aria-hidden="true">→</span>
+        </Link>
         <Link href="/admin/autorizaciones-familiares"
           className="mb-6 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900 hover:bg-blue-100">
           <span className="text-2xl">🛡️</span>

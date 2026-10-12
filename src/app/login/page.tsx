@@ -61,24 +61,21 @@ export default function LoginPage() {
       email: form.email.trim().toLowerCase(), password: form.password,
     })
     if (loginError) { setError('Correo o contraseña incorrectos'); setLoading(false); return }
-    // La cuenta existente mantiene acceso durante la transición.
+    // La cuenta conserva la fecha y permisos inicialmente registrados.
+    // Solo solicitar el formulario a quien no lo tenga en la versión vigente.
     const legacyGrace = hasLegacyConsentGrace(loginData.user?.created_at)
-    if (!legacyGrace && (!consentExpanded || !acceptedTerms)) {
-      await supabase.auth.signOut({scope:'local'})
-      setError('Revisa las condiciones de privacidad y confirma su lectura para continuar.')
-      setLoading(false); return
-    }
     const accountMinor = isMinor(String(loginData.user?.user_metadata?.birth_date || ''))
     if (!legacyGrace) {
-      const { error: consentError } = await supabase.rpc('record_sello_privacy_choices', {
-      p_policy_version: 'sello-2026-10-v1', p_terms_acknowledged: true,
-      p_choices: accountMinor ? Object.fromEntries(Object.keys(choices).map(key => [key,false])) : choices,
-    })
-    if (consentError) {
-      await supabase.auth.signOut({scope:'local'})
-      setError('No se pudo guardar el registro de privacidad. El acceso sigue restringido.')
-      setLoading(false); return
-    }
+      const {data:record,error:privacyError}=await supabase.from('sello_privacy_choices')
+        .select('version,terms_acknowledged_at').eq('user_id',loginData.user!.id).maybeSingle()
+      if (privacyError) {
+        setError('No se pudo consultar el registro de privacidad. Intenta nuevamente.')
+        setLoading(false); return
+      }
+      if(record?.version !== 'sello-2026-10-v1' || !record.terms_acknowledged_at) {
+        router.push('/consentimiento')
+        setLoading(false); return
+      }
     }
     if (accountMinor && !legacyGrace) {
       const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
@@ -139,6 +136,10 @@ export default function LoginPage() {
           guardian_email: minor ? guardianEmail.trim().toLowerCase() : null,
           sello_terms_version: 'sello-2026-10-v1',
           sello_terms_acknowledged: true,
+          sello_optional_choices_requested: minor
+            ? Object.fromEntries(Object.keys(choices).map(key=>[key,false]))
+            : Object.fromEntries(Object.entries(choices).filter(([key])=>key!=='platform_access')),
+
         },
       },
     })
@@ -172,11 +173,8 @@ export default function LoginPage() {
     }).catch(() => {})
 
     if (data.session) {
-      const { error: consentError } = await supabase.rpc('record_sello_privacy_choices', {
-        p_policy_version: 'sello-2026-10-v1', p_terms_acknowledged: true,
-        p_choices: minor ? Object.fromEntries(Object.keys(choices).map(key => [key,false])) : choices,
-      })
-      if (consentError) { setError('No se pudieron guardar los permisos: vuelve a ingresar tras verificar tu correo.'); setLoading(false); return }
+      // Supabase guardó la aceptación inicial al crear la cuenta, incluso
+      // cuando no entrega sesión hasta confirmar el correo.
       if (minor) {
         const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
         if (!result?.ok) setNotice('El envío del formulario familiar todavía no se confirmó; la cuenta seguirá restringida.')
@@ -237,9 +235,10 @@ export default function LoginPage() {
                   placeholder="••••••••" className={inputClass} />
               </div>
               <p className="text-xs text-gray-600">Las cuentas inscritas hasta el 11 de octubre de 2026 mantienen su acceso durante el plazo de transición, sin completar todavía el nuevo formulario.</p>
-              <SelloConsentPanel expanded={consentExpanded} setExpanded={setConsentExpanded}
-                terms={acceptedTerms} setTerms={setAcceptedTerms} choices={choices} setChoices={setChoices}
-                minor={false} guardianEmail={guardianEmail} setGuardianEmail={setGuardianEmail}/>
+              <p className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">
+                La plataforma conserva tus condiciones y preferencias. Solo solicitará el formulario
+                cuando todavía no exista aceptación de la versión vigente.
+              </p>
               <button type="submit" disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 mt-2">
                 {loading ? 'Ingresando...' : 'Ingresar'}

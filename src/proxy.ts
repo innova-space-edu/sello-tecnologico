@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createFamilyAdminClient } from '@/lib/family-consent/server'
-import { shouldEnforceFamilyConsent } from '@/lib/family-consent/transition'
+import { shouldEnforceFamilyConsent, hasLegacyConsentGrace as shouldRetainLegacyPrivacyGrace } from '@/lib/family-consent/transition'
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
@@ -10,6 +10,7 @@ export async function proxy(request: NextRequest) {
 
   const publicPaths = [
     '/login',
+    '/consentimiento',
     '/registro',
     '/bloqueado',
     '/formularios',
@@ -51,13 +52,33 @@ export async function proxy(request: NextRequest) {
 
   // Public content remains available to unauthenticated visitors. Authenticated
   // minors must not bypass the guardian gate by navigating to public app surfaces.
-  const legalOrAuthorizationPath = ['/login','/registro','/autorizacion-familiar',
+  const legalOrAuthorizationPath = ['/login','/consentimiento','/registro','/autorizacion-familiar',
     '/autorizacion-pendiente','/proteccion-datos','/auth/callback','/api/family-consent',
     '/api/register-profile','/bloqueado'].some(p => pathname === p || pathname.startsWith(p + '/'))
   if (isPublicPath && (!user || legalOrAuthorizationPath)) return response
 
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Registramos preferencias por cuenta. Solo la ausencia de la versión actual
+  // abre el formulario una vez, sin regrabar decisiones durante cada login.
+  // Las rutas legales/autorización quedan fuera para evitar ciclos.
+  const requiredInitialPrivacy = !legalOrAuthorizationPath &&
+    !shouldRetainLegacyPrivacyGrace(user.created_at)
+  if(requiredInitialPrivacy){
+    const {data:saved,error:privacyError}=await supabase.from('sello_privacy_choices')
+      .select('version,terms_acknowledged_at').eq('user_id',user.id).maybeSingle()
+    if(privacyError){
+      if(pathname.startsWith('/api/'))return NextResponse.json(
+        {error:'No fue posible consultar la privacidad de la cuenta.'},{status:503})
+      return NextResponse.redirect(new URL('/consentimiento',request.url))
+    }
+    if(saved?.version!=='sello-2026-10-v1'||!saved.terms_acknowledged_at){
+      if(pathname.startsWith('/api/'))return NextResponse.json(
+        {error:'Debes aceptar las condiciones vigentes una sola vez.',action:'/consentimiento'},{status:403})
+      return NextResponse.redirect(new URL('/consentimiento',request.url))
+    }
   }
 
   // Existing accounts are not blocked by the new consent requirements before 15 Nov 2026.
