@@ -23,11 +23,11 @@ export async function GET() {
           .eq("platform","sello").in("id",reqIds)
       : {data:[],error:null}
     if(reError||rqError)return privateResponse({error:"No se pudo completar la información del archivo."},503)
-    const reviewers=new Map((reviewers||[]).map(v=>[v.id,v.full_name||v.email||"Administrador"]))
+    const reviewerLookup=new Map((reviewers||[]).map(v=>[v.id,v.full_name||v.email||"Administrador"]))
     const byRequest=new Map((requests||[]).map(v=>[v.id,v]))
     return privateResponse({
       acts:list.map(a=>({
-        ...a, reviewer_name:a.reviewer_user_id?reviewers.get(a.reviewer_user_id)||"Administrador":"No corresponde · borrador",
+        ...a, reviewer_name:a.reviewer_user_id?reviewerLookup.get(a.reviewer_user_id)||"Administrador":"No corresponde · borrador",
         authorization_status:a.record_type==="borrador"?"borrador":byRequest.get(a.request_id)?.status||"no disponible",
         revoked_at:a.request_id?byRequest.get(a.request_id)?.revoked_at||null:null
       })),
