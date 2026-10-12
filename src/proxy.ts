@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createFamilyAdminClient } from '@/lib/family-consent/server'
+import { hasLegacyConsentGrace } from '@/lib/family-consent/transition'
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
@@ -11,6 +13,10 @@ export async function proxy(request: NextRequest) {
     '/registro',
     '/bloqueado',
     '/formularios',
+    '/autorizacion-familiar',
+    '/autorizacion-pendiente',
+    '/api/family-consent',
+    '/proteccion-datos',
     '/auth/callback',
     '/api/register-profile',
     '/api/promedios/editor/callback',
@@ -43,17 +49,56 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (isPublicPath) return response
+  // Public content remains available to unauthenticated visitors. Authenticated
+  // minors must not bypass the guardian gate by navigating to public app surfaces.
+  const legalOrAuthorizationPath = ['/login','/registro','/autorizacion-familiar',
+    '/autorizacion-pendiente','/proteccion-datos','/auth/callback','/api/family-consent',
+    '/api/register-profile','/bloqueado'].some(p => pathname === p || pathname.startsWith(p + '/'))
+  if (isPublicPath && (!user || legalOrAuthorizationPath)) return response
 
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
+
+  // Existing accounts are not blocked by the new consent requirements before 15 Nov 2026.
+  const familyConsentEnabled = process.env.SELLO_FAMILY_CONSENT_ENFORCE === 'true' && !hasLegacyConsentGrace(user.created_at)
 
   const { data: perfil } = await supabase
     .from('profiles')
     .select('blocked, role')
     .eq('id', user.id)
     .single()
+
+  // Staged enforcement: activate only after the migration, onboarding and privacy
+  // review. An invitation signature is insufficient; only institution-approved
+  // records may unlock a student's protected dashboard and API access.
+  const { data: lockedAge, error: ageError } = familyConsentEnabled
+    ? await createFamilyAdminClient().from('family_age_status').select('declared_birth_date')
+        .eq('user_id', user.id).maybeSingle()
+    : { data: null, error: null }
+  const rawDob = ageError ? '' : String(lockedAge?.declared_birth_date || '')
+  const dob = new Date(rawDob + 'T00:00:00')
+  const now = new Date()
+  const under18 = !rawDob || Number.isNaN(dob.getTime()) ||
+    dob > new Date(now.getFullYear() - 18, now.getMonth(), now.getDate())
+  if (familyConsentEnabled && under18 && perfil?.role !== 'admin') {
+    try {
+      const db = createFamilyAdminClient()
+      const { data: permission, error: familyError } = await db.from('family_authorization_requests')
+        .select('id,status,decisions,document_version').eq('student_user_id', user.id)
+        .eq('platform', 'sello').in('status', ['approved','revoked'])
+        .order('updated_at', { ascending: false }).limit(1).maybeSingle()
+      if (familyError || !permission || permission.status !== 'approved' || permission.document_version !== 'family-2026-10-v1' || permission.decisions?.platform_access !== true) {
+        if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Autorización familiar pendiente de verificación institucional' }, { status: 403 })
+        return NextResponse.redirect(new URL('/autorizacion-pendiente', request.url))
+      }
+    } catch {
+      if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'No se pudo verificar autorización familiar' }, { status: 503 })
+      return NextResponse.redirect(new URL('/autorizacion-pendiente', request.url))
+    }
+  }
+
+  if (isPublicPath) return response
 
   if (perfil?.blocked && perfil?.role !== 'admin') {
     return NextResponse.redirect(new URL('/bloqueado', request.url))

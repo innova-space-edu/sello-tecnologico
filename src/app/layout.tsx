@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import MiraChat from '@/components/MiraChat'
 import NotificationBanner from '@/components/NotificationBanner'
+import LegacyConsentCountdown from '@/components/legal/LegacyConsentCountdown'
 import ProviChat from '@/components/ProviChat'
 import AccessTracker from '@/components/AccessTracker'
 import FollowupRealtimeMount from '@/components/seguimientos/FollowupRealtimeMount'
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body>
+        <LegacyConsentCountdown policyHref="/proteccion-datos" />
         <NotificationBanner />
         <AccessTracker />
         <FollowupRealtimeMount />

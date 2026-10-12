@@ -2,7 +2,10 @@
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { useState } from 'react'
+import SelloConsentPanel, { selloChoices } from '@/components/legal/SelloConsentPanel'
+import { hasLegacyConsentGrace } from '@/lib/family-consent/transition'
 
 const CURSOS = [
   '1° Básico A', '1° Básico B',
@@ -27,6 +30,16 @@ export default function LoginPage() {
   const supabase = createClient()
 
   const [mode, setMode] = useState<Mode>('login')
+  const [birthDate, setBirthDate] = useState('')
+  const [guardianEmail, setGuardianEmail] = useState('')
+  const [consentExpanded, setConsentExpanded] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [choices, setChoices] = useState<Record<string, boolean>>(selloChoices())
+  const isMinor = (date: string) => {
+    const d = new Date(date + 'T00:00:00')
+    const now = new Date()
+    return !date || Number.isNaN(d.getTime()) || d > new Date(now.getFullYear() - 18, now.getMonth(), now.getDate())
+  }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -44,10 +57,37 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true); setError(''); setNotice('')
-    const { error: loginError } = await supabase.auth.signInWithPassword({
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
       email: form.email.trim().toLowerCase(), password: form.password,
     })
     if (loginError) { setError('Correo o contraseña incorrectos'); setLoading(false); return }
+    // La cuenta existente mantiene acceso durante la transición.
+    const legacyGrace = hasLegacyConsentGrace(loginData.user?.created_at)
+    if (!legacyGrace && (!consentExpanded || !acceptedTerms)) {
+      await supabase.auth.signOut({scope:'local'})
+      setError('Revisa las condiciones de privacidad y confirma su lectura para continuar.')
+      setLoading(false); return
+    }
+    const accountMinor = isMinor(String(loginData.user?.user_metadata?.birth_date || ''))
+    if (!legacyGrace) {
+      const { error: consentError } = await supabase.rpc('record_sello_privacy_choices', {
+      p_policy_version: 'sello-2026-10-v1', p_terms_acknowledged: true,
+      p_choices: accountMinor ? Object.fromEntries(Object.keys(choices).map(key => [key,false])) : choices,
+    })
+    if (consentError) {
+      await supabase.auth.signOut({scope:'local'})
+      setError('No se pudo guardar el registro de privacidad. El acceso sigue restringido.')
+      setLoading(false); return
+    }
+    }
+    if (accountMinor && !legacyGrace) {
+      const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
+      if (result?.ok) {
+        const state = await result.json().catch(() => ({}))
+        if (state.status === 'approved') { router.push('/dashboard'); setLoading(false); return }
+      } else setNotice('Pendiente: el correo al representante no pudo confirmarse. Contacta a administración.')
+      router.push('/autorizacion-pendiente'); setLoading(false); return
+    }
     await fetch('/api/access-log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -62,6 +102,15 @@ export default function LoginPage() {
     setLoading(true); setError(''); setNotice('')
 
     const email = form.email.trim().toLowerCase()
+    if (!consentExpanded || !acceptedTerms) { setError('Completa el formulario de consentimiento.'); setLoading(false); return }
+    const parsedBirth = new Date(birthDate + 'T00:00:00')
+    if (!birthDate || Number.isNaN(parsedBirth.getTime()) || parsedBirth > new Date()) {
+      setError('Indica una fecha de nacimiento válida.'); setLoading(false); return
+    }
+    const minor = isMinor(birthDate)
+    if (minor && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(guardianEmail.trim())) {
+      setError('Debes indicar un correo válido del representante legal.'); setLoading(false); return
+    }
     const role = detectRole(email)
     const rut = normalizeRut(form.rut)
     const cursoRaw = form.curso.trim()
@@ -86,6 +135,10 @@ export default function LoginPage() {
           rut,
           curso: cursoNormalizado,
           role,
+          birth_date: birthDate,
+          guardian_email: minor ? guardianEmail.trim().toLowerCase() : null,
+          sello_terms_version: 'sello-2026-10-v1',
+          sello_terms_acknowledged: true,
         },
       },
     })
@@ -119,7 +172,16 @@ export default function LoginPage() {
     }).catch(() => {})
 
     if (data.session) {
-      router.push('/dashboard')
+      const { error: consentError } = await supabase.rpc('record_sello_privacy_choices', {
+        p_policy_version: 'sello-2026-10-v1', p_terms_acknowledged: true,
+        p_choices: minor ? Object.fromEntries(Object.keys(choices).map(key => [key,false])) : choices,
+      })
+      if (consentError) { setError('No se pudieron guardar los permisos: vuelve a ingresar tras verificar tu correo.'); setLoading(false); return }
+      if (minor) {
+        const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
+        if (!result?.ok) setNotice('El envío del formulario familiar todavía no se confirmó; la cuenta seguirá restringida.')
+        router.push('/autorizacion-pendiente')
+      } else router.push('/dashboard')
     } else {
       setMode('login')
       setForm({ email, password: '', full_name: '', rut: '', curso: '' })
@@ -174,6 +236,10 @@ export default function LoginPage() {
                 <input type="password" required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="••••••••" className={inputClass} />
               </div>
+              <p className="text-xs text-gray-600">Las cuentas inscritas hasta el 11 de octubre de 2026 mantienen su acceso durante el plazo de transición, sin completar todavía el nuevo formulario.</p>
+              <SelloConsentPanel expanded={consentExpanded} setExpanded={setConsentExpanded}
+                terms={acceptedTerms} setTerms={setAcceptedTerms} choices={choices} setChoices={setChoices}
+                minor={false} guardianEmail={guardianEmail} setGuardianEmail={setGuardianEmail}/>
               <button type="submit" disabled={loading}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 mt-2">
                 {loading ? 'Ingresando...' : 'Ingresar'}
@@ -229,6 +295,14 @@ export default function LoginPage() {
                 </div>
               )}
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento *</label>
+                <input type="date" required value={birthDate} onChange={e=>setBirthDate(e.target.value)}
+                  className={inputClass} />
+              </div>
+              <SelloConsentPanel expanded={consentExpanded} setExpanded={setConsentExpanded}
+                terms={acceptedTerms} setTerms={setAcceptedTerms} choices={choices} setChoices={setChoices}
+                minor={isMinor(birthDate)} guardianEmail={guardianEmail} setGuardianEmail={setGuardianEmail}/>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
                 <input type="password" required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                   placeholder="Mínimo 6 caracteres" className={inputClass} />
@@ -239,6 +313,10 @@ export default function LoginPage() {
               </button>
             </form>
           )}
+          <div className="mt-4 text-center text-xs leading-5 text-gray-600">
+            <p>Estudiantes menores de edad: la institución podrá requerir un formulario familiar con firma electrónica simple y verificación de representación, antes de habilitar las funciones correspondientes.</p>
+            <Link href="/proteccion-datos" className="mt-2 inline-block font-semibold text-blue-700 underline">Protección de datos y autorizaciones familiares</Link>
+          </div>
           <p className="text-gray-400 text-xs text-center mt-4">Solo usuarios autorizados del Colegio Providencia</p>
         </div>
       </div>
