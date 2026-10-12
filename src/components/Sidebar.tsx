@@ -9,7 +9,7 @@ const menu = [
   { href: '/mis-encuestas', label: 'Mis encuestas', icon: '🗳️' },
   { href: '/admin', label: 'Panel Admin', icon: '👑' },
   { href: '/admin/autorizaciones-familiares', label: 'Autorizaciones', icon: '🛡️' },
-  { href: '/admin/actas-familiares', label: 'Actas', icon: '📜' }
+  { href: '/admin/actas-familiares', label: 'Actas', icon: '📜' },
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
