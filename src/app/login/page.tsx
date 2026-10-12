@@ -108,7 +108,7 @@ export default function LoginPage() {
       setError('Indica una fecha de nacimiento válida.'); setLoading(false); return
     }
     const minor = isMinor(birthDate)
-    if (minor && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(guardianEmail.trim())) {
+    if (minor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guardianEmail.trim())) {
       setError('Debes indicar un correo válido del representante legal.'); setLoading(false); return
     }
     const role = detectRole(email)

@@ -1,0 +1,30 @@
+name: Validación de correo del apoderado
+
+on:
+  pull_request:
+    paths:
+      - 'src/app/login/page.tsx'
+      - 'src/lib/family-consent/server.ts'
+      - 'scripts/test-guardian-email-validation.mjs'
+      - '.github/workflows/guardian-email-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/app/login/page.tsx'
+      - 'src/lib/family-consent/server.ts'
+      - 'scripts/test-guardian-email-validation.mjs'
+      - '.github/workflows/guardian-email-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  guardian-email:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Probar validación de correo de apoderados
+        run: node scripts/test-guardian-email-validation.mjs src/app/login/page.tsx src/lib/family-consent/server.ts
