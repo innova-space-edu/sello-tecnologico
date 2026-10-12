@@ -1,0 +1,23 @@
+name: Autorización familiar de cuentas nuevas
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  family-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Validar autorizaciones familiares y transición
+        run: node scripts/test-family-enforcement.mjs src/lib/family-consent/transition.ts src/proxy.ts src/app/autorizacion-pendiente/page.tsx
+      - name: Comprobar tipos
+        run: npx tsc --noEmit
+      - name: Compilar Next.js
+        run: npm run build
