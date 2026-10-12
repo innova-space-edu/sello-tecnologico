@@ -185,7 +185,7 @@ export default function LoginPage() {
     } else {
       setMode('login')
       setForm({ email, password: '', full_name: '', rut: '', curso: '' })
-      setNotice('✅ Cuenta creada correctamente. Revisa tu correo si debes confirmar el acceso y luego inicia sesión.')
+      setNotice(minor ? 'Cuenta creada. Verifica el correo si corresponde e inicia sesión; recibirás una pantalla de autorización y la invitación se solicitará automáticamente. El acceso queda restringido hasta la aprobación institucional.' : '✅ Cuenta creada correctamente. Revisa tu correo si debes confirmar el acceso y luego inicia sesión.')
     }
     setLoading(false)
   }

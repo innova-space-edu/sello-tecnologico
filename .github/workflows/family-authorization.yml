@@ -1,0 +1,28 @@
+name: Autorización familiar de cuentas nuevas
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  family-authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Validar autorizaciones familiares y transición
+        run: node scripts/test-family-enforcement.mjs src/lib/family-consent/transition.ts src/proxy.ts src/app/autorizacion-pendiente/page.tsx
+      - name: Parsear archivos modificados sin errores de sintaxis
+        run: |
+          node -e "const ts=require('typescript');const fs=require('fs');for(const p of ['src/proxy.ts','src/lib/family-consent/transition.ts','src/app/autorizacion-pendiente/page.tsx']){const a=ts.transpileModule(fs.readFileSync(p,'utf8'),{fileName:p,reportDiagnostics:true,compilerOptions:{jsx:ts.JsxEmit.Preserve}});const errs=a.diagnostics.filter(x=>x.category===ts.DiagnosticCategory.Error);if(errs.length)throw Error(p+': '+errs.map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')).join(', '))}console.log('Sintaxis correcta')"
+      - name: Compilar Next.js con configuración de prueba
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-placeholder
+          SUPABASE_SERVICE_ROLE_KEY: ci-server-placeholder
+        run: npm run build
