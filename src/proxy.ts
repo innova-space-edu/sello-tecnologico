@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createFamilyAdminClient } from '@/lib/family-consent/server'
-import { hasLegacyConsentGrace } from '@/lib/family-consent/transition'
+import { shouldEnforceFamilyConsent } from '@/lib/family-consent/transition'
 
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
@@ -61,7 +61,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Existing accounts are not blocked by the new consent requirements before 15 Nov 2026.
-  const familyConsentEnabled = process.env.SELLO_FAMILY_CONSENT_ENFORCE === 'true' && !hasLegacyConsentGrace(user.created_at)
+  const familyEnforceLegacy = process.env.SELLO_FAMILY_CONSENT_ENFORCE === 'true'
 
   const { data: perfil } = await supabase
     .from('profiles')
@@ -69,19 +69,18 @@ export async function proxy(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  // Staged enforcement: activate only after the migration, onboarding and privacy
-  // review. An invitation signature is insufficient; only institution-approved
-  // records may unlock a student's protected dashboard and API access.
-  const { data: lockedAge, error: ageError } = familyConsentEnabled
-    ? await createFamilyAdminClient().from('family_age_status').select('declared_birth_date')
-        .eq('user_id', user.id).maybeSingle()
-    : { data: null, error: null }
+  // Los menores inscritos desde el nuevo formulario requieren autorización de forma inmediata.
+  // El período de transición se conserva para las cuentas antiguas.
+  const { data: lockedAge, error: ageError } = await createFamilyAdminClient()
+    .from('family_age_status').select('declared_birth_date,captured_at')
+    .eq('user_id', user.id).maybeSingle()
+  const familyConsentEnabled = shouldEnforceFamilyConsent(user.created_at, lockedAge?.captured_at, familyEnforceLegacy)
   const rawDob = ageError ? '' : String(lockedAge?.declared_birth_date || '')
   const dob = new Date(rawDob + 'T00:00:00')
   const now = new Date()
   const under18 = !rawDob || Number.isNaN(dob.getTime()) ||
     dob > new Date(now.getFullYear() - 18, now.getMonth(), now.getDate())
-  if (familyConsentEnabled && under18 && perfil?.role !== 'admin') {
+  if (familyConsentEnabled && under18) {
     try {
       const db = createFamilyAdminClient()
       const { data: permission, error: familyError } = await db.from('family_authorization_requests')
