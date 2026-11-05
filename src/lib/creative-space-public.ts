@@ -15,3 +15,20 @@ export const CREATIVE_EXTENSIONS: Record<string, string[]> = {
   'audio/wav': ['wav'], 'audio/ogg': ['ogg', 'oga'], 'audio/webm': ['webm'],
 }
 
+
+/** Tags are user-editable labels, independent of the detected media type. */
+export function normalizeCreativeTags(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length > 8) return null
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const item of value) {
+    if (typeof item !== 'string') return null
+    const tag = item.trim().replace(/^#+/, '').replace(/\s+/g, ' ')
+    if (!tag || tag.length > 24) return null
+    const key = tag.toLocaleLowerCase('es-CL')
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(tag)
+  }
+  return result
+}

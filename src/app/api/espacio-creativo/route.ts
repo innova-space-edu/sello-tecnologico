@@ -5,6 +5,7 @@ import {
   CREATIVE_BUCKET, CREATIVE_MAX_BYTES, CREATIVE_MIMES,
   CREATIVE_EXTENSIONS, eligiblePublicAuthors, shortText,
 } from '@/lib/creative-space'
+import { normalizeCreativeTags } from '@/lib/creative-space-public'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,7 +17,7 @@ export async function GET() {
   try {
     const admin = createAdminSupabaseClient()
     const { data, error } = await admin.from('creative_space_works')
-      .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at,publication_basis')
+      .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at,publication_basis,tags')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(80)
@@ -43,6 +44,7 @@ export async function GET() {
         author: row.author_name,
         title: row.title,
         description: row.description,
+        tags: row.tags ?? [],
         type: row.media_type,
         url,
         date: row.published_at ?? row.created_at,
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
   const path = shortText(body.path, 300)
   const name = shortText(body.fileName, 200)
   const size = Number(body.size)
+  const tags = body.tags === undefined ? [] : normalizeCreativeTags(body.tags)
   const extension = path.split('.').pop()?.toLowerCase() ?? ''
   const filename = path.split('/').pop() ?? ''
   const validPath = path.startsWith(user.id + '/') &&
@@ -80,7 +83,7 @@ export async function POST(request: Request) {
     /^[a-f0-9-]{36}\.[a-z0-9]{2,5}$/i.test(filename)
 
   if (title.length < 2 || author.length < 2 || body.rightsConfirmed !== true ||
-      !validPath || !CREATIVE_MIMES[mime] || !CREATIVE_EXTENSIONS[mime]?.includes(extension) ||
+      !validPath || tags === null || !CREATIVE_MIMES[mime] || !CREATIVE_EXTENSIONS[mime]?.includes(extension) ||
       !Number.isSafeInteger(size) || size <= 0 || size > CREATIVE_MAX_BYTES || !name) {
     return NextResponse.json({
       error: 'Completa el título y el autor, confirma los derechos y selecciona un archivo válido (máximo 50 MB).',
@@ -101,7 +104,7 @@ export async function POST(request: Request) {
 
     const { data: saved, error } = await admin.from('creative_space_works')
       .insert({
-        uploader_id: user.id, author_name: author, title, description,
+        uploader_id: user.id, author_name: author, title, description, tags,
         media_type: CREATIVE_MIMES[mime], mime_type: mime,
         file_name: name, file_size: size, storage_path: path,
         rights_confirmed: true, status: 'pending',

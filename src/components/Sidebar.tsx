@@ -19,6 +19,7 @@ const menu = [
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
   { href: '/espacio-creativo', label: 'Espacio creativo', icon: '🎨' },
+  { href: '/espacio-creativo/mis-obras', label: 'Mis obras', icon: '✏️' },
   { href: '/informes', label: 'Informes', icon: '📘' },
   { href: '/promedios', label: 'Promedios', icon: '🧮' },
   { href: '/portafolio', label: 'Portafolio', icon: '📂' },

@@ -9,6 +9,7 @@ type Work = {
   title: string
   author: string
   description: string
+  tags: string[]
   type: 'image' | 'video' | 'audio'
   status: 'pending' | 'published'
   date: string
@@ -133,6 +134,7 @@ export default function RevisarEspacioCreativo() {
                             <h3 className="break-words text-lg font-black">{work.title}</h3>
                             <p className="text-sm font-semibold">Autor: {work.author}</p>
                             <p className="break-words text-sm text-slate-600">{work.description || 'Sin descripción.'}</p>
+                            {!!work.tags?.length && <div className="flex flex-wrap gap-2">{work.tags.map(tag => <span key={tag} className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">#{tag}</span>)}</div>}
                             <p className="text-xs text-slate-400">{new Date(work.date).toLocaleDateString('es-CL')}</p>
                             {work.status === 'pending' && work.canMarkInstitutional && (
                               <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs leading-relaxed text-indigo-950">
