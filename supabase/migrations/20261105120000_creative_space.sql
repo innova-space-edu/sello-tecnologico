@@ -30,13 +30,10 @@ create index if not exists creative_space_pending_idx
   where status = 'pending';
 
 alter table public.creative_space_works enable row level security;
+-- No direct Data API reads: authorization may be revoked after publication.
+-- Public and author views run exclusively through the server API, which checks
+-- current consent before generating short-lived signed media URLs.
 revoke all on public.creative_space_works from public, anon, authenticated;
-grant select on public.creative_space_works to anon, authenticated;
-
-create policy creative_public_read on public.creative_space_works
-  for select to anon, authenticated using (status = 'published');
-create policy creative_own_read on public.creative_space_works
-  for select to authenticated using (uploader_id = (select auth.uid()));
 
 -- Archivos privados: solo API con service_role puede firmar lecturas;
 -- estudiantes y docentes pueden crear archivos en su propia carpeta, sin leer
