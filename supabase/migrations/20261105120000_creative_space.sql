@@ -52,6 +52,12 @@ create policy creative_space_upload_own on storage.objects
   with check (
     bucket_id = 'creative-space'
     and (storage.foldername(name))[1] = (select auth.uid())::text
+    and exists (
+      select 1 from public.profiles p
+      where p.id = (select auth.uid())
+        and coalesce(p.blocked, false) = false
+        and p.role in ('admin', 'docente', 'coordinador', 'utp', 'estudiante')
+    )
   );
 
 commit;
