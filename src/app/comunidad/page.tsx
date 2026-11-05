@@ -11,6 +11,7 @@ const NAV = [
   { href: '/comunidad?type=image', icon: '🖼️', label: 'Imágenes' },
   { href: '/comunidad?type=video', icon: '🎬', label: 'Videos' },
   { href: '/comunidad?type=audio', icon: '🎙️', label: 'Podcasts' },
+  { href: '/espacio-creativo', icon: '🎨', label: 'Espacio creativo' },
   { href: '/vitrinas', icon: '🌐', label: 'Administrar páginas' },
 ]
 
@@ -56,6 +57,7 @@ export default async function ComunidadPage() {
             </div>
           </Link>
           <div className="flex items-center gap-2">
+            <Link href="/espacio-creativo" className="rounded-2xl border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-xs font-black text-fuchsia-700 transition hover:bg-fuchsia-100 sm:px-4 sm:text-sm">🎨 Espacio creativo</Link>
             <Link href="/vitrinas" className="hidden rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-100 sm:block">Crear publicación</Link>
             {viewer ? (
               <Link href="/portafolio" className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm transition hover:border-blue-200 hover:bg-blue-50" aria-label={`Abrir el perfil de ${viewer.name}`}>
