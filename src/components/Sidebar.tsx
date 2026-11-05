@@ -18,6 +18,7 @@ const menu = [
   { href: '/autoevaluacion/respuestas', label: 'Respuestas autoevaluación', icon: '📝' },
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
+  { href: '/espacio-creativo', label: 'Espacio creativo', icon: '🎨' },
   { href: '/informes', label: 'Informes', icon: '📘' },
   { href: '/promedios', label: 'Promedios', icon: '🧮' },
   { href: '/portafolio', label: 'Portafolio', icon: '📂' },
@@ -29,6 +30,7 @@ const menu = [
   { href: '/reportes', label: 'Reportes', icon: '📈' },
   { href: '/notificaciones', label: 'Notificaciones', icon: '📣' },
   { href: '/admin/moderacion', label: 'Moderación', icon: '🚨' },
+  { href: '/admin/espacio-creativo', label: 'Revisar galería', icon: '🖼️' },
   { href: '/configuracion', label: 'Configuración', icon: '⚙️' },
 ]
 
@@ -140,6 +142,7 @@ export default function Sidebar() {
             if (item.href === '/admin/autorizaciones-familiares' && !esAdmin) return null
             if (item.href === '/admin/actas-familiares' && !esAdmin) return null
             if (item.href === '/admin/moderacion' && !esAdmin) return null
+            if (item.href === '/admin/espacio-creativo' && !esAdmin) return null
             if (item.href === '/notificaciones' && !esAdmin) return null
             if (item.href === '/mis-encuestas' && !esEstudianteRol) return null
             if (item.href === '/usuarios/importar' && esEstudianteRol) return null

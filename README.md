@@ -798,3 +798,16 @@ Este repositorio es de **uso privado**. Su código, base de datos, recursos, con
 <sub>Proyectos, ciencia, tecnología, creatividad y comunidad educativa.</sub>
 
 </div>
+
+
+## 🎨 Espacio creativo · Museo digital
+
+La nueva ruta pública **/espacio-creativo** muestra las creaciones autorizadas de la comunidad educativa en dos presentaciones: **Sala** (obra destacada, recorrido y selección de piezas) y **Mosaico** (galería artística adaptable). Acepta imágenes, videos y podcasts; incluye búsqueda, filtros, reproductores nativos, vista ampliada y enlaces individuales para compartir mediante la URL con parámetro `obra`.
+
+**Subir material**: docentes, estudiantes y equipo autorizado ingresan el **autor**, título, descripción y archivo, con confirmación expresa de derechos y autorizaciones. Límite por publicación: **50 MiB**; formatos JPG/PNG/WebP/GIF, MP4/WebM, MP3/M4A/WAV/Ogg/WebM de audio. La carga va directamente a Supabase Storage privado. La API verifica sesión, rol, bloqueo, formato, carpeta y existencia del archivo. El material se registra **pendiente**, nunca se publica automáticamente.
+
+**Revisión institucional**: **/admin/espacio-creativo** permite al rol `admin` previsualizar, aprobar, rechazar o retirar una obra. Para aprobar se requiere consentimiento público vigente del titular adulto (`sello_privacy_choices.choices.public_showcase`) o autorización familiar aprobada (`family_authorization_requests.decisions.public_showcase`) para menores, con fecha de nacimiento registrada en `family_age_status`. La API vuelve a comprobar autorizaciones al mostrar obras, por lo que una revocación impide nuevas vistas públicas. No se revela un archivo privado sin URL firmada y aprobación.
+
+**Despliegue**: aplicar la migración `supabase/migrations/20261105120000_creative_space.sql` en el proyecto Supabase del Sello Tecnológico **antes** de habilitar el frontend. Crea la tabla con RLS y el bucket privado `creative-space`. Verificar Storage, permisos y las rutas `/api/espacio-creativo` y `/api/espacio-creativo/revision`. El servidor requiere `SUPABASE_SERVICE_ROLE_KEY` solo en el backend; nunca se expone en el navegador.
+
+**Pruebas recomendadas**: invitado ve solamente piezas publicadas; docente/estudiante puede enviar pero no aprobar; estudiante sin autorización pública no se puede publicar; el administrador aprueba una obra autorizada, puede retirarla y la revocación de consentimiento la oculta. Verificar formatos, límite y enlace compartido en móvil.
