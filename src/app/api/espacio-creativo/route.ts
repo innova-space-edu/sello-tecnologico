@@ -16,15 +16,19 @@ export async function GET() {
   try {
     const admin = createAdminSupabaseClient()
     const { data, error } = await admin.from('creative_space_works')
-      .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at')
+      .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at,publication_basis')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(80)
     if (error) throw error
 
     const rows = data ?? []
-    const allowed = await eligiblePublicAuthors(admin, rows.map(row => row.uploader_id))
-    const visible = rows.filter(row => allowed.has(row.uploader_id))
+    // Obras institucionales verificadas no dependen de consentimiento personal
+    // del usuario que las subió. Las obras personales sí se revalidan siempre.
+    const personal = rows.filter(row => row.publication_basis !== 'institutional')
+    const allowed = await eligiblePublicAuthors(admin, personal.map(row => row.uploader_id))
+    const visible = rows.filter(row =>
+      row.publication_basis === 'institutional' || allowed.has(row.uploader_id))
     if (!visible.length) return NextResponse.json({ works: [] }, { headers: noStore })
 
     const { data: links, error: linkError } = await admin.storage

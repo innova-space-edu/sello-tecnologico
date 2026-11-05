@@ -15,10 +15,10 @@ function failure(error: unknown) {
 
 export async function GET() {
   try {
-    await requireAdminSession()
+    const { user } = await requireAdminSession()
     const admin = createAdminSupabaseClient()
     const { data, error } = await admin.from('creative_space_works')
-      .select('id,uploader_id,author_name,title,description,media_type,storage_path,status,created_at,rights_confirmed')
+      .select('id,uploader_id,author_name,title,description,media_type,storage_path,status,created_at,rights_confirmed,publication_basis')
       .in('status', ['pending','published'])
       .order('created_at', { ascending: false })
       .limit(100)
@@ -33,6 +33,8 @@ export async function GET() {
       works: rows.map(row => ({
         id: row.id, title: row.title, author: row.author_name, description: row.description,
         type: row.media_type, status: row.status, date: row.created_at,
+        publicationBasis: row.publication_basis,
+        canMarkInstitutional: row.status === 'pending' && row.uploader_id === user.id,
         url: byPath.get(row.storage_path) ?? null,
       })),
     }, { headers: { 'Cache-Control': 'no-store' } })
@@ -59,21 +61,46 @@ export async function PATCH(request: Request) {
     if (workError || !work || !['pending', 'published'].includes(work.status)) {
       return NextResponse.json({ error: 'Obra no disponible para revisión.' }, { status: 404 })
     }
+    // La vía institucional solo puede declararla el administrador que cargó
+    // el material y exige confirmación manual de ausencia de datos personales.
+    const institutional = action === 'published' && body.institutionalNoPersonalData === true
     if (action === 'published') {
+      if (work.status !== 'pending') {
+        return NextResponse.json({ error: 'Esta obra ya fue revisada.' }, { status: 409 })
+      }
       if (!work.rights_confirmed) {
         return NextResponse.json({ error: 'Falta la declaración de derechos.' }, { status: 409 })
       }
-      const approved = await eligiblePublicAuthors(admin, [work.uploader_id])
-      if (!approved.has(work.uploader_id)) {
-        return NextResponse.json({
-          error: 'No existe autorización vigente para exhibición pública. Verifica la decisión del titular o representante.',
-        }, { status: 409 })
+      if (institutional) {
+        if (work.uploader_id !== user.id) {
+          return NextResponse.json({
+            error: 'Solo quien subió la obra puede certificar su carácter institucional.',
+          }, { status: 403 })
+        }
+      } else {
+        const approved = await eligiblePublicAuthors(admin, [work.uploader_id])
+        if (!approved.has(work.uploader_id)) {
+          return NextResponse.json({
+            code: 'PUBLIC_SHOWCASE_CONSENT_REQUIRED',
+            error: 'No existe autorización vigente para exhibición pública. En obras personales revisa Mis consentimientos; en obras de menores se necesita autorización familiar.',
+          }, { status: 409 })
+        }
       }
     }
-    const { error } = await admin.from('creative_space_works').update({
-      status: action, reviewed_at: new Date().toISOString(), reviewed_by: user.id,
-      published_at: action === 'published' ? new Date().toISOString() : null,
-    }).eq('id', id).in('status', ['pending','published'])
+    const reviewedAt = new Date().toISOString()
+    const changes = {
+      status: action,
+      reviewed_at: reviewedAt,
+      reviewed_by: user.id,
+      published_at: action === 'published' ? reviewedAt : null,
+      ...(action === 'published' ? {
+        publication_basis: institutional ? 'institutional' : 'personal',
+        institutional_attested_at: institutional ? reviewedAt : null,
+        institutional_attested_by: institutional ? user.id : null,
+      } : {}),
+    }
+    const { error } = await admin.from('creative_space_works').update(changes)
+      .eq('id', id).eq('status', action === 'published' ? 'pending' : work.status)
     if (error) throw error
     return NextResponse.json({ ok: true, status: action }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
