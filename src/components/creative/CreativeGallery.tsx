@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { CREATIVE_MAX_BYTES, CREATIVE_MIMES, CREATIVE_EXTENSIONS } from '@/lib/creative-space'
+import { CREATIVE_MAX_BYTES, CREATIVE_MIMES, CREATIVE_EXTENSIONS } from '@/lib/creative-space-public'
 
 type Work = {
   id: string
