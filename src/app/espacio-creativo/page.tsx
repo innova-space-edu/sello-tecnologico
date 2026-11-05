@@ -32,6 +32,15 @@ export default async function EspacioCreativoPage() {
             </span>
           </Link>
           <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+            <Link href={profile?.role === 'admin' ? '/admin' : user ? '/dashboard' : '/comunidad'}
+              className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-4 py-2.5 font-bold text-white transition hover:border-fuchsia-300 hover:bg-white/20">
+              ← Volver {profile?.role === 'admin' ? 'a Administración' : user ? 'a la plataforma' : 'a Comunidad'}
+            </Link>
+            {profile?.role === 'admin' && (
+              <Link href="/admin/espacio-creativo" className="rounded-full px-4 py-2 text-fuchsia-200 hover:bg-white/10">
+                Revisar obras
+              </Link>
+            )}
             <Link href="/comunidad" className="rounded-full px-4 py-2 text-slate-300 transition hover:bg-white/10 hover:text-white">Comunidad</Link>
             <Link href="/dashboard" className="rounded-full px-4 py-2 text-slate-300 transition hover:bg-white/10 hover:text-white">Plataforma</Link>
             {user ? (
