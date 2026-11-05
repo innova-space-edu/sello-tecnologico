@@ -274,7 +274,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-black">{work.title}</h2>
                     <p className="mt-1 truncate text-sm text-slate-400">Por {work.author}</p>
-                    {!!work.tags?.length && <p className="mt-2 line-clamp-1 text-xs text-fuchsia-200">{work.tags.map(tag => '#' + tag).join(' · ')}</p>
+                    {!!work.tags?.length && <p className="mt-2 line-clamp-1 text-xs text-fuchsia-200">{work.tags.map(tag => '#' + tag).join(' · ')}</p>}
                   </div>
                   <button type="button" onClick={() => void share(work)} aria-label={'Compartir ' + work.title}
                     className="shrink-0 rounded-full border border-white/20 px-3 py-2 text-sm hover:bg-white/10">↗</button>
