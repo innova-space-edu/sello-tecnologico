@@ -1,14 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import { CREATIVE_MAX_BYTES, CREATIVE_MIMES, CREATIVE_EXTENSIONS } from '@/lib/creative-space-public'
+import { CREATIVE_MAX_BYTES, CREATIVE_MIMES, CREATIVE_EXTENSIONS, normalizeCreativeTags } from '@/lib/creative-space-public'
 
 type Work = {
   id: string
   title: string
   author: string
   description: string
+  tags: string[]
   type: 'image' | 'video' | 'audio'
   url: string
   date: string
@@ -102,7 +104,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
   const visible = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('es-CL')
     return works.filter(work => (filter === 'all' || work.type === filter) &&
-      (!normalized || [work.title, work.author, work.description].join(' ').toLocaleLowerCase('es-CL').includes(normalized)))
+      (!normalized || [work.title, work.author, work.description, ...(work.tags || [])].join(' ').toLocaleLowerCase('es-CL').includes(normalized)))
   }, [works, filter, query])
 
   const selected = visible.find(work => work.id === focusId) ?? visible[0] ?? null
@@ -149,10 +151,18 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
               Explora cada obra como si estuvieras en una exposición de arte.
             </p>
           </div>
-          <button type="button" onClick={() => canUpload ? setUploadOpen(true) : window.location.assign('/login')}
-            className="inline-flex shrink-0 items-center justify-center gap-3 self-start rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-7 py-4 font-black text-white shadow-[0_18px_50px_rgba(167,67,221,0.25)] transition hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(167,67,221,0.45)]">
-            <span className="text-xl">＋</span> Subir material
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-3 self-start">
+            {canUpload && (
+              <Link href="/espacio-creativo/mis-obras"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-fuchsia-200/35 bg-white/10 px-6 py-4 font-bold text-white transition hover:bg-white/20">
+                ✎ Mis obras · Editar
+              </Link>
+            )}
+            <button type="button" onClick={() => canUpload ? setUploadOpen(true) : window.location.assign('/login')}
+              className="inline-flex items-center justify-center gap-3 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-7 py-4 font-black text-white shadow-[0_18px_50px_rgba(167,67,221,0.25)] transition hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(167,67,221,0.45)]">
+              <span className="text-xl">＋</span> Subir material
+            </button>
+          </div>
         </div>
 
         <div className="mb-10 grid grid-cols-3 gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4 sm:max-w-lg sm:p-5">
@@ -221,6 +231,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
                   <p className="mt-3 text-sm font-semibold text-slate-300">Por {selected.author}</p>
                   <p className="mt-1 text-xs text-slate-500">{dateLabel(selected.date)}</p>
                   <p className="mt-6 whitespace-pre-wrap break-words leading-relaxed text-slate-300">{selected.description || 'Una creación de nuestra comunidad educativa.'}</p>
+                  {!!selected.tags?.length && <div className="mt-4 flex flex-wrap gap-2">{selected.tags.map(tag => <span key={tag} className="rounded-full bg-fuchsia-400/10 px-3 py-1 text-xs text-fuchsia-200">#{tag}</span>)}</div>}
                   <div className="mt-8 flex flex-wrap gap-3">
                     <button type="button" onClick={() => setLightboxId(selected.id)}
                       className="rounded-full bg-fuchsia-400 px-5 py-3 text-sm font-black text-slate-950">Explorar obra</button>
@@ -263,6 +274,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-black">{work.title}</h2>
                     <p className="mt-1 truncate text-sm text-slate-400">Por {work.author}</p>
+                    {!!work.tags?.length && <p className="mt-2 line-clamp-1 text-xs text-fuchsia-200">{work.tags.map(tag => '#' + tag).join(' · ')}</p>
                   </div>
                   <button type="button" onClick={() => void share(work)} aria-label={'Compartir ' + work.title}
                     className="shrink-0 rounded-full border border-white/20 px-3 py-2 text-sm hover:bg-white/10">↗</button>
@@ -313,6 +325,7 @@ function CreativeUploadModal({
   const [author, setAuthor] = useState(viewerName)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [tagsText, setTagsText] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [rights, setRights] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -325,6 +338,11 @@ function CreativeUploadModal({
     if (!file || !CREATIVE_MIMES[file.type] || file.size > CREATIVE_MAX_BYTES ||
       !CREATIVE_EXTENSIONS[file.type]?.includes(file.name.split('.').pop()?.toLowerCase() ?? '')) {
       setError('Selecciona una imagen, un video o un audio compatible de hasta 50 MB.')
+      return
+    }
+    const tags = tagsText.trim() ? normalizeCreativeTags(tagsText.split(',')) : []
+    if (!tags) {
+      setError('Puedes agregar hasta 8 etiquetas de 24 caracteres, separadas por comas.')
       return
     }
     if (!rights) {
@@ -345,7 +363,7 @@ function CreativeUploadModal({
       const response = await fetch('/api/espacio-creativo', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          author, title, description, mime: file.type, size: file.size,
+          author, title, description, tags, mime: file.type, size: file.size,
           fileName: file.name, path, rightsConfirmed: rights,
         }),
       })
@@ -378,7 +396,10 @@ function CreativeUploadModal({
             <div className="text-4xl">✓</div>
             <p className="mt-3 font-bold text-emerald-200">{success}</p>
             <p className="mt-2 text-sm text-slate-300">Si la obra incluye información personal o aparece un estudiante menor de edad, debe contar con las autorizaciones institucionales correspondientes.</p>
-            <button type="button" onClick={onClose} className="mt-6 rounded-full bg-white px-6 py-3 font-bold text-slate-900">Cerrar</button>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link href="/espacio-creativo/mis-obras" className="rounded-full bg-fuchsia-400 px-6 py-3 font-bold text-slate-950">Ver y editar mis obras</Link>
+              <button type="button" onClick={onClose} className="rounded-full bg-white px-6 py-3 font-bold text-slate-900">Cerrar</button>
+            </div>
           </div>
         ) : (
           <form onSubmit={event => void submit(event)} className="space-y-5">
@@ -399,6 +420,13 @@ function CreativeUploadModal({
               <textarea maxLength={1200} rows={3} value={description} onChange={event => setDescription(event.target.value)}
                 placeholder="Cuéntanos qué inspiró este trabajo"
                 className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-white/5 px-4 py-3 font-normal text-white outline-none focus:border-fuchsia-300" />
+            </label>
+            <label className="block text-sm font-bold text-slate-200">
+              Etiquetas (opcional)
+              <input value={tagsText} onChange={event => setTagsText(event.target.value)}
+                placeholder="Arte, Ciencias, Podcast"
+                className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 font-normal text-white outline-none focus:border-fuchsia-300" />
+              <span className="mt-2 block text-xs font-normal text-slate-400">Hasta 8 etiquetas separadas por comas; podrás corregirlas en Mis obras.</span>
             </label>
             <label className="block rounded-2xl border border-dashed border-fuchsia-300/35 bg-fuchsia-300/5 p-5 text-sm font-bold text-slate-200">
               Archivo: imagen, video o podcast *
