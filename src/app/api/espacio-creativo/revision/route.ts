@@ -18,7 +18,7 @@ export async function GET() {
     const { user } = await requireAdminSession()
     const admin = createAdminSupabaseClient()
     const { data, error } = await admin.from('creative_space_works')
-      .select('id,uploader_id,author_name,title,description,media_type,storage_path,status,created_at,rights_confirmed,publication_basis')
+      .select('id,uploader_id,author_name,title,description,tags,media_type,storage_path,status,created_at,rights_confirmed,publication_basis')
       .in('status', ['pending','published'])
       .order('created_at', { ascending: false })
       .limit(100)
@@ -31,7 +31,7 @@ export async function GET() {
     const byPath = new Map((urls ?? []).map(url => [url.path, url.signedUrl]))
     return NextResponse.json({
       works: rows.map(row => ({
-        id: row.id, title: row.title, author: row.author_name, description: row.description,
+        id: row.id, title: row.title, author: row.author_name, description: row.description, tags: row.tags ?? [],
         type: row.media_type, status: row.status, date: row.created_at,
         publicationBasis: row.publication_basis,
         canMarkInstitutional: row.status === 'pending' && row.uploader_id === user.id,
@@ -56,7 +56,7 @@ export async function PATCH(request: Request) {
 
     const admin = createAdminSupabaseClient()
     const { data: work, error: workError } = await admin.from('creative_space_works')
-      .select('id,uploader_id,rights_confirmed,status')
+      .select('id,uploader_id,rights_confirmed,status,updated_at')
       .eq('id', id).maybeSingle()
     if (workError || !work || !['pending', 'published'].includes(work.status)) {
       return NextResponse.json({ error: 'Obra no disponible para revisión.' }, { status: 404 })
@@ -92,16 +92,20 @@ export async function PATCH(request: Request) {
       status: action,
       reviewed_at: reviewedAt,
       reviewed_by: user.id,
-      published_at: action === 'published' ? reviewedAt : null,
+      published_at: action === 'published' ? reviewedAt : null, updated_at: reviewedAt,
       ...(action === 'published' ? {
         publication_basis: institutional ? 'institutional' : 'personal',
         institutional_attested_at: institutional ? reviewedAt : null,
         institutional_attested_by: institutional ? user.id : null,
       } : {}),
     }
-    const { error } = await admin.from('creative_space_works').update(changes)
+    const { data: saved, error } = await admin.from('creative_space_works').update(changes)
       .eq('id', id).eq('status', action === 'published' ? 'pending' : work.status)
+      .eq('updated_at', work.updated_at).select('id').maybeSingle()
     if (error) throw error
+    if (!saved) return NextResponse.json({
+      error: 'La obra cambió durante la revisión. Actualiza la lista antes de continuar.',
+    }, { status: 409 })
     return NextResponse.json({ ok: true, status: action }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     return failure(error)
