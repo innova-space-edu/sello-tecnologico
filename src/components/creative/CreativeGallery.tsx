@@ -37,8 +37,8 @@ function Media({ work, large = false }: { work: Work, large?: boolean }) {
       <div className="flex h-20 w-20 items-center justify-center rounded-full border border-fuchsia-300/40 bg-fuchsia-400/10 text-5xl shadow-[0_0_60px_rgba(217,70,239,0.28)]">🎙️</div>
       <div className="flex h-14 items-center gap-1.5" aria-hidden="true">
         {Array.from({ length: 23 }, (_, index) => (
-          <span key={index} className="w-1 rounded-full bg-gradient-to-t from-fuchsia-500 to-cyan-300"
-            style={{ height: String(12 + (index * 17 % 43)) + 'px' }} />
+          <span key={index} className="creative-wave w-1 rounded-full bg-gradient-to-t from-fuchsia-500 to-cyan-300"
+            style={{ height: String(12 + (index * 17 % 43)) + 'px', animationDelay: String((index % 7) * .13) + 's' }} />
         ))}
       </div>
       {large && <audio src={work.url} controls preload="none" className="max-w-full" aria-label={'Reproducir ' + work.title} />}
