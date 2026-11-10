@@ -197,7 +197,7 @@ export default function LoginPage() {
         <div className="pt-8 pb-4 text-center">
           <div className="flex justify-center mb-4">
             <div className="relative h-40 w-40 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100">
-              <Image src="/crealab-logo.svg" alt="Logo CreaLab" fill sizes="160px"
+              <Image src="/crealab-logo.png" alt="Logo CreaLab" fill sizes="160px"
                 className="object-contain p-2" priority />
             </div>
           </div>
