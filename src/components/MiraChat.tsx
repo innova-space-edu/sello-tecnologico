@@ -33,10 +33,11 @@ export default function MiraChat() {
       const res = await fetch('/api/mira', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMessages.slice(1).slice(-12) }),
       })
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.content }])
+      const content = typeof data.content === 'string' ? data.content : 'No pude generar una respuesta.'
+      setMessages(prev => [...prev, { role: 'assistant', content }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Hubo un error. Intenta de nuevo.' }])
     }
@@ -124,7 +125,7 @@ export default function MiraChat() {
                 </svg>
               </button>
             </form>
-            <p className="text-xs text-gray-400 text-center mt-1.5">Mira AI · Colegio Providencia</p>
+            <p className="text-xs text-gray-400 text-center mt-1.5">Mira AI · CreaLab. Evita compartir datos personales.</p>
           </div>
         </div>
       )}
