@@ -196,13 +196,13 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="pt-8 pb-4 text-center">
           <div className="flex justify-center mb-4">
-            <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100">
-              <Image src="/colegio-logo.png" alt="Logo Colegio Providencia" fill sizes="96px"
+            <div className="relative h-40 w-40 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100">
+              <Image src="/crealab-logo.svg" alt="Logo CreaLab" fill sizes="160px"
                 className="object-contain p-2" priority />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-blue-900">Colegio Providencia</h1>
-          <p className="text-blue-600 font-semibold mt-1">Sello Tecnológico</p>
+          <h1 className="text-2xl font-bold text-blue-900">CreaLab</h1>
+          <p className="text-blue-600 font-semibold mt-1">Laboratorio de Proyectos Educativos</p>
         </div>
 
         <div className="flex mx-8 mb-6 bg-gray-100 rounded-xl p-1">
@@ -316,7 +316,7 @@ export default function LoginPage() {
             <p>Estudiantes menores de edad: la institución podrá requerir un formulario familiar con firma electrónica simple y verificación de representación, antes de habilitar las funciones correspondientes.</p>
             <Link href="/proteccion-datos" className="mt-2 inline-block font-semibold text-blue-700 underline">Protección de datos y autorizaciones familiares</Link>
           </div>
-          <p className="text-gray-400 text-xs text-center mt-4">Solo usuarios autorizados del Colegio Providencia</p>
+          <p className="text-gray-400 text-xs text-center mt-4">Una plataforma de Innova Space Education</p>
         </div>
       </div>
     </div>
