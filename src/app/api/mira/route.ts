@@ -137,7 +137,10 @@ function sanitizeMessages(raw: unknown): ChatMessage[] | null {
     if (totalCharacters > 16_000) return null
     messages.push({ role: message.role, content })
   }
-  return messages.at(-1)?.role === 'user' ? messages : null
+  if (messages.at(-1)?.role !== 'user') return null
+  // Las conversaciones visibles empiezan con el saludo de Mira; Gemini debe recibir un turno del usuario primero.
+  const firstUser = messages.findIndex(message => message.role === 'user')
+  return firstUser === -1 ? null : messages.slice(firstUser)
 }
 
 async function generate(messages: ChatMessage[]): Promise<Answer | null> {
