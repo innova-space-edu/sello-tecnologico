@@ -86,6 +86,11 @@ export default function FamilyConsentAdminPage() {
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterResponse, setFilterResponse] = useState("all")
   const [search, setSearch] = useState("")
+  const [searchDebounced, setSearchDebounced] = useState("")
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(100)
+  const [totalRequests, setTotalRequests] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [studentEmail, setStudentEmail] = useState("")
   const [institutionName, setInstitutionName] = useState("")
   const [guardianEmail, setGuardianEmail] = useState("")
@@ -93,15 +98,27 @@ export default function FamilyConsentAdminPage() {
   const [status, setStatus] = useState("")
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    const timeout = setTimeout(() => { setPage(0); setSearchDebounced(search.trim()) }, 350)
+    return () => clearTimeout(timeout)
+  }, [search])
+
   const reload = useCallback(async () => {
-    const res = await fetch("/api/family-consent/admin", { cache: "no-store" })
+    const params = new URLSearchParams({ page: String(page) })
+    if (filterStatus !== "all") params.set("status", filterStatus)
+    if (filterResponse !== "all") params.set("response", filterResponse)
+    if (searchDebounced) params.set("q", searchDebounced)
+    const res = await fetch(`/api/family-consent/admin?${params.toString()}`, { cache: "no-store" })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) { setStatus(json.error || "Acceso restringido"); return }
     setRows(json.requests || [])
-    setStatistics(json.statistics || null)
-    setStatisticsComplete(json.statisticsComplete !== false)
+    setTotalRequests(json.totalRequests ?? 0)
+    setPageSize(json.pageSize ?? 100)
+    setHasMore(json.hasMore === true)
+    if (json.statistics) setStatistics(json.statistics)
+    if (typeof json.statisticsComplete === "boolean") setStatisticsComplete(json.statisticsComplete)
     setStatus("")
-  }, [])
+  }, [page, filterStatus, filterResponse, searchDebounced])
   useEffect(() => { void reload() }, [reload])
 
   async function action(body: object) {
@@ -120,16 +137,7 @@ export default function FamilyConsentAdminPage() {
     finally { setLoading(false) }
   }
 
-  const visibleRows = rows.filter(row => {
-    const matchesStatus = filterStatus === "all" || row.status === filterStatus
-    const matchesResponse = filterResponse === "all" ||
-      (filterResponse === "yes" && row.submitted_at && row.decisions?.platform_access === true) ||
-      (filterResponse === "no" && row.submitted_at && row.decisions?.platform_access === false)
-    const needle = search.trim().toLocaleLowerCase("es-CL")
-    const matchesSearch = !needle || [row.student_name_declared, row.guardian_full_name,
-      row.guardian_email, row.institution_name].some(value => String(value || "").toLocaleLowerCase("es-CL").includes(needle))
-    return matchesStatus && matchesResponse && matchesSearch
-  })
+  const visibleRows = rows
 
   const shareMessage = link
     ? `La institución ha solicitado tu revisión y firma de autorizaciones familiares. Accede únicamente mediante el enlace privado: ${link}. No reenvíes este mensaje a terceros. El enlace no reemplaza la verificación de representación legal.`
@@ -215,29 +223,41 @@ export default function FamilyConsentAdminPage() {
         </section>
 
         <section className="space-y-3 rounded-2xl border bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Solicitudes recientes (últimas 100)</h2><button type="button" onClick={() => void reload()} className="rounded-lg border px-3 py-2 text-xs">Actualizar</button></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">Archivo de solicitudes familiares · todas las fechas</h2><button type="button" onClick={() => void reload()} className="rounded-lg border px-3 py-2 text-xs">Actualizar</button></div>
           <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-xs font-medium">Buscar estudiante o apoderado
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nombre, correo o institución" className="mt-1 w-full rounded-lg border p-2 text-sm" />
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar en todo el historial" className="mt-1 w-full rounded-lg border p-2 text-sm" />
             </label>
             <label className="text-xs font-medium">Estado
-              <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} className="mt-1 w-full rounded-lg border p-2 text-sm">
+              <select value={filterStatus} onChange={e=>{ setPage(0); setFilterStatus(e.target.value) }} className="mt-1 w-full rounded-lg border p-2 text-sm">
                 <option value="all">Todos</option><option value="submitted">Pendientes de revisión</option>
                 <option value="invited">Invitados</option><option value="approved">Aprobados</option>
                 <option value="rejected">Rechazados</option><option value="revoked">Revocados</option>
               </select>
             </label>
             <label className="text-xs font-medium">Respuesta al ingreso
-              <select value={filterResponse} onChange={e=>setFilterResponse(e.target.value)} className="mt-1 w-full rounded-lg border p-2 text-sm">
+              <select value={filterResponse} onChange={e=>{ setPage(0); setFilterResponse(e.target.value) }} className="mt-1 w-full rounded-lg border p-2 text-sm">
                 <option value="all">Todas</option><option value="yes">Sí</option><option value="no">No</option>
               </select>
             </label>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+            <span>Mostrando {totalRequests ? page * pageSize + 1 : 0}–{Math.min((page + 1) * pageSize, totalRequests)} de {totalRequests} solicitudes</span>
+            <div className="flex gap-2">
+              <button type="button" disabled={page === 0 || loading}
+                onClick={() => setPage(value => Math.max(0, value - 1))}
+                className="rounded-lg border bg-white px-3 py-2 disabled:opacity-40">← Anterior</button>
+              <button type="button" disabled={!hasMore || loading}
+                onClick={() => setPage(value => value + 1)}
+                className="rounded-lg border bg-white px-3 py-2 disabled:opacity-40">Siguiente →</button>
+            </div>
           </div>
           <div className="space-y-3">
             {visibleRows.length === 0 ? <p className="text-sm text-slate-500">No hay solicitudes que coincidan con los filtros.</p> : visibleRows.map(row => (
               <article key={row.id} className="space-y-2 rounded-xl border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm">{row.student_name_declared || "Estudiante asociado"}</strong><span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{row.status}</span></div>
                 <p className="text-xs text-slate-600">Institución: {row.institution_name} · Contacto: {row.guardian_email}</p>
+                <p className="text-xs text-slate-500">Invitación: {new Date(row.issued_at).toLocaleString("es-CL")}</p>
                 <p className="text-xs text-slate-600">Firmante: {row.guardian_full_name || "Pendiente"} · Relación: {row.guardian_relationship || "Pendiente"}</p>
                 <p className="text-sm font-semibold">{!row.submitted_at ? "Pendiente de respuesta" : row.decisions?.platform_access === true ? "Ingreso: Sí, autorizado por familia (falta aprobación institucional)" : row.decisions?.platform_access === false ? "Ingreso: No, acceso denegado por familia" : "Ingreso: no declarado"}</p>
                 <p className="text-xs text-slate-600">{row.submitted_at ? `Respondido: ${new Date(row.submitted_at).toLocaleString("es-CL")}` : "Todavía no se recibió formulario firmado."}</p>
