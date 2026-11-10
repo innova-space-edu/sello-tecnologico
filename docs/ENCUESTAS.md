@@ -1,5 +1,34 @@
 # Módulo de encuestas evaluadas
 
+
+## Nuevo creador de encuestas en línea (CreaLab)
+
+El módulo **Mis encuestas** ahora también permite **crear formularios en línea** desde
+cuentas de estudiantes, docentes y administración. Se mantiene separado del
+módulo de encuestas **evaluadas y calificadas**, para no alterar notas existentes.
+
+- **Editor:** \`/mis-encuestas/crear\`. Admite hasta 25 preguntas: respuesta corta,
+  párrafo largo, alternativa única, selección múltiple, escala 1–5, número y fecha.
+  Permite reordenar preguntas, duplicarlas, marcar obligatoriedad y usar secciones.
+- **Mis formularios:** \`/mis-encuestas\` muestra los creados y las encuestas asignadas.
+- **Resultados:** \`/mis-encuestas/creadas/[id]\`. Solo el autor o administración
+  accede al resumen y las respuestas. Las preguntas se bloquean cuando existen respuestas.
+- **Enlace público:** \`/formularios-online/[slug]\`. Se puede responder sin cuenta ni
+  aportar nombre/correo. No muestra resultados ni información de la persona creadora.
+- **Compartir:** el detalle genera un enlace copiable y un código QR mediante QuickChart
+  (el proveedor recibe únicamente la dirección pública, nunca las respuestas).
+- **Revisión:** formularios creados por estudiantes quedan en \`pending_review\`.
+  Un administrador los aprueba en \`/admin/encuestas-online\`; solo los publicados
+  aceptan visitas y respuestas. Docentes y administración publican directamente.
+- **Protección:** \`online_surveys\` y \`online_survey_submissions\` usan RLS y no
+  otorgan permisos directos de Data API a \`anon\` ni \`authenticated\`. Las API
+  comprueban identidad, propiedad, roles, publicación y límites de tamaño;
+  las respuestas almacenan un token de envío aleatorio y una huella de red
+  seudonimizada para reducir abusos. No sustituye la protección anti-bots del WAF.
+- **Supabase:** migración aplicada \`20261110172838_online_surveys_project_lab.sql\`.
+  Las encuestas calificadas preexistentes no se modifican.
+
+
 ## Qué incorpora
 
 - Menú interno **Encuestas** para cuentas con rol `docente` o `admin`.
