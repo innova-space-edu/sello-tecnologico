@@ -8,29 +8,34 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next()
   const pathname = request.nextUrl.pathname
 
-  const publicPaths = [
-    '/login',
-    '/consentimiento',
-    '/registro',
-    '/bloqueado',
-    '/formularios',
-    '/autorizacion-familiar',
-    '/autorizacion-pendiente',
-    '/api/family-consent',
-    '/proteccion-datos',
-    '/auth/callback',
-    '/api/register-profile',
-    '/api/promedios/editor/callback',
-    '/comunidad',
-    '/espacio-creativo',
-    '/p',
-    '/api/feed',
-    '/api/espacio-creativo',
-    '/api/stories',
-    '/api/vitrinas/social',
-    '/api/vitrinas/assets',
-  ]
-  const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(`${path}/`))
+  // Páginas abiertas de CreaLab: exclusivamente Comunidad y la galería
+  // de Espacio Creativo. Las subrutas (Mis obras, edición, vitrinas, etc.)
+  // requieren sesión; los formularios de alta/autorización conservan su
+  // acceso público indispensable para personas invitadas.
+  const publicSurfaces = pathname === '/comunidad' || pathname === '/espacio-creativo'
+  const publicSupport = [
+    '/login', '/consentimiento', '/registro', '/bloqueado',
+    '/formularios', '/autorizacion-familiar', '/autorizacion-pendiente',
+    '/api/family-consent', '/proteccion-datos', '/auth/callback',
+    '/api/register-profile', '/api/promedios/editor/callback',
+  ].some(path => pathname === path || pathname.startsWith(path + '/'))
+
+  // Solo las APIs que alimentan las dos páginas públicas y sus recursos.
+  // Sus endpoints de creación/moderación mantienen su propia validación
+  // de sesión y no se abren mediante una excepción general de subrutas.
+  const publicMethod = request.method === 'GET' || request.method === 'HEAD'
+  const storySocial = /^\/api\/stories\/[^/]+\/social$/.test(pathname)
+  const pageSocial = pathname.startsWith('/api/vitrinas/social/')
+  const publicReadApi = publicMethod && (
+    pathname === '/api/feed' || pathname.startsWith('/api/feed/') ||
+    pathname === '/api/stories' || storySocial ||
+    pathname === '/api/espacio-creativo' || pageSocial ||
+    pathname.startsWith('/api/vitrinas/assets/')
+  )
+  // Las reacciones y métricas de visitantes siguen gestionadas por las
+  // rutas sociales públicas; nunca concede acceso a endpoints privados.
+  const publicSocialAction = request.method === 'POST' && (storySocial || pageSocial)
+  const isPublicPath = publicSupport || publicSurfaces || publicReadApi || publicSocialAction
 
   // También refresca la sesión en rutas públicas. Así /comunidad puede
   // reconocer al usuario conectado sin convertir la página en privada.
