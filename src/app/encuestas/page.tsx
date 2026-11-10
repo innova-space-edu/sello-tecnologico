@@ -39,7 +39,11 @@ export default async function EncuestasPage() {
             <h1 className="text-2xl font-bold text-blue-900">Encuestas</h1>
             <p className="text-gray-500 mt-1">Crea formularios, comparte enlaces o QR y revisa opiniones por curso.</p>
           </div>
-          <Link href="/encuestas/nuevo" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">+ Nueva encuesta</Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/mis-encuestas" className="rounded-xl border border-blue-200 bg-white px-5 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-50">Mis encuestas en línea</Link>
+            <Link href="/mis-encuestas/crear" className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">＋ Encuesta en línea</Link>
+            <Link href="/encuestas/nuevo" className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">＋ Encuesta evaluada</Link>
+          </div>
         </div>
 
         {surveys && surveys.length > 0 ? (
