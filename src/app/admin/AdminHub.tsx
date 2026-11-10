@@ -17,6 +17,7 @@ const sections = [
       { href: '/admin/actas-familiares', icon: '📜', title: 'Archivo de actas', subtitle: 'Folios, aprobaciones, revocaciones e historial', counter: 'acts' },
       { href: '/admin/moderacion', icon: '🚨', title: 'Moderación', subtitle: 'Alertas, incidentes y revisión de mensajes', counter: 'moderation' },
       { href: '/admin/espacio-creativo', icon: '🖼️', title: 'Revisión de galería', subtitle: 'Aprobar, rechazar o retirar obras', counter: '' },
+      { href: '/admin/encuestas-online', icon: '📋', title: 'Encuestas públicas', subtitle: 'Revisar y aprobar formularios creados por estudiantes', counter: '' },
     ],
   },
   {
