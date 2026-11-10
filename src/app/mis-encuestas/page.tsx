@@ -22,9 +22,10 @@ export default async function MisEncuestasPage() {
   if (!actor) redirect('/login')
 
   const admin = createAdminSupabaseClient()
-  const [{ data: assigned }, { data: responses }] = await Promise.all([
+  const [{ data: assigned }, { data: responses }, { data: createdOnline }] = await Promise.all([
     admin.from('survey_students').select('survey_id, surveys(id, title, description, slug, is_active, created_at, courses(name))').eq('student_id', actor.id).order('created_at', { ascending: false }),
     admin.from('survey_responses').select('id, survey_id, earned_points, max_points, achievement_percent, grade, feedback, feedback_updated_at, created_at').eq('registered_user_id', actor.id).order('created_at', { ascending: false }),
+    admin.from('online_surveys').select('id,title,description,slug,status,created_at,online_survey_submissions(count)').eq('creator_id', actor.id).order('created_at', { ascending: false }).limit(100),
   ])
 
   const latestBySurvey = new Map<string, any>()
@@ -39,7 +40,10 @@ export default async function MisEncuestasPage() {
   return <div className="flex min-h-screen bg-gray-50">
     <Sidebar />
     <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8">
-      <div className="mb-6"><h1 className="text-2xl font-bold text-blue-900">Mis encuestas</h1><p className="text-gray-500 mt-1">Revisa tus encuestas asignadas, resultados y retroalimentaciones.</p></div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div><h1 className="text-2xl font-bold text-blue-900">Mis encuestas</h1><p className="text-gray-500 mt-1">Responde encuestas asignadas y crea tus propios formularios para proyectos.</p></div>
+        <Link href="/mis-encuestas/crear" className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-700">＋ Crear encuesta en línea</Link>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-xl shadow-sm p-5"><p className="text-sm text-gray-500">Encuestas asignadas</p><p className="text-2xl font-bold text-blue-900 mt-1">{rows.length}</p></div>
@@ -47,6 +51,22 @@ export default async function MisEncuestasPage() {
         <div className="bg-white rounded-xl shadow-sm p-5"><p className="text-sm text-gray-500">Respondidas</p><p className="text-2xl font-bold text-green-700 mt-1">{completed}</p></div>
       </div>
 
+      <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div><h2 className="font-black text-blue-950">📝 Encuestas creadas por mí</h2><p className="mt-1 text-xs text-slate-500">Puedes compartirlas por enlace público o código QR cuando estén aprobadas.</p></div>
+          <Link href="/mis-encuestas/crear" className="text-sm font-bold text-blue-700 hover:underline">＋ Nueva encuesta</Link>
+        </div>
+        {createdOnline && createdOnline.length > 0 ? <div className="divide-y divide-slate-100">{createdOnline.map((survey: any) => {
+          const count = survey.online_survey_submissions?.[0]?.count ?? 0
+          const status = survey.status === 'published' ? 'Publicada' : survey.status === 'pending_review' ? 'Pendiente de revisión' : survey.status === 'closed' ? 'Cerrada' : 'Requiere correcciones'
+          return <Link href={`/mis-encuestas/creadas/${survey.id}`} key={survey.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition hover:bg-blue-50">
+            <div className="min-w-0"><p className="font-bold text-slate-900">{survey.title}</p><p className="mt-1 text-xs text-slate-500">{status} · {count} respuestas</p></div>
+            <span className="text-sm font-bold text-blue-700">Ver y compartir →</span>
+          </Link>
+        })}</div> : <div className="p-6 text-sm text-slate-500">Todavía no has creado encuestas. Usa «Crear encuesta en línea» para comenzar.</div>}
+      </section>
+
+      <h2 className="mb-3 text-lg font-black text-blue-950">Encuestas asignadas</h2>
       <section className="bg-white rounded-xl shadow-sm overflow-hidden">
         {rows.length > 0 ? <div className="divide-y divide-gray-100">{rows.map(row => {
           const survey = row.surveys
