@@ -160,7 +160,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
             )}
             <button type="button" onClick={() => canUpload ? setUploadOpen(true) : window.location.assign('/login')}
               className="inline-flex items-center justify-center gap-3 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-7 py-4 font-black text-white shadow-[0_18px_50px_rgba(167,67,221,0.25)] transition hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(167,67,221,0.45)]">
-              <span className="text-xl">＋</span> Subir material
+              <span className="text-xl">＋</span> {canUpload ? 'Subir material' : 'Inicia sesión para subir'}
             </button>
           </div>
         </div>
