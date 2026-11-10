@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const pageSize = 100
     const status = params.get("status")
     const response = params.get("response")
-    const needle = (params.get("q") || "").replace(/[^\\p{L}\\p{N}\\s@._-]/gu, "").trim().slice(0, 80)
+    const needle = (params.get("q") || "").replace(/[^\p{L}\p{N}\s@._-]/gu, "").trim().slice(0, 80)
 
     let query = db.from("family_authorization_requests")
       .select("id,student_user_id,institution_name,guardian_email,status,issued_at,expires_at,submitted_at,guardian_full_name,guardian_relationship,student_name_declared,decisions,verified_method,reviewed_at", { count: "exact" })
