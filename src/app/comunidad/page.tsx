@@ -58,7 +58,11 @@ export default async function ComunidadPage() {
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/espacio-creativo" className="rounded-2xl border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-xs font-black text-fuchsia-700 transition hover:bg-fuchsia-100 sm:px-4 sm:text-sm">🎨 Espacio creativo</Link>
-            <Link href="/vitrinas" className="hidden rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-100 sm:block">Crear publicación</Link>
+            {viewer ? (
+              <Link href="/vitrinas" className="hidden rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-100 sm:block">Crear publicación</Link>
+            ) : (
+              <Link href="/registro" className="hidden rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-700 hover:bg-blue-100 sm:block">Regístrate para publicar</Link>
+            )}
             {viewer ? (
               <Link href="/portafolio" className="flex min-w-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm transition hover:border-blue-200 hover:bg-blue-50" aria-label={`Abrir el perfil de ${viewer.name}`}>
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-sm font-black text-white">{viewerInitial}</span>
@@ -78,7 +82,7 @@ export default async function ComunidadPage() {
       <div className="mx-auto grid max-w-[1440px] grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,700px)_320px] lg:items-start">
         <aside className="hidden lg:sticky lg:top-24 lg:block">
           <nav className="space-y-1 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-            {NAV.map(item => (
+            {NAV.filter(item => viewer || item.href !== '/vitrinas').map(item => (
               <Link key={item.href} href={item.href} className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-blue-50 hover:text-blue-800">
                 <span className="text-lg">{item.icon}</span><span>{item.label}</span>
               </Link>
