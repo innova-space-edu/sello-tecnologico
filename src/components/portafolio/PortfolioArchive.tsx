@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import PortfolioValue from '@/components/portafolio/PortfolioValue'
-import { ARCHIVE_CATEGORIES } from '@/lib/portfolio-archive'
+import { ARCHIVE_CATEGORIES } from '@/lib/portfolio-archive-categories'
 
 type ArchiveItem = {
   id: string; source_table: string; category: string; title: string; summary: string;
