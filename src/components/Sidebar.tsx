@@ -30,11 +30,9 @@ export default function Sidebar() {
   const [rol, setRol] = useState('')
   const [nombre, setNombre] = useState('')
   const [alertasMod, setAlertasMod] = useState(0)
-  const [unreadMessages, setUnreadMessages] = useState(0)
 
   useEffect(() => {
     let modChannel: ReturnType<typeof supabase.channel> | null = null
-    let msgChannel: ReturnType<typeof supabase.channel> | null = null
 
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -68,25 +66,11 @@ export default function Sidebar() {
           .subscribe()
       }
 
-      const { count: unread } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', user.id)
-        .eq('read', false)
-      setUnreadMessages(unread ?? 0)
-
-      msgChannel = supabase
-        .channel(`unread-msgs-${user.id}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${user.id}` }, () => {
-          setUnreadMessages(prev => prev + 1)
-        })
-        .subscribe()
     }
     init()
 
     return () => {
       if (modChannel) supabase.removeChannel(modChannel)
-      if (msgChannel) supabase.removeChannel(msgChannel)
     }
   }, [])
 
@@ -100,7 +84,7 @@ export default function Sidebar() {
       <button onClick={() => setOpen(!open)}
         className="lg:hidden fixed top-[calc(var(--legacy-consent-banner-height,0px)+1rem)] left-4 z-50 bg-blue-900 text-white p-2.5 rounded-xl shadow-lg">
         {open ? '✕' : '☰'}
-        {(alertasMod > 0 || unreadMessages > 0) && (
+        {alertasMod > 0 && (
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
         )}
       </button>
