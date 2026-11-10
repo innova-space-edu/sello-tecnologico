@@ -15,8 +15,13 @@
 <path d="M117 249c43-17 97-13 132 9v115c-36-25-88-30-132-14V249Z" fill="url(#left)"/>
 <path d="M263 258c35-22 89-26 132-9v110c-44-16-96-11-132 14V258Z" fill="url(#right)"/>
 <path d="M256 244v138" stroke="white" stroke-width="11" stroke-linecap="round"/>
-<path d="M152 288h66M152 311h52M291 288h71M291 311h54" stroke="white" stroke-width="10" stroke-linecap="round" opacity=".88"/>
-<circle cx="185" cy="337" r="9" fill="white"/><circle cx="322" cy="337" r="9" fill="white"/>
+<path d="M291 288h71M291 311h54" stroke="white" stroke-width="10" stroke-linecap="round" opacity=".88"/>
+<circle cx="322" cy="337" r="9" fill="white"/>
+<g transform="rotate(-7 185 304)">
+<rect x="139" y="268" width="92" height="77" rx="9" fill="#ffdc4d" stroke="#edab20" stroke-width="3"/>
+<text x="185" y="300" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="19" fill="#143d83" text-anchor="middle">STEAM</text>
+<text x="185" y="325" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="22" fill="#143d83" text-anchor="middle">ABP</text>
+</g>
 </g>
 <g filter="url(#shadow)">
 <circle cx="255" cy="144" r="58" fill="url(#spark)"/>
