@@ -12,82 +12,107 @@ export default function ProviChat() {
   const [unread, setUnread] = useState(0)
   const [lastSeen, setLastSeen] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  const [sendError, setSendError] = useState('')
+  const openRef = useRef(false)
+  const lastSeenRef = useRef<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || cancelled) return
 
       const { data: perfil } = await supabase
-        .from('profiles').select('*').eq('id', user.id).single()
+        .from('profiles').select('id, full_name, email, role, blocked').eq('id', user.id).single()
+      if (cancelled) return
 
-      // Mostrar a docentes, admin y coordinadores aunque el correo no use el dominio institucional
-      const rolValido = perfil?.role === 'docente' || perfil?.role === 'admin' || perfil?.role === 'coordinador'
-
-      if (!rolValido) {
-        setReady(true)
-        return
-      }
+      // El chat de docentes solo admite docentes y administración.
+      // Los estudiantes escriben exclusivamente desde /mensajes.
+      const autorizado = (perfil?.role === 'docente' || perfil?.role === 'admin') &&
+        perfil?.blocked !== true
+      if (!autorizado) return
 
       setEsDocente(true)
-      setReady(true)
       setCurrentUser(perfil)
-
-      const saved = localStorage.getItem('provi-last-seen')
+      const saved = localStorage.getItem(`crealab-teacher-chat-seen-${user.id}`)
+      lastSeenRef.current = saved
       setLastSeen(saved)
 
-      await fetchMessages(saved)
+      await fetchMessages()
+      if (cancelled) return
 
-      // Suscribir a mensajes nuevos
-      const channel = supabase
-        .channel('group-chat')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, (payload) => {
-          setMessages(prev => [...prev, payload.new])
-          if (!open) {
-            setUnread(prev => prev + 1)
-          }
+      // Un evento solo dispara una recarga autorizada; nunca se añade
+      // directamente un mensaje sin verificar el rol de quien lo escribió.
+      channel = supabase
+        .channel('crealab-teacher-chat')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages' }, () => {
+          void fetchMessages()
         })
         .subscribe()
-
-      return () => { supabase.removeChannel(channel) }
     }
-    init().finally(() => setReady(true))
+    void init().finally(() => { if (!cancelled) setReady(true) })
+    return () => {
+      cancelled = true
+      if (channel) void supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
+    openRef.current = open
     if (open) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
       setUnread(0)
       const now = new Date().toISOString()
+      lastSeenRef.current = now
       setLastSeen(now)
-      localStorage.setItem('provi-last-seen', now)
+      if (currentUser?.id) localStorage.setItem(`crealab-teacher-chat-seen-${currentUser.id}`, now)
     }
-  }, [open, messages])
+  }, [open, messages, currentUser?.id])
 
-  const fetchMessages = async (since?: string | null) => {
-    const { data } = await supabase
+  const fetchMessages = async () => {
+    const { data, error } = await supabase
       .from('group_messages')
-      .select('*, profiles(full_name, email)')
-      .order('created_at', { ascending: true })
+      .select('id, sender_id, content, created_at, profiles!inner(full_name, email, role)')
+      .in('profiles.role', ['docente', 'admin'])
+      .order('created_at', { ascending: false })
       .limit(100)
-    setMessages(data ?? [])
 
-    // Contar no leídos
-    if (since) {
-      const noLeidos = (data ?? []).filter(m => m.created_at > since).length
-      setUnread(noLeidos)
+    if (error) {
+      console.warn('[CreaLab] No se pudo consultar el chat docente', error.code)
+      setSendError('No fue posible cargar el chat docente.')
+      return
+    }
+    // La base histórica conserva mensajes antiguos de estudiantes para auditoría,
+    // pero jamás se muestran en el chat exclusivo de docentes.
+    const authorizedMessages = (data ?? []).reverse()
+    setMessages(authorizedMessages)
+    setSendError('')
+    if (!openRef.current) {
+      const since = lastSeenRef.current
+      setUnread(since ? authorizedMessages.filter(m => m.created_at > since).length : 0)
     }
   }
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || !currentUser) return
-    await supabase.from('group_messages').insert({
+    if (!input.trim() || !currentUser || !['docente', 'admin'].includes(currentUser.role)) return
+    const content = input.trim()
+    if (content.length > 4000) {
+      setSendError('El mensaje supera los 4000 caracteres permitidos.')
+      return
+    }
+    const { error } = await supabase.from('group_messages').insert({
       sender_id: currentUser.id,
-      content: input.trim(),
+      content,
     })
+    if (error) {
+      setSendError('No se pudo enviar el mensaje. Comprueba tus permisos e inténtalo otra vez.')
+      return
+    }
     setInput('')
+    void fetchMessages()
   }
 
   if (!ready || !esDocente) return null
@@ -136,7 +161,7 @@ export default function ProviChat() {
             </div>
             <div className="flex-1">
               <p className="text-white font-bold text-sm">Provi</p>
-              <p className="text-green-100 text-xs">Chat exclusivo docentes</p>
+              <p className="text-green-100 text-xs">Chat de docentes y administración</p>
             </div>
             <button onClick={() => setOpen(false)}
               className="text-white opacity-70 hover:opacity-100 text-lg">✕</button>
@@ -178,6 +203,7 @@ export default function ProviChat() {
 
           {/* Input */}
           <div className="p-3 bg-white border-t border-gray-100">
+            {sendError && <p role="alert" className="mb-2 text-xs text-red-700">{sendError}</p>}
             <form onSubmit={handleSend} className="flex gap-2">
               <input
                 value={input}
