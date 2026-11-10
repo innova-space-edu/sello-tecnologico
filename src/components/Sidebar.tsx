@@ -130,7 +130,7 @@ export default function Sidebar() {
         lg:translate-x-0
       `}>
         <div className="p-6 border-b border-blue-700">
-          <div className="text-xs text-blue-300 uppercase tracking-widest mb-1">Colegio Providencia</div>
+          <div className="text-xs text-blue-300 uppercase tracking-widest mb-1">CreaLab</div>
           <div className="text-lg font-bold text-white leading-tight">Proyectos</div>
         </div>
 
