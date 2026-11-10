@@ -6,23 +6,20 @@ import { useState, useEffect } from 'react'
 
 const menu = [
   { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-  { href: '/mis-encuestas', label: 'Mis encuestas', icon: '🗳️' },
   { href: '/admin', label: 'Panel Admin', icon: '👑' },
   { href: '/cursos', label: 'Cursos', icon: '📚' },
   { href: '/proyectos', label: 'Proyectos', icon: '🗂️' },
   { href: '/evidencias', label: 'Evidencias', icon: '📎' },
   { href: '/seguimientos', label: 'Seguimiento', icon: '🧭' },
+  { href: '/mis-encuestas', label: 'Mis encuestas', icon: '🗳️' },
   { href: '/autoevaluacion', label: 'Autoevaluación', icon: '🌱' },
   { href: '/autoevaluacion/respuestas', label: 'Respuestas autoevaluación', icon: '📝' },
   { href: '/encuestas', label: 'Encuestas', icon: '🗳️' },
   { href: '/vitrinas', label: 'Páginas', icon: '🌐' },
   { href: '/espacio-creativo', label: 'Espacio creativo', icon: '🎨' },
-  { href: '/espacio-creativo/mis-obras', label: 'Mis obras', icon: '✏️' },
   { href: '/informes', label: 'Informes', icon: '📘' },
   { href: '/promedios', label: 'Promedios', icon: '🧮' },
   { href: '/portafolio', label: 'Portafolio', icon: '📂' },
-  { href: '/calendario', label: 'Calendario', icon: '📅' },
-  { href: '/mensajes', label: 'Mensajes', icon: '💬' },
 ]
 
 export default function Sidebar() {
@@ -131,6 +128,7 @@ export default function Sidebar() {
 
             if (item.href === '/admin' && !esAdmin) return null
             if (item.href === '/mis-encuestas' && !esEstudianteRol) return null
+            if (item.href === '/cursos' && esEstudianteRol) return null
             if (item.href === '/promedios' && esEstudianteRol) return null
             if (item.href === '/encuestas' && !['admin', 'docente'].includes(rol)) return null
             if (item.href === '/autoevaluacion/respuestas' && !['admin', 'docente'].includes(rol)) return null
@@ -139,7 +137,6 @@ export default function Sidebar() {
               (item.href !== '/dashboard' && pathname.startsWith(item.href))
 
             const esMod = item.href === '/admin'
-            const esMensajes = item.href === '/mensajes'
 
             return (
               <Link key={item.href} href={item.href}
@@ -152,11 +149,6 @@ export default function Sidebar() {
                 {esMod && alertasMod > 0 && (
                   <span className="ml-auto flex items-center justify-center bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 font-bold">
                     {alertasMod > 9 ? '9+' : alertasMod}
-                  </span>
-                )}
-                {esMensajes && unreadMessages > 0 && (
-                  <span className="ml-auto flex items-center justify-center bg-red-500 text-white text-xs rounded-full min-w-5 h-5 px-1 font-bold">
-                    {unreadMessages > 9 ? '9+' : unreadMessages}
                   </span>
                 )}
               </Link>
