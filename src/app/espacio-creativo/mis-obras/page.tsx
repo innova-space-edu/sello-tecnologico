@@ -7,7 +7,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Mis obras · Espacio creativo',
-  description: 'Revisa y corrige el material que subiste a la galería del Sello Tecnológico.',
+  description: 'Revisa y corrige el material que subiste a la galería del CreaLab.',
 }
 
 export default async function MisObrasPage() {
@@ -27,7 +27,7 @@ export default async function MisObrasPage() {
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#090e1b]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4">
           <Link href="/espacio-creativo" className="font-black tracking-wide text-white">
-            ✦ Sello Tecnológico <span className="ml-2 text-sm font-normal text-slate-400">/ Mis obras</span>
+            ✦ CreaLab <span className="ml-2 text-sm font-normal text-slate-400">/ Mis obras</span>
           </Link>
           <div className="flex flex-wrap gap-2">
             <Link href="/espacio-creativo" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold hover:bg-white/20">
