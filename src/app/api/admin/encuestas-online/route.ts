@@ -12,7 +12,7 @@ export async function GET() {
     const db = createAdminSupabaseClient()
     const { data: surveys, error } = await db.from('online_surveys')
       .select('id,creator_id,title,description,questions,status,slug,created_at,reviewed_at')
-      .in('status', ['pending_review', 'rejected'])
+      .eq('status', 'pending_review')
       .order('created_at', { ascending: false }).limit(100)
     if (error) return NextResponse.json({ error: 'No se pudieron consultar las encuestas pendientes.' }, { status: 503, headers })
     const authors = [...new Set((surveys ?? []).map(row => row.creator_id))]
