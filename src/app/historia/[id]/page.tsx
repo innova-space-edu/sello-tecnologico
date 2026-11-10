@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       type: 'article',
       locale: 'es_CL',
-      siteName: 'Sello Tecnológico — Colegio Providencia',
+      siteName: 'CreaLab — Innova Space Education',
       url: absoluteUrl(sharePath),
       title: preview.title,
       description: preview.description,
