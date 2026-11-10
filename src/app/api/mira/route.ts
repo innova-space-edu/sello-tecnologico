@@ -39,7 +39,7 @@ function extractText(value: unknown): string | null {
   if (Array.isArray(value)) {
     const combined = value
       .filter((item): item is { text: string } =>
-        Boolean(item) && typeof item === 'object' && typeof item.text === 'string')
+        Boolean(item) && typeof item === 'object' && typeof item.text === 'string' && item.thought !== true)
       .map(item => item.text).join('\n').trim()
     return combined || null
   }
@@ -150,19 +150,23 @@ async function generate(messages: ChatMessage[]): Promise<Answer | null> {
       : process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
     if (!key) continue
 
-    const model = provider === 'groq'
-      ? process.env.MIRA_GROQ_MODEL || 'openai/gpt-oss-120b'
+    const models = provider === 'groq'
+      ? (process.env.MIRA_GROQ_MODEL
+          ? [process.env.MIRA_GROQ_MODEL]
+          : ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'])
       : provider === 'openrouter'
-        ? process.env.MIRA_OPENROUTER_MODEL || 'openrouter/auto'
-        : process.env.MIRA_GEMINI_MODEL || 'gemini-3.8-flash'
-    try {
-      const content = provider === 'gemini'
-        ? await callGemini(key, model, messages)
-        : await callOpenAICompatible(provider, key, model, messages)
-      if (content) return { content, provider, model }
-    } catch (error) {
-      console.warn('[Mira] Provider request failed:', provider,
-        error instanceof Error ? error.name : 'unknown')
+        ? [process.env.MIRA_OPENROUTER_MODEL || 'openrouter/auto']
+        : [process.env.MIRA_GEMINI_MODEL || 'gemini-3.8-flash']
+    for (const model of models) {
+      try {
+        const content = provider === 'gemini'
+          ? await callGemini(key, model, messages)
+          : await callOpenAICompatible(provider, key, model, messages)
+        if (content) return { content, provider, model }
+      } catch (error) {
+        console.warn('[Mira] Provider request failed:', provider,
+          error instanceof Error ? error.name : 'unknown')
+      }
     }
   }
   return null
