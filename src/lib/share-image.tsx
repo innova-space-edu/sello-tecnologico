@@ -126,8 +126,8 @@ export function createShareImage(preview: SharePreview) {
               {icon}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 24, fontWeight: 900 }}>Sello Tecnológico</div>
-              <div style={{ fontSize: 18, opacity: 0.82 }}>Colegio Providencia</div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>CreaLab</div>
+              <div style={{ fontSize: 18, opacity: 0.82 }}>Innova Space Education</div>
             </div>
           </div>
 
