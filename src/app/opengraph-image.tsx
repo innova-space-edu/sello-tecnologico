@@ -1,13 +1,13 @@
 import { createShareImage } from '@/lib/share-image'
 
 export const runtime = 'nodejs'
-export const alt = 'Sello Tecnológico — Colegio Providencia'
+export const alt = 'CreaLab — Innova Space Education'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
 export default function OpenGraphImage() {
   return createShareImage({
-    title: 'Sello Tecnológico — Colegio Providencia',
+    title: 'CreaLab — Innova Space Education',
     description: 'Proyectos, historias, publicaciones y páginas creadas por nuestra comunidad educativa.',
     label: 'Comunidad educativa',
     destination: '/',
