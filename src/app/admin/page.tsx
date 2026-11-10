@@ -5,6 +5,7 @@ import AdminActions from './AdminActions'
 import AdminAlertas from './AdminAlertas'
 import { redirect } from 'next/navigation'
 import AdminAutoRefresh from './AdminAutoRefresh'
+import AdminHub from './AdminHub'
 
 export default async function AdminPage() {
   const supabase = await createServerSupabaseClient()
@@ -54,33 +55,18 @@ export default async function AdminPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <AdminAutoRefresh intervalo={5000} />
+      <AdminAutoRefresh intervalo={60000} />
 
       <main className="lg:ml-64 flex-1 p-4 lg:p-8 pt-16 lg:pt-8 min-w-0">
         <div className="mb-6 lg:mb-8">
           <h1 className="text-xl lg:text-2xl font-bold text-blue-900">Panel de Administrador</h1>
-          <p className="text-gray-500 mt-1 text-sm">Vista omnisciente del sistema — solo administradores</p>
+          <p className="text-gray-500 mt-1 text-sm">Gestión institucional, seguridad, autorizaciones, usuarios y proyectos — acceso exclusivo de administración</p>
         </div>
 
         <div className="mb-6">
           <AdminAlertas />
         </div>
-        <Link href="/admin/actas-familiares"
-          className="mb-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950 hover:bg-amber-100">
-          <span className="text-2xl">📜</span>
-          <span className="flex-1"><strong className="block">Archivo de actas familiares</strong>
-            <span className="block text-sm">Folios, fecha y hora, estudiante, apoderado, administrador y borradores separados</span></span>
-          <span aria-hidden="true">→</span>
-        </Link>
-        <Link href="/admin/autorizaciones-familiares"
-          className="mb-6 flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900 hover:bg-blue-100">
-          <span className="text-2xl">🛡️</span>
-          <span className="flex-1">
-            <strong className="block">Autorizaciones familiares</strong>
-            <span className="block text-sm">Revisar formularios, Sí/No, solicitudes pendientes y aprobar acceso tras verificar al apoderado</span>
-          </span>
-          <span aria-hidden="true">→</span>
-        </Link>
+        <AdminHub />
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6 lg:mb-8">
           {[
