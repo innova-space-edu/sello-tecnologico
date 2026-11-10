@@ -650,7 +650,36 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 # IA con identidad Mira
 GROQ_API_KEY=TU_GROQ_API_KEY
+
+# Proveedores opcionales de respaldo de Mira AI
+OPENROUTER_API_KEY=
+GEMINI_API_KEY=
+
+# Orden configurable (por defecto: groq,openrouter,gemini)
+MIRA_PROVIDER_ORDER=groq,openrouter,gemini
+MIRA_GROQ_MODEL=openai/gpt-oss-120b
+MIRA_OPENROUTER_MODEL=openrouter/auto
+MIRA_GEMINI_MODEL=gemini-3.8-flash
+
+# Opcionales. Para exigir sesión en la API de Mira, configurar true.
+MIRA_REQUIRE_AUTH=false
+MIRA_TIMEOUT_MS=12000
 ```
+
+Los proveedores se usan en el orden indicado y **solo si existe su clave en el entorno del servidor**.
+Groq utiliza modelos actuales (GPT-OSS 120B por defecto), OpenRouter usa el enrutador general
+`openrouter/auto` y Gemini utiliza `gemini-3.8-flash`. Si un servicio falla o excede su cuota,
+se intenta el siguiente proveedor configurado. No se envían claves al navegador.
+
+**Importante:** configurar una clave puede generar cargos por consumo. Definir presupuestos y
+restricciones de uso en cada proveedor. Para instituciones con menores, revisar contratos, transferencias
+internacionales, consentimiento y retención de datos de los proveedores externos.
+
+El chat de Mira sigue disponible en páginas públicas por compatibilidad. Para restringir la API
+a usuarios autenticados, usar `MIRA_REQUIRE_AUTH=true` y ocultar o adaptar el widget en páginas
+públicas. Los límites de tamaño y los tiempos de espera de la API no sustituyen una protección
+distribuida contra abuso (WAF y límites por usuario/IP).
+
 
 En Vercel, `VERCEL_PROJECT_PRODUCTION_URL` es proporcionada automáticamente por la plataforma y se utiliza como respaldo para los metadatos públicos.
 
