@@ -40,7 +40,7 @@ export default async function BloqueadoPage() {
         </div>
 
         <p className="text-xs text-gray-400">
-          Colegio Providencia — Plataforma Sello Tecnológico
+          Innova Space Education — Plataforma CreaLab
         </p>
       </div>
     </div>
