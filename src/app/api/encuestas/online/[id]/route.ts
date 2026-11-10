@@ -63,7 +63,7 @@ export async function PATCH(request: Request, params: Params) {
   if ('error' in context) return fail(context.error!, context.status!)
   const { db, survey, actor } = context
   const body = await request.json().catch(() => null)
-  const action = body && typeof body === 'object' ? String(body.action ?? '') : ''
+  const action = body && typeof body === 'object' && !Array.isArray(body) ? String((body as Record<string, unknown>).action ?? '') : ''
   let status = ''
   if (action === 'approve' && actor.role === 'admin' && ['pending_review','rejected'].includes(survey.status)) status = 'published'
   if (action === 'reject' && actor.role === 'admin' && survey.status === 'pending_review') status = 'rejected'
