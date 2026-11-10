@@ -52,8 +52,8 @@ export default async function ComunidadPage() {
           <Link href="/comunidad" className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-xl text-white shadow-sm">🌐</div>
             <div className="min-w-0">
-              <p className="truncate text-lg font-black leading-tight text-blue-950">Comunidad Sello Tecnológico</p>
-              <p className="truncate text-xs font-semibold text-slate-500">Colegio Providencia · Proyectos que inspiran</p>
+              <p className="truncate text-lg font-black leading-tight text-blue-950">Comunidad CreaLab</p>
+              <p className="truncate text-xs font-semibold text-slate-500">Innova Space Education · Proyectos que inspiran</p>
             </div>
           </Link>
           <div className="flex items-center gap-2">
@@ -85,7 +85,7 @@ export default async function ComunidadPage() {
             ))}
           </nav>
           <div className="mt-4 rounded-3xl bg-gradient-to-br from-blue-700 to-indigo-800 p-5 text-white shadow-sm">
-            <p className="text-xs font-black uppercase tracking-widest text-blue-200">Sello Tecnológico</p>
+            <p className="text-xs font-black uppercase tracking-widest text-blue-200">CreaLab</p>
             <h2 className="mt-2 text-lg font-black">Una sola comunidad</h2>
             <p className="mt-2 text-sm leading-relaxed text-blue-100">Todas las páginas, proyectos, podcasts, historias y evidencias públicas conectadas en un feed continuo.</p>
           </div>
