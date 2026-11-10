@@ -14,7 +14,7 @@ type ArchiveDetail = ArchiveItem & { snapshot: Record<string, unknown> }
 type ArchivePage = {
   items: ArchiveItem[]; total: number; page: number; pageSize: number; hasMore: boolean
 }
-const names = new Map(ARCHIVE_CATEGORIES.map(item => [item.key, item]))
+const names = new Map<string, { label: string; icon: string }>(ARCHIVE_CATEGORIES.map(item => [item.key, item]))
 function showDate(input: string | null) {
   if (!input) return 'Sin fecha'
   return new Date(input).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
