@@ -1,6 +1,7 @@
 import Sidebar from '@/components/Sidebar'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import Link from 'next/link'
+import StudentDashboard from '@/components/dashboard/StudentDashboard'
 
 const statusOrder = ['Borrador', 'En progreso', 'En revisión', 'Revisado', 'Aprobado', 'Cerrado']
 
@@ -38,6 +39,8 @@ export default async function DashboardPage() {
   const isAdmin = role === 'admin'
   const isStaff = ['admin', 'docente', 'coordinador', 'utp'].includes(role)
   const isStudent = role === 'estudiante'
+  // Para estudiantes no ejecutamos consultas globales de cursos ni de otros usuarios.
+  if (isStudent) return <><Sidebar /><StudentDashboard userId={user.id} name={perfil?.full_name || 'estudiante'} /></>
 
   const [projectsRes, evidencesRes, pagesRes, coursesRes, usersRes, unreadRes] = await Promise.all([
     supabase.from('projects').select('id, title, status, course_id, updated_at, created_at, courses(name), profiles!projects_owner_id_fkey(full_name)').order('updated_at', { ascending: false }).limit(500),

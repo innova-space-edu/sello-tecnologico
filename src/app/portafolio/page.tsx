@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import PortfolioSections from '@/components/PortfolioSections'
 import ExportPortafolioPDF from '@/components/ExportPortafolioPDF'
+import PortfolioArchive from '@/components/portafolio/PortfolioArchive'
 
 const etapaColor: Record<string, string> = {
   inicial: 'bg-yellow-100 text-yellow-700',
@@ -153,7 +154,7 @@ export default function PortafolioPage() {
   const evIntermedia = evidencias.filter(e => e.evidencia_tipo === 'intermedia')
   const evFinal = evidencias.filter(e => e.evidencia_tipo === 'final')
 
-  const TABS = ['A. Información', 'B. Presentación', 'C. Proyectos', 'D. Evidencias', 'E. Reflexiones', 'F. Progreso', 'G. Reflexión final', '➕ Mis secciones']
+  const TABS = ['A. Información', 'B. Presentación', 'C. Proyectos', 'D. Evidencias', 'E. Reflexiones', 'F. Progreso', 'G. Reflexión final', '➕ Mis secciones', '📚 Archivo automático']
 
   if (loading) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -244,6 +245,7 @@ export default function PortafolioPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Link href="/portafolio/feria" className="rounded-full border border-violet-200 bg-white/80 px-4 py-2.5 text-sm font-bold text-violet-700 shadow-sm transition hover:bg-white">🎪 Modo Feria</Link>
               <ExportPortafolioPDF portafolio={portafolio} estudiante={perfil} evidencias={evidencias} proyectos={proyectos} secciones={portfolioSections} />
+              <button type="button" onClick={() => setTab(8)} className="rounded-full border border-violet-200 bg-white/80 px-4 py-2.5 text-sm font-bold text-violet-700 shadow-sm hover:bg-white">📚 Mi archivo automático</button>
               <button onClick={handleSave} disabled={saving} className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-emerald-400 disabled:opacity-50">{saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar cambios'}</button>
             </div>
           </div>
@@ -257,7 +259,7 @@ export default function PortafolioPage() {
               className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${
                 tab === i ? 'bg-violet-600 text-white shadow-md shadow-violet-200' : 'text-slate-500 hover:bg-violet-50 hover:text-violet-700'
               }`}>
-              <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-[10px] ${tab === i ? 'bg-white/15' : 'bg-slate-100'}`}>{i + 1}</span>{t.replace(/^[A-G]\.\s*/, '')}
+              <span className={`flex h-6 w-6 items-center justify-center rounded-lg text-[10px] ${tab === i ? 'bg-white/15' : 'bg-slate-100'}`}>{i + 1}</span>{t.replace(/^[A-H]\.\s*/, '')}
             </button>
           ))}
         </div>
@@ -674,6 +676,9 @@ export default function PortafolioPage() {
               />
             </div>
           )}
+
+          {/* H — Biblioteca de trabajos capturados automáticamente */}
+          {tab === 8 && <PortfolioArchive />}
 
           {/* Navegación */}
           <div className="flex justify-between items-center pb-8">
