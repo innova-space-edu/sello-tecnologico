@@ -194,15 +194,16 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="pt-8 pb-4 text-center">
-          <div className="flex justify-center mb-4">
-            <div className="relative h-40 w-40 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100">
-              <Image src="/crealab-logo.png" alt="Logo CreaLab" fill sizes="160px"
-                className="object-contain p-2" priority />
+        <div className="pt-5 pb-4 text-center">
+          <div className="flex justify-center mb-1">
+            <div className="relative h-44 w-44 sm:h-48 sm:w-48">
+              <Image src="/crealab-logo.svg" alt="Símbolo CreaLab: un cuaderno de proyectos y una idea" fill
+                sizes="(max-width: 640px) 176px, 192px"
+                className="object-contain" priority />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-blue-900">CreaLab</h1>
-          <p className="text-blue-600 font-semibold mt-1">Laboratorio de Proyectos Educativos</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-blue-950">CreaLab</h1>
+          <p className="mt-1 px-3 text-sm font-semibold text-blue-600">Laboratorio de Proyectos Educativos</p>
         </div>
 
         <div className="flex mx-8 mb-6 bg-gray-100 rounded-xl p-1">
