@@ -35,7 +35,13 @@ export async function proxy(request: NextRequest) {
   // Las reacciones y métricas de visitantes siguen gestionadas por las
   // rutas sociales públicas; nunca concede acceso a endpoints privados.
   const publicSocialAction = request.method === 'POST' && (storySocial || pageSocial)
-  const isPublicPath = publicSupport || publicSurfaces || publicReadApi || publicSocialAction
+  // Los enlaces de encuestas aprobadas funcionan para cualquier visitante,
+  // sin dar acceso a la bandeja privada ni a las APIs de creación/revisión.
+  const publicOnlineForm = /^\/formularios-online\/[a-z0-9-]{10,80}\/?$/.test(pathname)
+  const publicOnlineApi = /^\/api\/formularios-online\/[a-z0-9-]{10,80}\/?$/.test(pathname) &&
+    ['GET', 'HEAD', 'POST'].includes(request.method)
+  const isPublicPath = publicSupport || publicSurfaces || publicReadApi ||
+    publicSocialAction || publicOnlineForm || publicOnlineApi
 
   // También refresca la sesión en rutas públicas. Así /comunidad puede
   // reconocer al usuario conectado sin convertir la página en privada.
@@ -56,6 +62,10 @@ export async function proxy(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Formularios en línea publicados: acceso anónimo de lectura y respuesta.
+  // La API verifica siempre el estado publicado, los datos y los límites.
+  if (publicOnlineForm || publicOnlineApi) return response
 
   // Public content remains available to unauthenticated visitors. Authenticated
   // minors must not bypass the guardian gate by navigating to public app surfaces.
@@ -165,6 +175,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|woff|woff2|ttf)$|login|registro|bloqueado|formularios).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|woff|woff2|ttf)$|login|registro|bloqueado).*)',
   ],
 }
