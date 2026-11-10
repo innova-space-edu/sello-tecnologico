@@ -21,30 +21,61 @@ async function createSession() {
   return supabase
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const admin = await authorizedAdmin()
     if (!admin) return privateResponse({ error: "Solo administración institucional autorizada." }, 403)
     const db = createFamilyAdminClient()
-    const { data, error } = await db.from("family_authorization_requests")
-      .select("id,student_user_id,institution_name,guardian_email,status,issued_at,expires_at,submitted_at,guardian_full_name,guardian_relationship,student_name_declared,decisions,verified_method,reviewed_at")
-      .eq("platform", PLATFORM).order("issued_at", { ascending: false }).limit(100)
+    const params = request.nextUrl.searchParams
+    const rawPage = Number(params.get("page") || "0")
+    const page = Number.isSafeInteger(rawPage) && rawPage >= 0 ? rawPage : 0
+    const pageSize = 100
+    const status = params.get("status")
+    const response = params.get("response")
+    const needle = (params.get("q") || "").replace(/[^\\p{L}\\p{N}\\s@._-]/gu, "").trim().slice(0, 80)
+
+    let query = db.from("family_authorization_requests")
+      .select("id,student_user_id,institution_name,guardian_email,status,issued_at,expires_at,submitted_at,guardian_full_name,guardian_relationship,student_name_declared,decisions,verified_method,reviewed_at", { count: "exact" })
+      .eq("platform", PLATFORM)
+    if (status && ["submitted", "invited", "approved", "rejected", "revoked"].includes(status)) {
+      query = query.eq("status", status)
+    }
+    if (response === "yes" || response === "no") {
+      query = query.not("submitted_at", "is", null)
+        .contains("decisions", { platform_access: response === "yes" })
+    }
+    if (needle) {
+      query = query.or(`student_name_declared.ilike.%${needle}%,guardian_full_name.ilike.%${needle}%,guardian_email.ilike.%${needle}%,institution_name.ilike.%${needle}%`)
+    }
+    const { data, error, count } = await query
+      .order("issued_at", { ascending: false }).order("id", { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1)
     if (error) return privateResponse({ error: "No se pudo consultar el registro." }, 503)
 
-    // Count all signed forms, not merely the 100 most recent displayed rows.
-    const countRows: FamilyDecisionRow[] = []
-    let complete = false
-    for (let page = 0; page < 20; page++) {
-      const start = page * 1000
-      const { data: batch, error: countError } = await db.from("family_authorization_requests")
-        .select("status,submitted_at,decisions").eq("platform", PLATFORM)
-        .order("issued_at", { ascending: false }).range(start, start + 999)
-      if (countError || !batch) return privateResponse({ error: "No se pudo calcular el resumen." }, 503)
-      countRows.push(...batch)
-      if (batch.length < 1000) { complete = true; break }
+    // Los resúmenes se calculan únicamente al consultar la primera página.
+    // Se mantienen independientes de los filtros para no confundir totales y resultados.
+    let statistics = null
+    let statisticsComplete = true
+    if (page === 0) {
+      const countRows: FamilyDecisionRow[] = []
+      let complete = false
+      for (let index = 0; index < 20; index++) {
+        const start = index * 1000
+        const { data: batch, error: countError } = await db.from("family_authorization_requests")
+          .select("status,submitted_at,decisions").eq("platform", PLATFORM)
+          .order("issued_at", { ascending: false }).range(start, start + 999)
+        if (countError || !batch) return privateResponse({ error: "No se pudo calcular el resumen." }, 503)
+        countRows.push(...batch)
+        if (batch.length < 1000) { complete = true; break }
+      }
+      statistics = summarizeFamilyResponses(countRows, familyPurposes(PLATFORM))
+      statisticsComplete = complete
     }
-    const statistics = summarizeFamilyResponses(countRows, familyPurposes(PLATFORM))
-    return privateResponse({ requests: data ?? [], statistics, statisticsComplete: complete })
+    const totalRequests = count ?? 0
+    return privateResponse({
+      requests: data ?? [], statistics, statisticsComplete,
+      totalRequests, page, pageSize, hasMore: (page + 1) * pageSize < totalRequests,
+    })
   } catch {
     return privateResponse({ error: "Servicio de autorizaciones no disponible." }, 503)
   }
