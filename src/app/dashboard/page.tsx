@@ -68,12 +68,13 @@ export default async function DashboardPage() {
     { label: 'Revisados', value: revisados, icon: '✅', href: '/proyectos?estado=Revisado' },
     { label: 'Evidencias', value: evidencias.length, icon: '📎', href: '/evidencias' },
     { label: 'Páginas', value: publicadas, icon: '🌐', href: '/vitrinas' },
-    { label: 'Cursos', value: cursosCount, icon: '📚', href: '/cursos' },
+    { label: 'Cursos', value: cursosCount, icon: '📚', href: '/cursos', show: isStaff },
     { label: 'Usuarios', value: usuariosCount, icon: '👥', href: '/usuarios', show: isStaff },
   ].filter(item => item.show !== false)
 
   const quickActions = [
     { href: '/calendario', label: 'Abrir calendario', icon: '📅', show: true },
+    { href: '/mensajes', label: unreadMessages > 0 ? `Mensajes (${unreadMessages} sin leer)` : 'Abrir mensajes', icon: '💬', show: true },
     { href: '/mensajes/broadcast', label: 'Mensaje grupal', icon: '📢', show: isAdmin },
     { href: '/proyectos/nuevo', label: 'Crear proyecto', icon: '🗂️', show: true },
     { href: '/evidencias/nueva', label: 'Subir evidencia', icon: '📎', show: true },
@@ -87,9 +88,9 @@ export default async function DashboardPage() {
         <section className="mb-6 overflow-hidden rounded-[2.4rem] bg-gradient-to-br from-blue-900 via-blue-700 to-sky-500 p-6 text-white shadow-sm">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="mb-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">Panel de seguimiento · Sello Tecnológico</div>
+              <div className="mb-3 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold ring-1 ring-white/20">Panel de seguimiento · CreaLab</div>
               <h1 className="text-2xl lg:text-4xl font-black leading-tight">Hola, {perfil?.full_name ?? user.email}</h1>
-              <p className="mt-2 max-w-3xl text-sm text-blue-50">Revisa proyectos, evidencias, calendario, mensajes y seguimiento del colegio.</p>
+              <p className="mt-2 max-w-3xl text-sm text-blue-50">Revisa tus proyectos, evidencias, calendario, mensajes y seguimiento de actividades.</p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs">
                 <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Rol: {role || 'sin rol'}</span>
                 <span className="rounded-full bg-white/15 px-3 py-1 font-semibold ring-1 ring-white/20">Avance: {avance}%</span>
@@ -107,6 +108,9 @@ export default async function DashboardPage() {
         <section className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Link href="/calendario" className="group rounded-[2rem] border border-cyan-100 bg-gradient-to-br from-cyan-50 to-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md">
             <div className="flex items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-cyan-100 text-3xl text-cyan-700">📅</div><div><p className="text-sm font-black text-cyan-950">Calendario</p><p className="mt-1 text-xs text-cyan-700/70">Ver actividades, fechas y eventos.</p></div></div>
+          </Link>
+          <Link href="/mensajes" className="group rounded-[2rem] border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md">
+            <div className="flex items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-sky-100 text-3xl text-sky-700">💬</div><div><p className="text-sm font-black text-sky-950">Mensajes</p><p className="mt-1 text-xs text-sky-700/70">{unreadMessages > 0 ? `${unreadMessages} sin leer · Abrir conversaciones` : 'Conversaciones y mensajería institucional.'}</p></div></div>
           </Link>
           {isAdmin && <Link href="/mensajes/broadcast" className="group rounded-[2rem] border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
             <div className="flex items-center gap-4"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-100 text-3xl text-blue-700">📢</div><div><p className="text-sm font-black text-blue-950">Mensaje grupal</p><p className="mt-1 text-xs text-blue-700/70">Enviar comunicado desde administración.</p></div></div>
