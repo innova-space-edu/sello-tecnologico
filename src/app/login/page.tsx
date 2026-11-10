@@ -197,7 +197,7 @@ export default function LoginPage() {
         <div className="pt-8 pb-4 text-center">
           <div className="flex justify-center mb-4">
             <div className="relative h-24 w-24 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-blue-100">
-              <Image src="/colegio-logo.jpg" alt="Logo Colegio Providencia" fill sizes="96px"
+              <Image src="/colegio-logo.png" alt="Logo Colegio Providencia" fill sizes="96px"
                 className="object-contain p-2" priority />
             </div>
           </div>
