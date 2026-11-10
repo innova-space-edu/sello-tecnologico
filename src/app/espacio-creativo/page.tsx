@@ -27,8 +27,8 @@ export default async function EspacioCreativoPage() {
           <Link href="/comunidad" className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-indigo-600 text-2xl">✦</span>
             <span>
-              <strong className="block text-base tracking-wide">Sello Tecnológico</strong>
-              <small className="text-slate-400">Colegio Providencia · Galería creativa</small>
+              <strong className="block text-base tracking-wide">CreaLab</strong>
+              <small className="text-slate-400">Innova Space Education · Galería creativa</small>
             </span>
           </Link>
           <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold">
