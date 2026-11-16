@@ -9,6 +9,10 @@ const files=[
  "src/app/configuracion/privacidad/page.tsx",
  "src/app/admin/actas-familiares/page.tsx",
  "src/app/api/admin/actas-familiares/route.ts",
+ "src/lib/family-consent/account-status.ts",
+ "src/app/api/privacy/self/route.ts",
+ "src/app/api/admin/actas-privacidad/route.ts",
+ "src/app/admin/actas-privacidad/page.tsx",
 ]
 for(const path of files){
  const result=ts.transpileModule(readFileSync(path,"utf8"),{
@@ -26,11 +30,11 @@ const actPage=readFileSync(files[4],"utf8")
 const actApi=readFileSync(files[5],"utf8")
 const actsSql=readFileSync("supabase/migrations/202610120010_sello_family_acts.sql","utf8")
 const privacySql=readFileSync("supabase/migrations/202610120011_sello_privacy_persist_once.sql","utf8")
-assert.match(login,/\.from\('sello_privacy_choices'\)/)
+assert.match(login,/fetch\('\/api\/privacy\/self'/)
 assert.match(login,/router\.push\('\/consentimiento'\)/)
 assert.doesNotMatch(login,/record_sello_privacy_choices/,"Inicio de sesión y registro no deben regrabar cada vez")
 assert.doesNotMatch(login,/minor=\{false\} guardianEmail/,"Inicio de sesión no debe pedir formulario de registro")
-assert.match(login,/sello_optional_choices_requested/)
+assert.doesNotMatch(login,/sello_terms_acknowledged|sello_optional_choices_requested/,"Consentimiento posterior a autenticación")
 assert.match(firstConsent,/record_sello_privacy_choices/)
 assert.match(firstConsent,/terms/)
 assert.match(proxy,/requiredInitialPrivacy/)
@@ -50,3 +54,15 @@ assert.match(actApi,/record_type/)
 assert.match(actPage,/BORRADOR · SIN VALIDEZ/)
 assert.match(actPage,/no habilita|No habilita/)
 console.log("OK: acta ficticia privada sin permisos, archivo real y consentimiento por versión persistente")
+
+const status=readFileSync("src/lib/family-consent/account-status.ts","utf8")
+const review=readFileSync("src/app/api/admin/actas-privacidad/route.ts","utf8")
+const migration=readFileSync("supabase/migrations/20261116000900_sello_account_consent_review.sql","utf8")
+assert.match(status,/category==="unknown"&&!isAdmin/)
+assert.match(status,/category==="minor"&&/)
+assert.match(status,/approval!=="approved"/)
+assert.match(review,/profile\?\.role!=="admin"/)
+assert.match(review,/event\.data\.user_id===user\.id/)
+assert.match(migration,/enable row level security/)
+assert.match(migration,/is distinct from 'true'/)
+console.log("OK: acceso administrativo, revisión individual y consentimiento posterior a autenticación")
