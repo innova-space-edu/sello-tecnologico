@@ -21,9 +21,10 @@ export default function PrivacySettings() {
    const db=createClient()
    const {data:{user}}=await db.auth.getUser()
    if(!user){setStatus("Inicia sesión para consultar tus opciones.");return}
-   const dob=String(user.user_metadata?.birth_date||"")
-   const d=new Date(dob+"T00:00:00"), now=new Date()
-   const isMinor=!dob||Number.isNaN(d.getTime())||d>new Date(now.getFullYear()-18,now.getMonth(),now.getDate())
+   const response=await fetch("/api/privacy/self",{cache:"no-store"}).catch(()=>null)
+   const account=await response?.json().catch(()=>null)
+   if(!response?.ok||!account){setStatus("No se pudo verificar la edad registrada.");return}
+   const isMinor=account.age!=="adult"
    setMinor(isMinor)
    const {data,error}=await db.from("sello_privacy_choices").select("choices,version,terms_acknowledged_at,updated_at").eq("user_id",user.id).maybeSingle()
    if(error){setStatus("No se pudieron consultar los permisos. Solicita apoyo.");return}
@@ -37,7 +38,7 @@ export default function PrivacySettings() {
      .select("recorded_at,version,choices").eq("user_id",user.id)
      .order("recorded_at",{ascending:false}).limit(15)
    if(history)setEvents(history as Array<{recorded_at:string;version:string;choices:Record<string,boolean>}>)
-   setStatus(isMinor?"Los permisos de cuentas menores se determinan mediante el formulario familiar aprobado.":"Cambia o retira cada permiso voluntario.")
+   setStatus(account.age==="unknown"?"Falta regularizar la fecha de nacimiento.":isMinor?"Los permisos de cuentas menores se determinan mediante el formulario familiar aprobado.":"Cambia o retira cada permiso voluntario.")
   }
   void load()
  },[])
@@ -88,7 +89,7 @@ export default function PrivacySettings() {
       </div>)}
      </div>
     </details>}
-   <div><Link className="text-sm text-blue-700 underline" href="/proteccion-datos">Protección de datos</Link></div>
+   <div className="flex flex-wrap gap-3"><Link className="text-sm text-blue-700 underline" href="/proteccion-datos">Protección de datos</Link>{minor&&<Link className="text-sm text-blue-700 underline" href="/autorizacion-pendiente">Consultar o regularizar edad</Link>}</div>
   </div>
  </main>
 }
