@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import CreativeEvidenceCatalog from '@/components/creative/CreativeEvidenceCatalog'
 import CreativeAdminEdit from '@/components/creative/CreativeAdminEdit'
+import CreativeTemporaryCopy from '@/components/creative/CreativeTemporaryCopy'
 
 type Work = {
   id: string
@@ -17,6 +18,7 @@ type Work = {
   updatedAt:string
   date: string
   publicationBasis: 'personal' | 'institutional'
+  ownAdminWork:boolean
   canMarkInstitutional: boolean
   canMarkTemporary:boolean
   temporaryExample:boolean
@@ -27,6 +29,7 @@ type Work = {
 export default function RevisarEspacioCreativo() {
   const [works, setWorks] = useState<Work[]>([])
   const [editing,setEditing]=useState<Work|null>(null)
+  const [copySource,setCopySource]=useState<Work|null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
@@ -109,7 +112,7 @@ export default function RevisarEspacioCreativo() {
             <div>
               <h1 className="text-3xl font-black text-blue-950">Revisión · Espacio creativo</h1>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-                Revisa archivos, atribución y privacidad antes de aprobar su exhibición. La publicación exige autorización vigente para visibilidad pública.
+                Revisa archivos, atribución y privacidad antes de aprobar su exhibición. Tus publicaciones propias pueden aprobarse con tu declaración de derechos; las de terceros conservan su revisión de autorización.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -118,8 +121,9 @@ export default function RevisarEspacioCreativo() {
             </div>
           </div>
 
-          <div className="my-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><strong>Ejemplos de egresados · 6 meses</strong><p>Agrega desde la galería una copia nueva de la fotografía del proyecto, sin personas, nombres, voces ni otros identificadores. Usa como autor «Proyecto de egresados · ejemplo anónimo». Verifica los derechos de publicación y marca la opción de exhibición temporal en esta página. No se modifica ningún consentimiento personal.</p></div>
+          <div className="my-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><strong>Ejemplos de egresados · 6 meses</strong><p>Abre el catálogo y pulsa «Crear copia temporal» en una fotografía. También puedes hacerlo desde una tarjeta pendiente. Revisa la copia sin personas, nombres ni otros identificadores, verifica los derechos y apruébala en Pendientes de revisión. No se modifica ningún consentimiento personal. No se modifica ningún consentimiento personal.</p></div>
           <CreativeEvidenceCatalog onImported={()=>void reload()}/>
+          {copySource&&<CreativeTemporaryCopy source={{id:copySource.id,title:copySource.title,url:copySource.url,kind:'work'}} onClose={()=>setCopySource(null)} onSaved={()=>{setCopySource(null);void reload()}}/>}
           {editing&&<CreativeAdminEdit key={editing.id} work={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);void reload()}}/>}
           <div className="my-7 flex flex-wrap gap-3">
             <span className="rounded-full bg-amber-100 px-5 py-2 text-sm font-bold text-amber-900">Pendientes: {pending.length}</span>
@@ -134,7 +138,7 @@ export default function RevisarEspacioCreativo() {
                 <p className="mt-2">
                   Para obras propias de adultos, revisa el permiso «Vitrina y comunidad pública» en{' '}
                   <Link href="/configuracion/privacidad" className="font-bold underline">Mis consentimientos</Link>.
-                  Si se trata de una obra institucional sin datos personales, usa la declaración específica de su tarjeta.
+                  Para ejemplos temporales, crea una copia anónima desde el catálogo o la tarjeta original y aprueba esa copia.
                 </p>
               )}
             </div>
@@ -166,7 +170,8 @@ export default function RevisarEspacioCreativo() {
                             <p className="break-words text-sm text-slate-600">{work.description || 'Sin descripción.'}</p>
                             {!!work.tags?.length && <div className="flex flex-wrap gap-2">{work.tags.map(tag => <span key={tag} className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">#{tag}</span>)}</div>}
                             <p className="text-xs text-slate-400">{new Date(work.date).toLocaleDateString('es-CL')}</p>
-                            {work.status === 'pending' && work.canMarkInstitutional && (
+                            {work.status==='pending'&&work.ownAdminWork&&!work.temporaryExample&&<p className="rounded-xl bg-blue-50 p-3 text-xs text-blue-900">Publicación propia del administrador: puedes aprobar directamente después de confirmar los derechos y permisos aplicables. No necesitas regularizar tu fecha de nacimiento para esta acción.</p>}
+                            {work.status === 'pending' && work.canMarkInstitutional && !work.temporaryExample && (
                               <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs leading-relaxed text-indigo-950">
                                 <input type="checkbox" className="mt-0.5 shrink-0"
                                   disabled={busyId === work.id}
@@ -191,9 +196,10 @@ export default function RevisarEspacioCreativo() {
                             <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                               {expired.some(e=>e.id===work.id)?<button type="button" disabled={!!busyId} onClick={()=>void purgeExpiredCopy(work)} className="rounded-full bg-red-700 px-4 py-2 text-xs font-bold text-white">Eliminar copia vencida</button>:<>
                               {work.status === 'pending' && (
-                                <button type="button" disabled={busyId === work.id} onClick={() => void review(work, 'publish')}
-                                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Aprobar</button>
+                                <button type="button" disabled={busyId === work.id||(work.temporaryExample&&!temporaryDeclarations[work.id])} onClick={() => void review(work, 'publish')}
+                                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">{work.temporaryExample?'Aprobar ejemplo temporal':'Aprobar'}</button>
                               )}
+                              {work.status==='pending'&&work.type==='image'&&!work.temporaryExample&&<button type="button" disabled={!!busyId} onClick={()=>{setError('');setCopySource(work)}} className="rounded-full bg-indigo-700 px-4 py-2 text-xs font-bold text-white">Crear copia temporal</button>}
                               <button type="button" disabled={!!busyId} onClick={()=>setEditing(work)} className="rounded-full bg-blue-100 px-4 py-2 text-xs font-bold text-blue-800">Editar</button>
                               {work.status==='rejected'?<button type="button" disabled={!!busyId} onClick={()=>void review(work,'restore')} className="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold">Recuperar</button>:<button type="button" disabled={busyId === work.id} onClick={() => void review(work, 'reject')}
                                 className="rounded-full bg-rose-100 px-4 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">

@@ -91,6 +91,8 @@ const adult={declared_birth_date:"1980-01-01",captured_at:"2026-10-11T00:00:00Z"
 const minor={declared_birth_date:"2015-01-01",captured_at:"2026-10-11T00:00:00Z"}
 fixtures={profiles:{role:"admin",blocked:false},sello_privacy_choices:consent}
 assert.equal((await account(user)).next,"/dashboard","Admin antiguo sin fecha no se confunde con menor")
+fixtures.sello_age_review_requests={status:"pending"}
+assert.equal((await account(user)).next,"/dashboard","La revisión de edad del administrador no bloquea su acceso")
 fixtures={profiles:{role:"admin",blocked:false}}
 assert.equal((await account(user)).next,"/consentimiento","Admin también registra condiciones")
 fixtures={profiles:{role:"admin",blocked:false},family_age_status:minor,sello_privacy_choices:consent}
@@ -110,3 +112,8 @@ fixtures={profiles:{role:"admin",blocked:true},sello_privacy_choices:consent}
 assert.equal((await account(user)).next,"/bloqueado","No abrir cuenta bloqueada")
 assert.equal(ctx.exports.ageCategory("2020-02-31"),"unknown","No normalizar fechas inválidas")
 console.log("OK: escenarios de acceso ejecutados con cuentas simuladas")
+
+const pendingPage=readFileSync("src/app/autorizacion-pendiente/page.tsx","utf8")
+assert.match(pendingPage,/regularizar"\)===\s*"1"/)
+assert.match(pendingPage,/data.next==="\/dashboard"&&!voluntaryAdminAge/)
+console.log("OK: salida automática de la revisión de edad para administración")

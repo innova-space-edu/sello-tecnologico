@@ -22,10 +22,14 @@ export async function getAccountStatus(user:User){
  const accepted=consent.data?.version===SELLO_PRIVACY_VERSION&&Boolean(consent.data.terms_acknowledged_at)
  const legacy=hasLegacyConsentGrace(user.created_at)
  let approval="pending",ageRequest="none",familyApproved=false
- if(category==="unknown"){
+ if(category==="unknown"&&!isAdmin){
   const r=await db.from("sello_age_review_requests").select("status").eq("user_id",user.id).maybeSingle()
   if(r.error)throw Error("No se pudo comprobar la edad.")
   ageRequest=r.data?.status||"none"
+ }else if(category==="unknown"&&isAdmin){
+  // Optional metadata must not deny administrative access if its lookup fails.
+  const r=await db.from("sello_age_review_requests").select("status").eq("user_id",user.id).maybeSingle()
+  if(!r.error)ageRequest=r.data?.status||"none"
  }
  if(accepted&&!isAdmin){
   const [approved,latest]=await Promise.all([
@@ -46,6 +50,6 @@ export async function getAccountStatus(user:User){
   if(r.error)throw Error("No se pudo verificar autorización familiar.")
   familyApproved=r.data?.status==="approved"&&r.data.document_version==="family-2026-10-v1"&&r.data.decisions?.platform_access===true
  }
- const next=profile.data.blocked&&!isAdmin?"/bloqueado":!accepted&&!legacy?"/consentimiento":category==="unknown"&&!isAdmin&&!legacy?"/autorizacion-pendiente":familyRequired&&!familyApproved?"/autorizacion-pendiente":!isAdmin&&!legacy&&approval!=="approved"?"/autorizacion-pendiente":"/dashboard"
+ const next=profile.data.blocked?"/bloqueado":!accepted&&!legacy?"/consentimiento":isAdmin&&!familyRequired?"/dashboard":category==="unknown"&&!isAdmin&&!legacy?"/autorizacion-pendiente":familyRequired&&!familyApproved?"/autorizacion-pendiente":!isAdmin&&!legacy&&approval!=="approved"?"/autorizacion-pendiente":"/dashboard"
  return {accepted,choices:consent.data?.choices||{},acceptedAt:consent.data?.terms_acknowledged_at||null,isAdmin,role:profile.data.role,blocked:Boolean(profile.data.blocked),age:category,ageRequest,approval,familyRequired,familyApproved,next}
 }

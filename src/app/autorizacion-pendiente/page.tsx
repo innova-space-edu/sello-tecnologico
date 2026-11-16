@@ -12,7 +12,10 @@ export default function FamilyAuthorizationPending(){
   const data=await res.json()
   if(!res.ok)throw Error(data.error||"No se pudo consultar tu cuenta.")
   setStatus(data)
-  if(data.next==="/consentimiento"||data.next==="/bloqueado"||(data.next==="/dashboard"&&!(data.isAdmin&&data.age==="unknown"))){router.replace(data.next);router.refresh()}
+  // An authenticated, unblocked administrator may regularize age voluntarily.
+  // Never leave an eligible administrator stuck on this gate after sign-in.
+  const voluntaryAdminAge=data.isAdmin&&data.age==="unknown"&&new URLSearchParams(window.location.search).get("regularizar")==="1"
+  if(data.next==="/consentimiento"||data.next==="/bloqueado"||(data.next==="/dashboard"&&!voluntaryAdminAge)){router.replace(data.next);router.refresh()}
   return data as Status
  },[router])
  const verifyOrSend=useCallback(async()=>{
@@ -46,7 +49,7 @@ export default function FamilyAuthorizationPending(){
  <p className="text-xs font-bold uppercase tracking-widest text-blue-700">CreaLab · verificación de cuenta</p>
  {!status?<h1 className="text-2xl font-bold">Consultando estado de acceso</h1>:status.age==="unknown"?<>
   <h1 className="text-2xl font-bold">Regularizar fecha de nacimiento</h1>
-  <p className="text-sm leading-6">Tu cuenta no tiene una fecha registrada. Esto no significa que seas menor de edad. Declara la fecha para que administración la verifique de forma independiente.</p>
+  <p className="text-sm leading-6">{status.isAdmin?"Esta regularización es voluntaria para tu cuenta administrativa y no impide acceder a la plataforma.":"Tu cuenta no tiene una fecha registrada. Esto no significa que seas menor de edad. Declara la fecha para que administración la verifique de forma independiente."}</p>
   {status.ageRequest==="pending"?<p className="rounded-xl bg-amber-50 p-3 text-sm">Solicitud pendiente de revisión institucional.</p>:<form className="space-y-3" onSubmit={e=>{e.preventDefault();void requestAge()}}><label className="block text-sm font-medium">Fecha de nacimiento<input type="date" required value={birthDate} onChange={e=>setBirthDate(e.target.value)} className="mt-1 w-full rounded-lg border p-3"/></label><button disabled={busy} className="w-full rounded-xl bg-blue-700 p-3 font-semibold text-white disabled:opacity-50">Enviar fecha a revisión</button></form>}
   {status.isAdmin&&<Link href="/dashboard" className="block text-sm font-semibold text-blue-700 underline">Continuar como administrador</Link>}
  </>:status.familyRequired&&!status.familyApproved?<><h1 className="text-2xl font-bold">Autorización familiar pendiente</h1><p className="text-sm leading-6">Un representante debe firmar y la institución verificar identidad y representación. El acceso se habilita tras la aprobación institucional.</p></>:<>
