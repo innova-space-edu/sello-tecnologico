@@ -11,29 +11,33 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const noStore = { 'Cache-Control': 'no-store' }
-const allowedRoles = new Set(['admin', 'docente', 'coordinador', 'utp', 'estudiante'])
+const allowedRoles = new Set(['admin'])
 
 export async function GET() {
   try {
     const admin = createAdminSupabaseClient()
+    const all: any[] = []
+    for(let offset=0;;offset+=100){
     const { data, error } = await admin.from('creative_space_works')
       .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at,publication_basis,tags')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
-      .limit(80)
+      .order('id', { ascending: true }).range(offset,offset+99)
     if (error) throw error
-
-    const rows = data ?? []
+    all.push(...(data??[])); if((data??[]).length<100)break
+    }
+    const rows = all
     // Obras institucionales verificadas no dependen de consentimiento personal
     // del usuario que las subió. Las obras personales sí se revalidan siempre.
     const personal = rows.filter(row => row.publication_basis !== 'institutional')
-    const allowed = await eligiblePublicAuthors(admin, personal.map(row => row.uploader_id))
+    const allowed = new Set<string>()
+    for(let i=0;i<personal.length;i+=100){for(const id of await eligiblePublicAuthors(admin,personal.slice(i,i+100).map(row=>row.uploader_id)))allowed.add(id)}
     const visible = rows.filter(row =>
       row.publication_basis === 'institutional' || allowed.has(row.uploader_id))
     if (!visible.length) return NextResponse.json({ works: [] }, { headers: noStore })
 
     const { data: links, error: linkError } = await admin.storage
-      .from(CREATIVE_BUCKET).createSignedUrls(visible.map(row => row.storage_path), 3600)
+      .from(CREATIVE_BUCKET).createSignedUrls(visible.map(row => row.storage_path), 300)
     if (linkError) throw linkError
 
     const byPath = new Map((links ?? []).map(link => [link.path, link.signedUrl]))
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('profiles')
     .select('role,blocked').eq('id', user.id).maybeSingle()
   if (!profile || profile.blocked || !allowedRoles.has(profile.role)) {
-    return NextResponse.json({ error: 'Tu cuenta no está habilitada para subir material.' }, { status: 403, headers: noStore })
+    return NextResponse.json({ error: 'Solo administración puede agregar evidencias a la galería.' }, { status: 403, headers: noStore })
   }
 
   const body = await request.json().catch(() => ({}))
