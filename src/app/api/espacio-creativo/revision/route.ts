@@ -71,6 +71,7 @@ export async function PATCH(request: Request) {
     // el material y exige confirmación manual de ausencia de datos personales.
     const institutional = action === 'published' && body.institutionalNoPersonalData === true
     if (action === 'published') {
+      if(body.authorshipAndPermissionsVerified!==true)return NextResponse.json({error:'Confirma la autoría y las autorizaciones de todas las personas identificables antes de publicar.'},{status:400})
       if (work.status !== 'pending') {
         return NextResponse.json({ error: 'Esta obra ya fue revisada.' }, { status: 409 })
       }
