@@ -37,7 +37,22 @@ function compatible(row:any){
 export async function GET(request:Request){
  try{
   const {db}=await administrator()
-  const previewId=new URL(request.url).searchParams.get('preview')
+  const params=new URL(request.url).searchParams
+  const previewId=params.get('preview')
+  const batch=params.get('previews')
+  if(batch!==null){
+   const ids=[...new Set(batch.split(',').filter(Boolean))]
+   if(!ids.length||ids.length>24||ids.some(id=>!/^[0-9a-f-]{36}$/i.test(id)))return respond({error:'Solicitud de vistas previas inválida.'},400)
+   const {data:rows,error}=await db.from('evidences').select(columns).in('id',ids)
+   if(error)throw error
+   const media=(rows??[]).filter(row=>compatible(row))
+   const paths=[...new Set(media.map(row=>objectPath(row.file_url)!))]
+   if(!paths.length)return respond({previews:{}})
+   const {data:links,error:signError}=await db.storage.from('evidencias').createSignedUrls(paths,300)
+   if(signError)throw signError
+   const byPath=new Map((links??[]).map(link=>[link.path,link.signedUrl]))
+   return respond({previews:Object.fromEntries(media.flatMap(row=>{const url=byPath.get(objectPath(row.file_url)!);return url?[[row.id,url]]:[]}))})
+  }
   if(previewId){
    if(!/^[0-9a-f-]{36}$/i.test(previewId))return respond({error:'Evidencia inválida.'},400)
    const {data:row,error}=await db.from('evidences').select(columns).eq('id',previewId).maybeSingle()
@@ -60,7 +75,7 @@ export async function GET(request:Request){
    if(error)throw error
    for(const p of data??[])creators.set(p.id,p.full_name||'')
   }
-  return respond({evidences:rows.map(r=>({id:r.id,title:r.title,description:r.description,registeredCreator:creators.get(r.created_by)||'',date:r.created_at,mime:r.file_type,kind:r.type,compatible:compatible(r)}))})
+  return respond({evidences:rows.map(r=>({id:r.id,title:r.title,description:r.description,registeredCreator:creators.get(r.created_by)||'',date:r.created_at,mime:r.file_type,kind:r.type,compatible:compatible(r),fileName:r.file_name||'',tags:normalizeCreativeTags(r.tags)||[]}))})
  }catch(e){return failure(e)}
 }
 export async function POST(request:Request){
@@ -69,6 +84,8 @@ export async function POST(request:Request){
   const body=await request.json().catch(()=>({}))
   if(typeof body.id!=='string'||!/^[0-9a-f-]{36}$/i.test(body.id)||body.rightsConfirmed!==true||body.authorshipConfirmed!==true)return respond({error:'Confirma la autoría y los derechos antes de incorporar la evidencia.'},400)
   const author=shortText(body.author,121)
+  const tags=body.tags===undefined?undefined:normalizeCreativeTags(body.tags)
+  if(tags===null)return respond({error:'Etiquetas inválidas.'},400)
   if(author.length<2||author.length>120)return respond({error:'Indica el autor o autores reales.'},400)
   const {data:row,error}=await db.from('evidences').select(columns).eq('id',body.id).maybeSingle()
   if(error)throw error
@@ -84,7 +101,7 @@ export async function POST(request:Request){
   if(file.size<=0||file.size>CREATIVE_MAX_BYTES||file.size!==row.file_size||(file.type&&file.type.split(';')[0]!==mime))return respond({error:'El archivo original no coincide con sus metadatos.'},400)
   const {error:uploadError}=await db.storage.from(CREATIVE_BUCKET).upload(path,file,{contentType:mime,upsert:false})
   if(uploadError)return respond({error:'No se pudo copiar la evidencia. Comprueba si ya existe.'},409)
-  const {data:saved,error:insertError}=await db.from('creative_space_works').insert({uploader_id:row.created_by,author_name:author,title:shortText(body.title,160)||shortText(row.title,160)||'Evidencia de proyecto',description:shortText(row.description,1200),tags:normalizeCreativeTags(row.tags)||[],media_type:CREATIVE_MIMES[mime],mime_type:mime,file_name:shortText(row.file_name,200)||'evidencia.'+ext,file_size:file.size,storage_path:path,rights_confirmed:true,status:'pending'}).select('id').single()
+  const {data:saved,error:insertError}=await db.from('creative_space_works').insert({uploader_id:row.created_by,author_name:author,title:shortText(body.title,160)||shortText(row.title,160)||'Evidencia de proyecto',description:shortText(typeof body.description==='string'?body.description:row.description,1200),tags:tags??normalizeCreativeTags(row.tags)??[],media_type:CREATIVE_MIMES[mime],mime_type:mime,file_name:shortText(row.file_name,200)||'evidencia.'+ext,file_size:file.size,storage_path:path,rights_confirmed:true,status:'pending'}).select('id').single()
   if(insertError){await db.storage.from(CREATIVE_BUCKET).remove([path]);throw insertError}
   return respond({ok:true,id:saved.id,message:'Evidencia incorporada a revisión privada. Aún no está publicada.'},201)
  }catch(e){return failure(e)}
