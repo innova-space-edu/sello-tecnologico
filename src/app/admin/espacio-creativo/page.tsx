@@ -48,6 +48,7 @@ export default function RevisarEspacioCreativo() {
   useEffect(() => { void reload() }, [reload])
 
   const review = async (work: Work, action: 'publish' | 'reject' | 'restore') => {
+    if(action==='publish'&&!window.confirm('¿Verificaste la autoría, los derechos y la autorización de todas las personas identificables, incluidos menores, cuando corresponda?'))return
     if(action==='reject'&&!window.confirm('¿Retirar esta obra de la galería pública? Se conservará en el archivo privado.'))return
     setBusyId(work.id)
     setError('')
@@ -59,6 +60,7 @@ export default function RevisarEspacioCreativo() {
         body: JSON.stringify({
           id: work.id,
           action,
+          authorshipAndPermissionsVerified: action === 'publish',
           institutionalNoPersonalData: action === 'publish' && institutionalDeclarations[work.id] === true,
         }),
       })
