@@ -121,9 +121,9 @@ export default function RevisarEspacioCreativo() {
             </div>
           </div>
 
-          <div className="my-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><strong>Ejemplos de egresados · 6 meses</strong><p>Abre el catálogo y pulsa «Crear copia temporal» en una fotografía. También puedes hacerlo desde una tarjeta pendiente. Revisa la copia sin personas, nombres ni otros identificadores, verifica los derechos y apruébala en Pendientes de revisión. No se modifica ningún consentimiento personal. No se modifica ningún consentimiento personal.</p></div>
+          <div className="my-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><strong>Ejemplos de egresados · 6 meses</strong><p>Abre el catálogo y pulsa «Crear copia temporal» en una fotografía. También puedes hacerlo desde una tarjeta pendiente. Revisa la copia sin personas, nombres ni otros identificadores, verifica los derechos y apruébala en Pendientes de revisión. No se modifica ningún consentimiento personal.</p></div>
           <CreativeEvidenceCatalog onImported={()=>void reload()}/>
-          {copySource&&<CreativeTemporaryCopy source={{id:copySource.id,title:copySource.title,url:copySource.url,kind:'work'}} onClose={()=>setCopySource(null)} onSaved={()=>{setCopySource(null);void reload()}}/>}
+          {copySource&&<CreativeTemporaryCopy source={{id:copySource.id,title:copySource.title,url:copySource.url,kind:'work',description:copySource.description,registeredCreator:copySource.author,date:copySource.date,tags:copySource.tags}} onClose={()=>setCopySource(null)} onSaved={()=>{setCopySource(null);void reload()}}/>}
           {editing&&<CreativeAdminEdit key={editing.id} work={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);void reload()}}/>}
           <div className="my-7 flex flex-wrap gap-3">
             <span className="rounded-full bg-amber-100 px-5 py-2 text-sm font-bold text-amber-900">Pendientes: {pending.length}</span>
