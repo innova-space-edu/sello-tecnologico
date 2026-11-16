@@ -20,7 +20,7 @@ export async function GET() {
     const all: any[] = []
     for(let offset=0;;offset+=100){
     const { data, error } = await admin.from('creative_space_works')
-      .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at,publication_basis,tags')
+      .select('id,uploader_id,author_name,title,description,media_type,storage_path,created_at,published_at,publication_basis,tags,rights_confirmed,reviewed_by,institutional_attested_at,institutional_attested_by')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .order('id', { ascending: true }).range(offset,offset+99)
@@ -33,9 +33,20 @@ export async function GET() {
     const personal = rows.filter(row => row.publication_basis !== 'institutional')
     const allowed = new Set<string>()
     for(let i=0;i<personal.length;i+=100){for(const id of await eligiblePublicAuthors(admin,personal.slice(i,i+100).map(row=>row.uploader_id)))allowed.add(id)}
+    // Only a self-reviewed, rights-confirmed personal upload can use the admin attestation.
+    // Recheck the protected role on every public read, never trust a client-supplied role.
+    const adminAttested=personal.filter(row=>row.rights_confirmed===true&&row.reviewed_by===row.uploader_id&&row.institutional_attested_by===row.uploader_id&&Boolean(row.institutional_attested_at))
+    const activeAdmins=new Set<string>()
+    const adminIds=[...new Set(adminAttested.map(row=>row.uploader_id as string))]
+    for(let i=0;i<adminIds.length;i+=100){
+      const {data,error}=await admin.from('profiles').select('id,role,blocked').in('id',adminIds.slice(i,i+100))
+      if(error)throw error
+      for(const p of data??[])if(p.role==='admin'&&!p.blocked)activeAdmins.add(p.id)
+    }
+    const ownAttestedIds=new Set(adminAttested.filter(row=>activeAdmins.has(row.uploader_id)).map(row=>row.id))
     const visible = rows.filter(row => isTemporaryExample(row.tags)
       ? row.publication_basis==='institutional' && row.author_name===TEMPORARY_EXAMPLE_AUTHOR && row.media_type==='image' && exampleRemainingSeconds(row.created_at)>0
-      : row.publication_basis === 'institutional' || allowed.has(row.uploader_id))
+      : row.publication_basis === 'institutional' || allowed.has(row.uploader_id) || ownAttestedIds.has(row.id))
     if (!visible.length) return NextResponse.json({ works: [] }, { headers: noStore })
 
     const regular=visible.filter(row=>!isTemporaryExample(row.tags))
