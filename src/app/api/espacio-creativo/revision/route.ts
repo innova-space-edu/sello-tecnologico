@@ -40,6 +40,7 @@ export async function GET() {
         type: row.media_type, status: row.status, date: row.created_at, updatedAt:row.updated_at,fileName:row.file_name,
         publicationBasis: row.publication_basis,
         canMarkInstitutional: row.status === 'pending' && row.uploader_id === user.id,
+        ownAdminWork: row.uploader_id === user.id,
         canMarkTemporary: row.status === 'pending' && row.uploader_id === user.id && row.media_type==='image' && exampleRemainingSeconds(row.created_at)>0,
         temporaryExample:isTemporaryExample(row.tags),
         expiresAt:isTemporaryExample(row.tags)?exampleExpiresAt(row.created_at):null,
@@ -89,6 +90,9 @@ export async function PATCH(request: Request) {
     // el material y exige confirmación manual de ausencia de datos personales.
     const temporary = action === 'published' && body.temporaryExample === true
     const institutional = action === 'published' && (body.institutionalNoPersonalData === true || temporary)
+    // A verified administrator may certify the rights of their own upload per work.
+    // Never turn that declaration into the student's consent or apply it to another uploader.
+    const adminOwnAttestation=action==='published'&&!institutional&&work.uploader_id===user.id&&body.authorshipAndPermissionsVerified===true
     if(action==='published' && isTemporaryExample(work.tags) && !temporary)return NextResponse.json({error:'Este ejemplo temporal no se puede convertir en una publicación permanente.'},{status:409})
     if(temporary && (work.uploader_id!==user.id || work.media_type!=='image' || body.anonymizedCopyVerified!==true || work.author_name!==TEMPORARY_EXAMPLE_AUTHOR || exampleRemainingSeconds(work.created_at)<=0))return NextResponse.json({error:'Sube una copia nueva anonimizada como administrador, con la atribución indicada, y verifica sus derechos. No se pueden aprobar originales de estudiantes por esta vía.'},{status:409})
     if(action==='pending' && isTemporaryExample(work.tags) && exampleRemainingSeconds(work.created_at)<=0)return NextResponse.json({error:'La exhibición temporal venció y no puede recuperarse.'},{status:409})
@@ -106,7 +110,7 @@ export async function PATCH(request: Request) {
             error: 'Solo quien subió la obra puede certificar su carácter institucional.',
           }, { status: 403 })
         }
-      } else {
+      } else if (!adminOwnAttestation) {
         const approved = await eligiblePublicAuthors(admin, [work.uploader_id])
         if (!approved.has(work.uploader_id)) {
           return NextResponse.json({
@@ -126,8 +130,8 @@ export async function PATCH(request: Request) {
       ...(temporary ? {tags:[...((work.tags??[]) as string[]).filter(t=>t.toLowerCase()!==TEMPORARY_EXAMPLE_TAG.toLowerCase()).slice(0,7),TEMPORARY_EXAMPLE_TAG]} : {}),
       ...(action === 'published' ? {
         publication_basis: institutional ? 'institutional' : 'personal',
-        institutional_attested_at: institutional ? reviewedAt : null,
-        institutional_attested_by: institutional ? user.id : null,
+        institutional_attested_at: institutional || adminOwnAttestation ? reviewedAt : null,
+        institutional_attested_by: institutional || adminOwnAttestation ? user.id : null,
       } : {}),
     }
     const { data: saved, error } = await admin.from('creative_space_works').update(changes)
