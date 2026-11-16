@@ -58,6 +58,20 @@ export async function PATCH(request: Request) {
     if(role.error||role.data?.role!=='admin'||role.data.blocked)return NextResponse.json({error:'Acceso exclusivo de administración.'},{status:403})
     const body = await request.json().catch(() => ({}))
     const id = typeof body.id === 'string' ? body.id : ''
+    if(body.action==='purgeExpiredCopy'){
+      if(!/^[0-9a-f-]{36}$/i.test(id)||body.confirmDelete!==true)return NextResponse.json({error:'Confirma la eliminación de la copia vencida.'},{status:400})
+      const db=createAdminSupabaseClient()
+      const {data:copy,error}=await db.from('creative_space_works').select('id,storage_path,tags,created_at,author_name,updated_at').eq('id',id).maybeSingle()
+      if(error)throw error
+      if(!copy||!isTemporaryExample(copy.tags)||copy.author_name!==TEMPORARY_EXAMPLE_AUTHOR||exampleRemainingSeconds(copy.created_at)>0)return NextResponse.json({error:'Solo puedes eliminar una copia temporal vencida.'},{status:409})
+      // The public endpoint already excludes expired copies. Remove the private
+      // gallery asset only, never the project's original evidence.
+      const {error:removeError}=await db.storage.from(CREATIVE_BUCKET).remove([copy.storage_path])
+      if(removeError)throw removeError
+      const {data:deleted,error:deleteError}=await db.from('creative_space_works').delete().eq('id',id).eq('updated_at',copy.updated_at).select('id').maybeSingle()
+      if(deleteError||!deleted)throw deleteError||Error('La copia cambió durante la eliminación.')
+      return NextResponse.json({ok:true},{headers:{'Cache-Control':'no-store'}})
+    }
     const action = body.action === 'publish' ? 'published'
       : body.action === 'reject' ? 'rejected' : body.action === 'restore' ? 'pending' : ''
     if (!/^[0-9a-f-]{36}$/i.test(id) || !action) {
