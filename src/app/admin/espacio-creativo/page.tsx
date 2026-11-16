@@ -18,6 +18,7 @@ type Work = {
   updatedAt:string
   date: string
   publicationBasis: 'personal' | 'institutional'
+  ownAdminWork:boolean
   canMarkInstitutional: boolean
   canMarkTemporary:boolean
   temporaryExample:boolean
@@ -111,7 +112,7 @@ export default function RevisarEspacioCreativo() {
             <div>
               <h1 className="text-3xl font-black text-blue-950">Revisión · Espacio creativo</h1>
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600">
-                Revisa archivos, atribución y privacidad antes de aprobar su exhibición. La publicación exige autorización vigente para visibilidad pública.
+                Revisa archivos, atribución y privacidad antes de aprobar su exhibición. Tus publicaciones propias pueden aprobarse con tu declaración de derechos; las de terceros conservan su revisión de autorización.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -169,6 +170,7 @@ export default function RevisarEspacioCreativo() {
                             <p className="break-words text-sm text-slate-600">{work.description || 'Sin descripción.'}</p>
                             {!!work.tags?.length && <div className="flex flex-wrap gap-2">{work.tags.map(tag => <span key={tag} className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-700">#{tag}</span>)}</div>}
                             <p className="text-xs text-slate-400">{new Date(work.date).toLocaleDateString('es-CL')}</p>
+                            {work.status==='pending'&&work.ownAdminWork&&!work.temporaryExample&&<p className="rounded-xl bg-blue-50 p-3 text-xs text-blue-900">Publicación propia del administrador: puedes aprobar directamente después de confirmar los derechos y permisos aplicables. No necesitas regularizar tu fecha de nacimiento para esta acción.</p>}
                             {work.status === 'pending' && work.canMarkInstitutional && !work.temporaryExample && (
                               <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs leading-relaxed text-indigo-950">
                                 <input type="checkbox" className="mt-0.5 shrink-0"
