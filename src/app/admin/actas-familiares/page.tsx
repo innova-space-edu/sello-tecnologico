@@ -86,6 +86,7 @@ export default function ActasFamiliaresPage() {
       <nav className="flex flex-wrap gap-4 text-sm text-blue-700">
         <Link href="/admin">← Panel Admin</Link>
         <Link href="/admin/autorizaciones-familiares">Revisar autorizaciones</Link>
+        <Link href="/admin/actas-privacidad">Actas de privacidad</Link>
       </nav>
       <header className="rounded-2xl bg-blue-950 p-6 text-white">
         <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">Archivo privado · CreaLab</p>

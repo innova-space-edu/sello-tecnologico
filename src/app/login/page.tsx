@@ -4,8 +4,6 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
-import SelloConsentPanel, { selloChoices } from '@/components/legal/SelloConsentPanel'
-import { hasLegacyConsentGrace } from '@/lib/family-consent/transition'
 
 const CURSOS = [
   '1° Básico A', '1° Básico B',
@@ -32,9 +30,6 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('login')
   const [birthDate, setBirthDate] = useState('')
   const [guardianEmail, setGuardianEmail] = useState('')
-  const [consentExpanded, setConsentExpanded] = useState(false)
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [choices, setChoices] = useState<Record<string, boolean>>(selloChoices())
   const isMinor = (date: string) => {
     const d = new Date(date + 'T00:00:00')
     const now = new Date()
@@ -61,30 +56,10 @@ export default function LoginPage() {
       email: form.email.trim().toLowerCase(), password: form.password,
     })
     if (loginError) { setError('Correo o contraseña incorrectos'); setLoading(false); return }
-    // La cuenta conserva la fecha y permisos inicialmente registrados.
-    // Solo solicitar el formulario a quien no lo tenga en la versión vigente.
-    const legacyGrace = hasLegacyConsentGrace(loginData.user?.created_at)
-    const accountMinor = isMinor(String(loginData.user?.user_metadata?.birth_date || ''))
-    if (!legacyGrace) {
-      const {data:record,error:privacyError}=await supabase.from('sello_privacy_choices')
-        .select('version,terms_acknowledged_at').eq('user_id',loginData.user!.id).maybeSingle()
-      if (privacyError) {
-        setError('No se pudo consultar el registro de privacidad. Intenta nuevamente.')
-        setLoading(false); return
-      }
-      if(record?.version !== 'sello-2026-10-v1' || !record.terms_acknowledged_at) {
-        router.push('/consentimiento')
-        setLoading(false); return
-      }
-    }
-    if (accountMinor && !legacyGrace) {
-      const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
-      if (result?.ok) {
-        const state = await result.json().catch(() => ({}))
-        if (state.status === 'approved') { router.push('/dashboard'); setLoading(false); return }
-      } else setNotice('Pendiente: el correo al representante no pudo confirmarse. Contacta a administración.')
-      router.push('/autorizacion-pendiente'); setLoading(false); return
-    }
+    const response=await fetch('/api/privacy/self',{cache:'no-store'}).catch(()=>null)
+    const status=await response?.json().catch(()=>null)
+    if(!response?.ok||!status){setError('No se pudo verificar el estado de la cuenta. Intenta nuevamente.');setLoading(false);return}
+    if(status.next!=='/dashboard'){router.push(status.next);setLoading(false);return}
     await fetch('/api/access-log', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -99,7 +74,6 @@ export default function LoginPage() {
     setLoading(true); setError(''); setNotice('')
 
     const email = form.email.trim().toLowerCase()
-    if (!consentExpanded || !acceptedTerms) { setError('Completa el formulario de consentimiento.'); setLoading(false); return }
     const parsedBirth = new Date(birthDate + 'T00:00:00')
     if (!birthDate || Number.isNaN(parsedBirth.getTime()) || parsedBirth > new Date()) {
       setError('Indica una fecha de nacimiento válida.'); setLoading(false); return
@@ -134,12 +108,6 @@ export default function LoginPage() {
           role,
           birth_date: birthDate,
           guardian_email: minor ? guardianEmail.trim().toLowerCase() : null,
-          sello_terms_version: 'sello-2026-10-v1',
-          sello_terms_acknowledged: true,
-          sello_optional_choices_requested: minor
-            ? Object.fromEntries(Object.keys(choices).map(key=>[key,false]))
-            : Object.fromEntries(Object.entries(choices).filter(([key])=>key!=='platform_access')),
-
         },
       },
     })
@@ -173,17 +141,11 @@ export default function LoginPage() {
     }).catch(() => {})
 
     if (data.session) {
-      // Supabase guardó la aceptación inicial al crear la cuenta, incluso
-      // cuando no entrega sesión hasta confirmar el correo.
-      if (minor) {
-        const result = await fetch('/api/family-consent/self/invite',{method:'POST'}).catch(()=>null)
-        if (!result?.ok) setNotice('El envío del formulario familiar todavía no se confirmó; la cuenta seguirá restringida.')
-        router.push('/autorizacion-pendiente')
-      } else router.push('/dashboard')
+      router.push('/consentimiento')
     } else {
       setMode('login')
       setForm({ email, password: '', full_name: '', rut: '', curso: '' })
-      setNotice(minor ? 'Cuenta creada. Verifica el correo si corresponde e inicia sesión; recibirás una pantalla de autorización y la invitación se solicitará automáticamente. El acceso queda restringido hasta la aprobación institucional.' : '✅ Cuenta creada correctamente. Revisa tu correo si debes confirmar el acceso y luego inicia sesión.')
+      setNotice('Cuenta creada. Verifica tu correo si corresponde e inicia sesión para registrar tus decisiones y enviarlas a revisión institucional.')
     }
     setLoading(false)
   }
@@ -299,9 +261,8 @@ export default function LoginPage() {
                 <input type="date" required value={birthDate} onChange={e=>setBirthDate(e.target.value)}
                   className={inputClass} />
               </div>
-              <SelloConsentPanel expanded={consentExpanded} setExpanded={setConsentExpanded}
-                terms={acceptedTerms} setTerms={setAcceptedTerms} choices={choices} setChoices={setChoices}
-                minor={isMinor(birthDate)} guardianEmail={guardianEmail} setGuardianEmail={setGuardianEmail}/>
+              {birthDate&&isMinor(birthDate)&&<label className="block text-sm text-gray-700">Correo del representante legal *<input type="email" required value={guardianEmail} onChange={e=>setGuardianEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2.5" /></label>}
+              <p className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-800">Después de confirmar tu cuenta e iniciar sesión podrás revisar y registrar las condiciones. Administración verificará la solicitud antes de habilitar el acceso.</p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
                 <input type="password" required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}

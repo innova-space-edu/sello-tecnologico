@@ -27,7 +27,7 @@ assert.equal(check(early, previousSnapshot, true, november), true, "Cuenta antig
 assert.equal(check(early, previousSnapshot, false, november), false, "No activar bandera sin intervención")
 assert.equal(check(null, null, false, october), true, "Antigüedad no comprobable: no abrir acceso")
 
-const proxy = readFileSync(proxyPath, "utf8")
+const proxy = readFileSync(proxyPath, "utf8") + "\n" + readFileSync("src/lib/family-consent/account-status.ts", "utf8")
 const pending = readFileSync(pendingPath, "utf8")
 assert.match(proxy, /family_authorization_requests/, "Solo permitir autorizaciones institucionales registradas")
 assert.match(proxy, /platform_access/, "El permiso de acceso debe constar expresamente")
