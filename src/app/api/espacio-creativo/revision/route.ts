@@ -50,6 +50,8 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const { user } = await requireAdminSession()
+    const role=await createAdminSupabaseClient().from('profiles').select('role,blocked').eq('id',user.id).maybeSingle()
+    if(role.error||role.data?.role!=='admin'||role.data.blocked)return NextResponse.json({error:'Acceso exclusivo de administración.'},{status:403})
     const body = await request.json().catch(() => ({}))
     const id = typeof body.id === 'string' ? body.id : ''
     const action = body.action === 'publish' ? 'published'
