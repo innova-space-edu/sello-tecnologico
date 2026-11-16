@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
+import CreativeEvidenceCatalog from '@/components/creative/CreativeEvidenceCatalog'
+import CreativeAdminEdit from '@/components/creative/CreativeAdminEdit'
 
 type Work = {
   id: string
@@ -11,7 +13,8 @@ type Work = {
   description: string
   tags: string[]
   type: 'image' | 'video' | 'audio'
-  status: 'pending' | 'published'
+  status: 'pending' | 'published' | 'rejected'
+  updatedAt:string
   date: string
   publicationBasis: 'personal' | 'institutional'
   canMarkInstitutional: boolean
@@ -20,6 +23,7 @@ type Work = {
 
 export default function RevisarEspacioCreativo() {
   const [works, setWorks] = useState<Work[]>([])
+  const [editing,setEditing]=useState<Work|null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
@@ -43,7 +47,8 @@ export default function RevisarEspacioCreativo() {
 
   useEffect(() => { void reload() }, [reload])
 
-  const review = async (work: Work, action: 'publish' | 'reject') => {
+  const review = async (work: Work, action: 'publish' | 'reject' | 'restore') => {
+    if(action==='reject'&&!window.confirm('¿Retirar esta obra de la galería pública? Se conservará en el archivo privado.'))return
     setBusyId(work.id)
     setError('')
     setConsentHelp(false)
@@ -73,6 +78,7 @@ export default function RevisarEspacioCreativo() {
 
   const pending = works.filter(work => work.status === 'pending')
   const published = works.filter(work => work.status === 'published')
+  const rejected = works.filter(work=>work.status==='rejected')
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -88,13 +94,16 @@ export default function RevisarEspacioCreativo() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link href="/admin" className="inline-flex items-center rounded-full border border-blue-200 bg-white px-5 py-3 text-sm font-bold text-blue-800 shadow-sm hover:bg-blue-50">← Volver a Administración</Link>
-              <Link href="/espacio-creativo" className="rounded-full bg-blue-700 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800">Ver galería</Link>
+              <Link href="/espacio-creativo" className="rounded-full bg-blue-700 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800">Ver galería / agregar evidencia</Link>
             </div>
           </div>
 
+          <CreativeEvidenceCatalog onImported={()=>void reload()}/>
+          {editing&&<CreativeAdminEdit key={editing.id} work={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);void reload()}}/>}
           <div className="my-7 flex flex-wrap gap-3">
             <span className="rounded-full bg-amber-100 px-5 py-2 text-sm font-bold text-amber-900">Pendientes: {pending.length}</span>
             <span className="rounded-full bg-emerald-100 px-5 py-2 text-sm font-bold text-emerald-900">Publicadas: {published.length}</span>
+            <span className="rounded-full bg-slate-100 px-5 py-2 text-sm font-bold">Retiradas: {rejected.length}</span>
             <button type="button" onClick={() => void reload()} className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-bold">Actualizar</button>
           </div>
           {error && (
@@ -113,7 +122,7 @@ export default function RevisarEspacioCreativo() {
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">No hay obras pendientes ni publicadas.</div>
           ) : (
             <div className="space-y-10">
-              {[{ heading: 'Pendientes de revisión', rows: pending }, { heading: 'Obras en exhibición', rows: published }].map(section => (
+              {[{ heading: 'Pendientes de revisión', rows: pending }, { heading: 'Obras en exhibición', rows: published },{heading:'Retiradas o rechazadas',rows:rejected}].map(section => (
                 <section key={section.heading}>
                   <h2 className="mb-4 text-xl font-black text-slate-800">{section.heading}</h2>
                   {section.rows.length === 0 ? <p className="rounded-xl bg-white p-5 text-sm text-slate-500">Sin obras en esta categoría.</p> : (
@@ -161,10 +170,11 @@ export default function RevisarEspacioCreativo() {
                                 <button type="button" disabled={busyId === work.id} onClick={() => void review(work, 'publish')}
                                   className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">Aprobar</button>
                               )}
-                              <button type="button" disabled={busyId === work.id} onClick={() => void review(work, 'reject')}
+                              <button type="button" disabled={!!busyId} onClick={()=>setEditing(work)} className="rounded-full bg-blue-100 px-4 py-2 text-xs font-bold text-blue-800">Editar</button>
+                              {work.status==='rejected'?<button type="button" disabled={!!busyId} onClick={()=>void review(work,'restore')} className="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold">Recuperar</button>:<button type="button" disabled={busyId === work.id} onClick={() => void review(work, 'reject')}
                                 className="rounded-full bg-rose-100 px-4 py-2 text-xs font-bold text-rose-800 disabled:opacity-50">
-                                {work.status === 'published' ? 'Retirar' : 'Rechazar'}
-                              </button>
+                                {work.status === 'published' ? 'Eliminar de galería' : 'Rechazar'}
+                              </button>}
                             </div>
                           </div>
                         </article>
