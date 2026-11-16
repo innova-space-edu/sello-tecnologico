@@ -32,7 +32,7 @@ function Media({ work, large = false }: { work: Work, large?: boolean }) {
     return <img src={work.url} alt={work.title + ' de ' + work.author} loading={large ? 'eager' : 'lazy'} className="h-full w-full object-contain" />
   }
   if (work.type === 'video') {
-    return <video src={work.url} controls={large} preload="metadata" playsInline className="h-full w-full object-contain" aria-label={work.title} />
+    return <video src={work.url} controls={large} preload={large ? "metadata" : "none"} playsInline className="h-full w-full object-contain" aria-label={work.title} />
   }
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-gradient-to-br from-indigo-950 via-fuchsia-950 to-slate-950 px-5 text-center">
@@ -83,6 +83,11 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
   }, [])
 
   useEffect(() => { void loadWorks() }, [loadWorks])
+  // Refresh signed links before expiry without exposing private storage paths.
+  useEffect(() => {
+    const timer=window.setInterval(()=>void loadWorks(),240000)
+    return ()=>window.clearInterval(timer)
+  },[loadWorks])
 
   useEffect(() => {
     if (!works.length || deepLinkApplied.current) return
