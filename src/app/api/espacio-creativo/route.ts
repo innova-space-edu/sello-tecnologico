@@ -6,7 +6,7 @@ import {
   CREATIVE_EXTENSIONS, eligiblePublicAuthors, shortText,
 } from '@/lib/creative-space'
 import { normalizeCreativeTags } from '@/lib/creative-space-public'
-import {isTemporaryExample,exampleRemainingSeconds,TEMPORARY_EXAMPLE_AUTHOR} from '@/lib/creative-temporary-example'
+import {isTemporaryExample,exampleRemainingSeconds,TEMPORARY_EXAMPLE_AUTHOR,TEMPORARY_EXAMPLE_TAG} from '@/lib/creative-temporary-example'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => ({}))
+  const temporary=body.temporaryExample===true
   const title = shortText(body.title, 160)
   const author = shortText(body.author, 120)
   const description = shortText(body.description, 1200)
@@ -103,28 +104,37 @@ export async function POST(request: Request) {
 
   try {
     const admin = createAdminSupabaseClient()
+    if(temporary){
+      if(body.anonymizedCopyVerified!==true||body.authorshipAndPermissionsVerified!==true||author!==TEMPORARY_EXAMPLE_AUTHOR||mime!=='image/jpeg'||description||tags.length||name!=='ejemplo-temporal.jpg'||typeof body.sourceId!=='string'||! /^[0-9a-f-]{36}$/i.test(body.sourceId))return NextResponse.json({error:'Confirma la anonimización y los derechos de la copia, y utiliza la versión JPEG preparada por el editor.'},{status:400,headers:noStore})
+      const {data:source,error:sourceError}=await admin.from('creative_space_works').select('id,status,media_type,storage_path,tags').eq('id',body.sourceId).maybeSingle()
+      if(sourceError||!source||source.status!=='pending'||source.media_type!=='image'||source.storage_path===path||isTemporaryExample(source.tags))return NextResponse.json({error:'La obra original ya no está disponible para este proceso.'},{status:409,headers:noStore})
+    }
     const { data: entries, error: uploadError } = await admin.storage
       .from(CREATIVE_BUCKET).list(user.id, { search: filename, limit: 100 })
     if (uploadError) throw uploadError
     const uploaded = (entries ?? []).find(entry => entry.name === filename)
     if (!uploaded) return NextResponse.json({ error: 'El archivo aún no se ha subido.' }, { status: 400, headers: noStore })
     const storedSize = Number(uploaded.metadata?.size)
+    const storedMime=String(uploaded.metadata?.mimetype??'').split(';')[0].toLowerCase()
+    if(temporary&&(!Number.isFinite(storedSize)||storedMime!=='image/jpeg'))return NextResponse.json({error:'No se pudo verificar el archivo JPEG.'},{status:400,headers:noStore})
     if (Number.isFinite(storedSize) && storedSize !== size) {
       return NextResponse.json({ error: 'El tamaño del archivo no coincide.' }, { status: 400, headers: noStore })
     }
 
+    const now=new Date().toISOString()
     const { data: saved, error } = await admin.from('creative_space_works')
       .insert({
         uploader_id: user.id, author_name: author, title, description, tags,
         media_type: CREATIVE_MIMES[mime], mime_type: mime,
         file_name: name, file_size: size, storage_path: path,
-        rights_confirmed: true, status: 'pending',
+        rights_confirmed: true, status: temporary?'published':'pending',
+        ...(temporary?{tags:[TEMPORARY_EXAMPLE_TAG],publication_basis:'institutional',institutional_attested_at:now,institutional_attested_by:user.id,reviewed_at:now,reviewed_by:user.id,published_at:now}:{}),
       })
       .select('id').single()
     if (error) throw error
     return NextResponse.json({
       ok: true, id: saved.id,
-      message: 'Obra recibida. Se mostrará en la galería cuando sea revisada y autorizada.',
+      message: temporary?'Ejemplo anónimo publicado por seis meses. El original sigue privado.':'Obra recibida. Se mostrará en la galería cuando sea revisada y autorizada.',
     }, { status: 201, headers: noStore })
   } catch {
     return NextResponse.json({ error: 'No fue posible registrar el material. Intenta nuevamente.' }, { status: 503, headers: noStore })
