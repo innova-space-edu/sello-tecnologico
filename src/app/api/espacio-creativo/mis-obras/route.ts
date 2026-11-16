@@ -6,6 +6,7 @@ import {
   normalizeCreativeTags,
 } from '@/lib/creative-space-public'
 import { shortText } from '@/lib/creative-space'
+import {isTemporaryExample,exampleRemainingSeconds,TEMPORARY_EXAMPLE_AUTHOR,TEMPORARY_EXAMPLE_TAG} from '@/lib/creative-temporary-example'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -80,7 +81,7 @@ export async function PATCH(request: Request) {
     }
 
     const { data: work, error: readError } = await admin.from('creative_space_works')
-      .select('id,uploader_id,status,storage_path,updated_at').eq('id', id).maybeSingle()
+      .select('id,uploader_id,status,storage_path,updated_at,tags,created_at').eq('id', id).maybeSingle()
     if (readError) throw readError
     if (!work) {
       return NextResponse.json({ error: 'Obra no encontrada.' }, { status: 403, headers: noStore })
@@ -90,6 +91,10 @@ export async function PATCH(request: Request) {
         { status: 409, headers: noStore })
     }
 
+    const temporary=isTemporaryExample(work.tags)
+    if(temporary&&(exampleRemainingSeconds(work.created_at)<=0||author!==TEMPORARY_EXAMPLE_AUTHOR))return NextResponse.json({error:'Un ejemplo temporal no puede extender su vigencia ni incluir un autor identificable.'},{status:409,headers:noStore})
+    if(!temporary&&isTemporaryExample(tags))return NextResponse.json({error:'El marcador de ejemplo temporal se asigna al aprobar.'},{status:400,headers:noStore})
+    const retainedTags=temporary?[...tags.filter(t=>t.toLowerCase()!==TEMPORARY_EXAMPLE_TAG.toLowerCase()).slice(0,7),TEMPORARY_EXAMPLE_TAG]:tags
     const replacement = body.replacement
     const replacing = replacement !== null && replacement !== undefined
     let nextFile: Record<string, unknown> = {}
@@ -131,7 +136,7 @@ export async function PATCH(request: Request) {
     // Edits to published or rejected works revoke publication and trigger moderation.
     // Reset institutional attestation: no old approval can silently cover new content.
     const { data: updated, error: updateError } = await admin.from('creative_space_works').update({
-      title, author_name: author, description, tags,
+      title, author_name: author, description, tags:retainedTags,
       ...nextFile,
       rights_confirmed: true,
       status: 'pending', reviewed_at: null, reviewed_by: null, published_at: null,
