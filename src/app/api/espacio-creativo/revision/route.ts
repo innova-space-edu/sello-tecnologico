@@ -16,14 +16,18 @@ function failure(error: unknown) {
 export async function GET() {
   try {
     const { user } = await requireAdminSession()
+    const role = await createAdminSupabaseClient().from('profiles').select('role,blocked').eq('id',user.id).maybeSingle()
+    if(role.error||role.data?.role!=='admin'||role.data.blocked)return NextResponse.json({error:'Acceso exclusivo de administración.'},{status:403})
     const admin = createAdminSupabaseClient()
+    const rows:any[]=[]
+    for(let offset=0;;offset+=100){
     const { data, error } = await admin.from('creative_space_works')
-      .select('id,uploader_id,author_name,title,description,tags,media_type,storage_path,status,created_at,rights_confirmed,publication_basis')
-      .in('status', ['pending','published'])
+      .select('id,uploader_id,author_name,title,description,tags,media_type,storage_path,status,created_at,rights_confirmed,publication_basis,updated_at,file_name')
       .order('created_at', { ascending: false })
-      .limit(100)
-    if (error) throw error
-    const rows = data ?? []
+      .order('id',{ascending:true}).range(offset,offset+99)
+    if(error)throw error
+    rows.push(...(data??[]));if((data??[]).length<100)break
+    }
     const { data: urls, error: signError } = rows.length
       ? await admin.storage.from(CREATIVE_BUCKET).createSignedUrls(rows.map(row => row.storage_path), 1200)
       : { data: [], error: null }
@@ -32,7 +36,7 @@ export async function GET() {
     return NextResponse.json({
       works: rows.map(row => ({
         id: row.id, title: row.title, author: row.author_name, description: row.description, tags: row.tags ?? [],
-        type: row.media_type, status: row.status, date: row.created_at,
+        type: row.media_type, status: row.status, date: row.created_at, updatedAt:row.updated_at,fileName:row.file_name,
         publicationBasis: row.publication_basis,
         canMarkInstitutional: row.status === 'pending' && row.uploader_id === user.id,
         url: byPath.get(row.storage_path) ?? null,
@@ -46,10 +50,12 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const { user } = await requireAdminSession()
+    const role=await createAdminSupabaseClient().from('profiles').select('role,blocked').eq('id',user.id).maybeSingle()
+    if(role.error||role.data?.role!=='admin'||role.data.blocked)return NextResponse.json({error:'Acceso exclusivo de administración.'},{status:403})
     const body = await request.json().catch(() => ({}))
     const id = typeof body.id === 'string' ? body.id : ''
     const action = body.action === 'publish' ? 'published'
-      : body.action === 'reject' ? 'rejected' : ''
+      : body.action === 'reject' ? 'rejected' : body.action === 'restore' ? 'pending' : ''
     if (!/^[0-9a-f-]{36}$/i.test(id) || !action) {
       return NextResponse.json({ error: 'Solicitud inválida.' }, { status: 400 })
     }
@@ -58,13 +64,14 @@ export async function PATCH(request: Request) {
     const { data: work, error: workError } = await admin.from('creative_space_works')
       .select('id,uploader_id,rights_confirmed,status,updated_at')
       .eq('id', id).maybeSingle()
-    if (workError || !work || !['pending', 'published'].includes(work.status)) {
+    if (workError || !work || !['pending', 'published','rejected'].includes(work.status)) {
       return NextResponse.json({ error: 'Obra no disponible para revisión.' }, { status: 404 })
     }
     // La vía institucional solo puede declararla el administrador que cargó
     // el material y exige confirmación manual de ausencia de datos personales.
     const institutional = action === 'published' && body.institutionalNoPersonalData === true
     if (action === 'published') {
+      if(body.authorshipAndPermissionsVerified!==true)return NextResponse.json({error:'Confirma la autoría y las autorizaciones de todas las personas identificables antes de publicar.'},{status:400})
       if (work.status !== 'pending') {
         return NextResponse.json({ error: 'Esta obra ya fue revisada.' }, { status: 409 })
       }
@@ -87,11 +94,12 @@ export async function PATCH(request: Request) {
         }
       }
     }
+    if(action==='pending'&&work.status!=='rejected')return NextResponse.json({error:'Solo se pueden recuperar obras retiradas.'},{status:409})
     const reviewedAt = new Date().toISOString()
     const changes = {
       status: action,
-      reviewed_at: reviewedAt,
-      reviewed_by: user.id,
+      reviewed_at: action==='pending'?null:reviewedAt,
+      reviewed_by: action==='pending'?null:user.id,
       published_at: action === 'published' ? reviewedAt : null, updated_at: reviewedAt,
       ...(action === 'published' ? {
         publication_basis: institutional ? 'institutional' : 'personal',

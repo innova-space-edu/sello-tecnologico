@@ -18,7 +18,7 @@ export default async function EspacioCreativoPage() {
     : { data: null }
 
   const canUpload = Boolean(user && profile && !profile.blocked &&
-    ['admin','coordinador','utp','docente','estudiante'].includes(profile.role))
+    profile.role === 'admin')
 
   return (
     <main className="min-h-screen bg-[#090e1b] text-white">
@@ -36,9 +36,9 @@ export default async function EspacioCreativoPage() {
               className="inline-flex items-center gap-2 rounded-full border border-fuchsia-300/30 bg-white/10 px-4 py-2.5 font-bold text-white transition hover:border-fuchsia-300 hover:bg-white/20">
               ← Volver {profile?.role === 'admin' ? 'a Administración' : user ? 'a la plataforma' : 'a Comunidad'}
             </Link>
-            {profile?.role === 'admin' && (
+            {canUpload && (
               <Link href="/admin/espacio-creativo" className="rounded-full px-4 py-2 text-fuchsia-200 hover:bg-white/10">
-                Revisar obras
+                Administrar evidencias
               </Link>
             )}
             <Link href="/comunidad" className="rounded-full px-4 py-2 text-slate-300 transition hover:bg-white/10 hover:text-white">Comunidad</Link>

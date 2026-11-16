@@ -59,6 +59,8 @@ export async function PATCH(request: Request) {
   try {
     const { user, admin } = await currentAuthor()
     if (!user || !admin) return NextResponse.json({ error: 'Debes iniciar sesión con una cuenta habilitada.' }, { status: 401, headers: noStore })
+    const {data:role,error:roleError}=await admin.from('profiles').select('role,blocked').eq('id',user.id).maybeSingle()
+    if(roleError||role?.role!=='admin'||role.blocked)return NextResponse.json({error:'Solo administración puede editar la galería.'},{status:403,headers:noStore})
 
     const body = await request.json().catch(() => ({}))
     const id = body.id
@@ -80,8 +82,8 @@ export async function PATCH(request: Request) {
     const { data: work, error: readError } = await admin.from('creative_space_works')
       .select('id,uploader_id,status,storage_path,updated_at').eq('id', id).maybeSingle()
     if (readError) throw readError
-    if (!work || work.uploader_id !== user.id) {
-      return NextResponse.json({ error: 'Solo puedes editar las obras que subiste.' }, { status: 403, headers: noStore })
+    if (!work) {
+      return NextResponse.json({ error: 'Obra no encontrada.' }, { status: 403, headers: noStore })
     }
     if (work.updated_at !== expectedUpdatedAt) {
       return NextResponse.json({ error: 'La obra fue modificada. Actualiza la lista antes de editarla nuevamente.' },
@@ -135,7 +137,7 @@ export async function PATCH(request: Request) {
       status: 'pending', reviewed_at: null, reviewed_by: null, published_at: null,
       publication_basis: 'personal', institutional_attested_at: null,
       institutional_attested_by: null, updated_at: new Date().toISOString(),
-    }).eq('id', id).eq('uploader_id', user.id).eq('updated_at', expectedUpdatedAt)
+    }).eq('id', id).eq('updated_at', expectedUpdatedAt)
       .select('id').maybeSingle()
 
     if (updateError) throw updateError
@@ -146,8 +148,7 @@ export async function PATCH(request: Request) {
     if (replacing) {
       // Remove the old media only after the new database reference was committed.
       // A stale signed URL may otherwise point to a previously published asset.
-      const { error: removeError } = await admin.storage.from(CREATIVE_BUCKET).remove([work.storage_path])
-      if (removeError) console.error('Creative space: could not remove replaced asset', removeError.message)
+      // Preserve the old asset for the private portfolio archive. Its signed public URL expires.
     }
     return NextResponse.json({ ok: true, status: 'pending',
       message: 'Cambios guardados. La obra vuelve a revisión antes de exhibirse.' }, { headers: noStore })
