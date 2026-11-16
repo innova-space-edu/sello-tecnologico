@@ -34,9 +34,19 @@ function compatible(row:any){
  const mime=String(row.file_type||'').toLowerCase(),path=objectPath(row.file_url)
  return Boolean(path&&CREATIVE_MIMES[mime]&&Number.isSafeInteger(row.file_size)&&row.file_size>0&&row.file_size<=CREATIVE_MAX_BYTES)
 }
-export async function GET(){
+export async function GET(request:Request){
  try{
   const {db}=await administrator()
+  const previewId=new URL(request.url).searchParams.get('preview')
+  if(previewId){
+   if(!/^[0-9a-f-]{36}$/i.test(previewId))return respond({error:'Evidencia inválida.'},400)
+   const {data:row,error}=await db.from('evidences').select(columns).eq('id',previewId).maybeSingle()
+   if(error)throw error
+   if(!row||!compatible(row)||!String(row.file_type).startsWith('image/'))return respond({error:'No hay una imagen compatible disponible para copiar. Selecciona una fotografía corregida.'},404)
+   const {data,error:signError}=await db.storage.from('evidencias').createSignedUrl(objectPath(row.file_url)!,300)
+   if(signError||!data?.signedUrl)return respond({error:'No se pudo abrir la evidencia.'},404)
+   return respond({url:data.signedUrl})
+  }
   const rows:any[]=[]
   for(let offset=0;;offset+=100){
    const {data,error}=await db.from('evidences').select(columns).order('created_at',{ascending:false}).order('id',{ascending:true}).range(offset,offset+99)
