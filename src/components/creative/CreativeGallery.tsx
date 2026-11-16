@@ -60,7 +60,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
   const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
-  const [mode, setMode] = useState<Mode>('museum')
+  const [mode, setMode] = useState<Mode>('mosaic')
   const [focusId, setFocusId] = useState<string | null>(null)
   const [lightboxId, setLightboxId] = useState<string | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
@@ -153,15 +153,15 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-3 self-start">
             {canUpload && (
-              <Link href="/espacio-creativo/mis-obras"
+              <Link href="/admin/espacio-creativo"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-fuchsia-200/35 bg-white/10 px-6 py-4 font-bold text-white transition hover:bg-white/20">
-                ✎ Mis obras · Editar
+                Administrar evidencias
               </Link>
             )}
-            <button type="button" onClick={() => canUpload ? setUploadOpen(true) : window.location.assign('/login')}
+            {canUpload && <button type="button" onClick={() => setUploadOpen(true)}
               className="inline-flex items-center justify-center gap-3 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-7 py-4 font-black text-white shadow-[0_18px_50px_rgba(167,67,221,0.25)] transition hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(167,67,221,0.45)]">
-              <span className="text-xl">＋</span> {canUpload ? 'Subir material' : 'Inicia sesión para subir'}
-            </button>
+              <span className="text-xl">＋</span> Agregar evidencia
+            </button>}
           </div>
         </div>
 
@@ -254,7 +254,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
                     (work.id === selected.id ? 'border-fuchsia-300 bg-fuchsia-300/15' : 'border-white/10 bg-white/5 hover:border-white/30')}>
                   <div className="aspect-[4/3] overflow-hidden bg-slate-950"><Media work={work} /></div>
                   <p className="truncate px-3 pt-3 text-sm font-bold">{work.title}</p>
-                  <p className="truncate px-3 pb-3 text-xs text-slate-400">{work.author}</p>
+                  <p className="break-words px-3 pb-3 text-xs text-slate-400">{work.author}</p>
                 </button>
               ))}
             </div>
@@ -273,7 +273,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
                 <div className="flex items-start justify-between gap-2 px-2 pb-2 pt-4">
                   <div className="min-w-0">
                     <h2 className="truncate text-lg font-black">{work.title}</h2>
-                    <p className="mt-1 truncate text-sm text-slate-400">Por {work.author}</p>
+                    <p className="mt-1 break-words text-sm text-slate-400">Por {work.author}</p>
                     {!!work.tags?.length && <p className="mt-2 line-clamp-1 text-xs text-fuchsia-200">{work.tags.map(tag => '#' + tag).join(' · ')}</p>}
                   </div>
                   <button type="button" onClick={() => void share(work)} aria-label={'Compartir ' + work.title}
@@ -296,7 +296,7 @@ export default function CreativeGallery({ canUpload, viewerName }: Props) {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="truncate text-lg font-black">{openWork.title}</p>
-              <p className="truncate text-sm text-slate-400">Por {openWork.author}</p>
+              <p className="break-words text-sm text-slate-400">Por {openWork.author}</p>
             </div>
             <button type="button" onClick={() => setLightboxId(null)} autoFocus aria-label="Cerrar obra"
               className="rounded-full border border-white/20 px-5 py-3 text-sm font-bold hover:bg-white/15">Cerrar ✕</button>
@@ -426,7 +426,7 @@ function CreativeUploadModal({
               <input value={tagsText} onChange={event => setTagsText(event.target.value)}
                 placeholder="Arte, Ciencias, Podcast"
                 className="mt-2 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 font-normal text-white outline-none focus:border-fuchsia-300" />
-              <span className="mt-2 block text-xs font-normal text-slate-400">Hasta 8 etiquetas separadas por comas; podrás corregirlas en Mis obras.</span>
+              <span className="mt-2 block text-xs font-normal text-slate-400">Hasta 8 etiquetas separadas por comas; podrás corregirlas en Administración.</span>
             </label>
             <label className="block rounded-2xl border border-dashed border-fuchsia-300/35 bg-fuchsia-300/5 p-5 text-sm font-bold text-slate-200">
               Archivo: imagen, video o podcast *
