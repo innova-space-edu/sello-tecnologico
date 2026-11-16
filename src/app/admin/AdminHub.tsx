@@ -14,6 +14,9 @@ const sections = [
     description: 'Control institucional, consentimientos y revisión de contenido.',
     links: [
       { href: '/admin/autorizaciones-familiares', icon: '🛡️', title: 'Autorizaciones', subtitle: 'Solicitudes, firmas, decisiones y pendientes', counter: 'authPending' },
+      { href: '/admin/actas-privacidad', icon: '📑', title: 'Actas de privacidad y revisión', subtitle: 'Revisar condiciones personales y regularizar fechas de nacimiento', counter: '' },
+      { href: '/consentimiento', icon: '🔐', title: 'Mis condiciones', subtitle: 'Consultar o registrar condiciones de tu cuenta', counter: '' },
+      { href: '/autorizacion-pendiente', icon: '📅', title: 'Regularizar mi edad', subtitle: 'Enviar la fecha de nacimiento si aún no está registrada', counter: '' },
       { href: '/admin/actas-familiares', icon: '📜', title: 'Archivo de actas', subtitle: 'Folios, aprobaciones, revocaciones e historial', counter: 'acts' },
       { href: '/admin/moderacion', icon: '🚨', title: 'Moderación', subtitle: 'Alertas, incidentes y revisión de mensajes', counter: 'moderation' },
       { href: '/admin/espacio-creativo', icon: '🖼️', title: 'Revisión de galería', subtitle: 'Aprobar, rechazar o retirar obras', counter: '' },
