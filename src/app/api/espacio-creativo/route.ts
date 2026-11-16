@@ -6,6 +6,7 @@ import {
   CREATIVE_EXTENSIONS, eligiblePublicAuthors, shortText,
 } from '@/lib/creative-space'
 import { normalizeCreativeTags } from '@/lib/creative-space-public'
+import {isTemporaryExample,exampleRemainingSeconds,TEMPORARY_EXAMPLE_AUTHOR} from '@/lib/creative-temporary-example'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -32,15 +33,21 @@ export async function GET() {
     const personal = rows.filter(row => row.publication_basis !== 'institutional')
     const allowed = new Set<string>()
     for(let i=0;i<personal.length;i+=100){for(const id of await eligiblePublicAuthors(admin,personal.slice(i,i+100).map(row=>row.uploader_id)))allowed.add(id)}
-    const visible = rows.filter(row =>
-      row.publication_basis === 'institutional' || allowed.has(row.uploader_id))
+    const visible = rows.filter(row => isTemporaryExample(row.tags)
+      ? row.publication_basis==='institutional' && row.author_name===TEMPORARY_EXAMPLE_AUTHOR && row.media_type==='image' && exampleRemainingSeconds(row.created_at)>0
+      : row.publication_basis === 'institutional' || allowed.has(row.uploader_id))
     if (!visible.length) return NextResponse.json({ works: [] }, { headers: noStore })
 
-    const { data: links, error: linkError } = await admin.storage
-      .from(CREATIVE_BUCKET).createSignedUrls(visible.map(row => row.storage_path), 300)
-    if (linkError) throw linkError
-
-    const byPath = new Map((links ?? []).map(link => [link.path, link.signedUrl]))
+    const regular=visible.filter(row=>!isTemporaryExample(row.tags))
+    const {data:links,error:linkError}=regular.length?await admin.storage.from(CREATIVE_BUCKET).createSignedUrls(regular.map(row=>row.storage_path),300):{data:[],error:null}
+    if(linkError)throw linkError
+    const byPath=new Map((links??[]).map(link=>[link.path,link.signedUrl]))
+    for(const row of visible.filter(row=>isTemporaryExample(row.tags))){
+      const ttl=Math.min(300,exampleRemainingSeconds(row.created_at))
+      if(ttl<=0)continue
+      const {data,error}=await admin.storage.from(CREATIVE_BUCKET).createSignedUrl(row.storage_path,ttl)
+      if(!error&&data?.signedUrl)byPath.set(row.storage_path,data.signedUrl)
+    }
     const works = visible.flatMap(row => {
       const url = byPath.get(row.storage_path)
       return url ? [{
@@ -87,7 +94,7 @@ export async function POST(request: Request) {
     /^[a-f0-9-]{36}\.[a-z0-9]{2,5}$/i.test(filename)
 
   if (title.length < 2 || author.length < 2 || body.rightsConfirmed !== true ||
-      !validPath || tags === null || !CREATIVE_MIMES[mime] || !CREATIVE_EXTENSIONS[mime]?.includes(extension) ||
+      !validPath || tags === null || isTemporaryExample(tags) || !CREATIVE_MIMES[mime] || !CREATIVE_EXTENSIONS[mime]?.includes(extension) ||
       !Number.isSafeInteger(size) || size <= 0 || size > CREATIVE_MAX_BYTES || !name) {
     return NextResponse.json({
       error: 'Completa el título y el autor, confirma los derechos y selecciona un archivo válido (máximo 50 MB).',

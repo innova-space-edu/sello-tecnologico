@@ -35,3 +35,22 @@ for(const p of ['src/app/espacio-creativo/page.tsx','src/components/creative/Cre
  assert.equal(errors.length,0,p+': '+errors.map(x=>ts.flattenDiagnosticMessageText(x.messageText,' ')).join(', '))
 }
 console.log('OK: galería pública de lectura, permisos exclusivos del administrador, catálogo completo, autoría y revisión')
+
+import {runInNewContext} from 'node:vm'
+const helper={exports:{}}
+runInNewContext(ts.transpileModule(read('src/lib/creative-temporary-example.ts'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,helper)
+const {exampleExpiresAt,exampleRemainingSeconds,isTemporaryExample}=helper.exports
+assert.equal(exampleExpiresAt('2026-11-15T12:00:00.000Z'),'2027-05-15T12:00:00.000Z')
+assert.equal(exampleExpiresAt('2026-08-31T12:00:00.000Z'),'2027-02-28T12:00:00.000Z')
+assert.equal(exampleExpiresAt('invalid'),null)
+assert.equal(exampleRemainingSeconds('2026-11-15T12:00:00.000Z',Date.parse('2027-05-15T12:00:00.000Z')),0)
+assert.equal(isTemporaryExample(['Ejemplo temporal']),true)
+assert.match(review,/work\.uploader_id!==user\.id/)
+assert.match(review,/work\.author_name!==TEMPORARY_EXAMPLE_AUTHOR/)
+assert.match(review,/body\.anonymizedCopyVerified!==true/)
+assert.match(api,/exampleRemainingSeconds\(row\.created_at\)>0/)
+assert.match(api,/Math\.min\(300,exampleRemainingSeconds\(row\.created_at\)\)/)
+assert.match(edit,/retainedTags/)
+assert.match(review,/purgeExpiredCopy/)
+assert.match(admin,/Eliminar copia vencida/)
+console.log('OK: ejemplos anónimos, seis meses sin prórroga y eliminación privada controlada')
