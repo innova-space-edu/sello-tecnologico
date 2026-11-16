@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { AdminAuthorizationError, requireAdminSession } from '@/lib/admin-auth'
 import { createAdminSupabaseClient } from '@/lib/supabase-admin'
 import { CREATIVE_BUCKET, eligiblePublicAuthors } from '@/lib/creative-space'
+import { TEMPORARY_EXAMPLE_TAG,TEMPORARY_EXAMPLE_AUTHOR,isTemporaryExample,exampleExpiresAt,exampleRemainingSeconds } from '@/lib/creative-temporary-example'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,9 @@ export async function GET() {
         type: row.media_type, status: row.status, date: row.created_at, updatedAt:row.updated_at,fileName:row.file_name,
         publicationBasis: row.publication_basis,
         canMarkInstitutional: row.status === 'pending' && row.uploader_id === user.id,
+        canMarkTemporary: row.status === 'pending' && row.uploader_id === user.id && row.media_type==='image' && exampleRemainingSeconds(row.created_at)>0,
+        temporaryExample:isTemporaryExample(row.tags),
+        expiresAt:isTemporaryExample(row.tags)?exampleExpiresAt(row.created_at):null,
         url: byPath.get(row.storage_path) ?? null,
       })),
     }, { headers: { 'Cache-Control': 'no-store' } })
@@ -62,14 +66,18 @@ export async function PATCH(request: Request) {
 
     const admin = createAdminSupabaseClient()
     const { data: work, error: workError } = await admin.from('creative_space_works')
-      .select('id,uploader_id,rights_confirmed,status,updated_at')
+      .select('id,uploader_id,rights_confirmed,status,updated_at,tags,created_at,media_type,author_name')
       .eq('id', id).maybeSingle()
     if (workError || !work || !['pending', 'published','rejected'].includes(work.status)) {
       return NextResponse.json({ error: 'Obra no disponible para revisión.' }, { status: 404 })
     }
     // La vía institucional solo puede declararla el administrador que cargó
     // el material y exige confirmación manual de ausencia de datos personales.
-    const institutional = action === 'published' && body.institutionalNoPersonalData === true
+    const temporary = action === 'published' && body.temporaryExample === true
+    const institutional = action === 'published' && (body.institutionalNoPersonalData === true || temporary)
+    if(action==='published' && isTemporaryExample(work.tags) && !temporary)return NextResponse.json({error:'Este ejemplo temporal no se puede convertir en una publicación permanente.'},{status:409})
+    if(temporary && (work.uploader_id!==user.id || work.media_type!=='image' || body.anonymizedCopyVerified!==true || work.author_name!==TEMPORARY_EXAMPLE_AUTHOR || exampleRemainingSeconds(work.created_at)<=0))return NextResponse.json({error:'Sube una copia nueva anonimizada como administrador, con la atribución indicada, y verifica sus derechos. No se pueden aprobar originales de estudiantes por esta vía.'},{status:409})
+    if(action==='pending' && isTemporaryExample(work.tags) && exampleRemainingSeconds(work.created_at)<=0)return NextResponse.json({error:'La exhibición temporal venció y no puede recuperarse.'},{status:409})
     if (action === 'published') {
       if(body.authorshipAndPermissionsVerified!==true)return NextResponse.json({error:'Confirma la autoría y las autorizaciones de todas las personas identificables antes de publicar.'},{status:400})
       if (work.status !== 'pending') {
@@ -101,6 +109,7 @@ export async function PATCH(request: Request) {
       reviewed_at: action==='pending'?null:reviewedAt,
       reviewed_by: action==='pending'?null:user.id,
       published_at: action === 'published' ? reviewedAt : null, updated_at: reviewedAt,
+      ...(temporary ? {tags:[...((work.tags??[]) as string[]).filter(t=>t.toLowerCase()!==TEMPORARY_EXAMPLE_TAG.toLowerCase()).slice(0,7),TEMPORARY_EXAMPLE_TAG]} : {}),
       ...(action === 'published' ? {
         publication_basis: institutional ? 'institutional' : 'personal',
         institutional_attested_at: institutional ? reviewedAt : null,
