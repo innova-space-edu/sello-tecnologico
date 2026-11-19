@@ -13,6 +13,9 @@ SOURCE_BUCKET = "evidencias"
 TARGET_BUCKET = "innova-crealab"
 PREFIX = "evidencias/"
 CHUNK = 1024 * 1024
+# Fase 1: techo local conservador; no representa un límite de facturación de Cloudflare.
+MAX_TARGET_BYTES = 2_000_000_000
+MAX_SOURCE_OBJECTS = 1000
 
 def digest(stream, output=None):
     sha = hashlib.sha256()
@@ -129,6 +132,12 @@ def main():
         raise RuntimeError("Espacio insuficiente para respaldo completo")
     target = client("R2", "auto")
     target.head_bucket(Bucket=TARGET_BUCKET)
+    # Conservar margen incluso contando dos veces objetos ya copiados.
+    existing = [o for page in target.get_paginator("list_objects_v2").paginate(Bucket=TARGET_BUCKET)
+                for o in page.get("Contents", [])]
+    existing_bytes = sum(o["Size"] for o in existing)
+    if total + existing_bytes > MAX_TARGET_BYTES or len(items) > MAX_SOURCE_OBJECTS:
+        raise RuntimeError("Migración bloqueada por presupuesto local de 2 GB / 1000 objetos")
     # Never publish the manifest. File names and metadata may be personal data.
     manifest = directory / "manifest.jsonl"
     with manifest.open("w", encoding="utf-8") as log:
