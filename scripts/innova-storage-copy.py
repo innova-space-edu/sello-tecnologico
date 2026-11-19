@@ -35,7 +35,7 @@ def client(prefix, region):
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise ValueError("Se requiere un endpoint HTTPS sin credenciales en URL")
     if prefix == "SUPABASE":
-        if parsed.hostname != "xfleqorozycfdmefdejs.supabase.co" or parsed.path.rstrip("/") != "/storage/v1/s3":
+        if parsed.hostname not in {"xfleqorozycfdmefdejs.supabase.co", "xfleqorozycfdmefdejs.storage.supabase.co"} or parsed.path.rstrip("/") != "/storage/v1/s3":
             raise ValueError("El endpoint no pertenece al proyecto CreaLab esperado")
     elif not parsed.hostname.endswith(".r2.cloudflarestorage.com"):
         raise ValueError("El endpoint no corresponde a R2")
