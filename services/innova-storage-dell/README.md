@@ -60,3 +60,8 @@ La última prueba crea un PostgreSQL temporal de Docker sin red ni puertos, con 
 - Presigned R2: https://developers.cloudflare.com/r2/api/s3/presigned-urls/
 - CORS R2: https://developers.cloudflare.com/r2/buckets/cors/
 - Supabase API/RLS: https://supabase.com/docs/guides/api/securing-your-api
+
+## Revisión de infraestructura 19-11-2026
+- Cloudflare Tunnel existente `intranet-dell` healthy, con seis hostnames configurados. El hostname propuesto `storage-api.innova-space-edu.cl` no tiene registro DNS en la zona según consulta de solo lectura; **no se creó DNS ni se modificó túnel**.
+- El agente administrador del Dell no permite instalar esta nueva API directamente desde ChatGPT sin una operación aprobada por el propietario. Código y tests están preparados en GitHub para revisión previa.
+- Para utilizar el túnel existente, el servicio deberá compartir una red Docker controlada con `intranet-tunnel` o emplear una ruta host explícita; nunca asumir que `127.0.0.1` de un contenedor apunta al anfitrión.
