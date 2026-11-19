@@ -25,7 +25,7 @@ function objectKey(value: unknown): string | null {
 // Disabled by default. Only a single administrator-selected record, no arbitrary object key.
 // Server-side read: neither the signed URL nor the object bytes are sent to the browser.
 export async function GET() {
-  if (process.env.INNOVA_R2_PILOT_ENABLED !== 'true') return reply({error:'No disponible'},404)
+  if (process.env.VERCEL_ENV !== 'preview' || process.env.VERCEL_GIT_COMMIT_REF !== 'feat/innova-storage-r2-migration' || process.env.INNOVA_R2_PILOT_ENABLED !== 'true') return reply({error:'No disponible'},404)
   try {
     const {supabase,user} = await requireAdminSession()
     const {data:profile,error:profileError} = await supabase.from('profiles').select('role,blocked').eq('id',user.id).maybeSingle()
