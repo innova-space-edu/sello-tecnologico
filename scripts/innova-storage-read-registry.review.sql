@@ -39,8 +39,8 @@ security invoker
 set search_path = ''
 as $$
 declare
-  v_day date := (now() at time zone 'UTC')::date;
-  v_month date := date_trunc('month',v_day::timestamp)::date;
+  v_day date;
+  v_month date;
   v_global constant uuid := '00000000-0000-0000-0000-000000000000';
   v_bytes bigint;
   v_ops bigint;
@@ -48,10 +48,12 @@ declare
   rec record;
 begin
   if p_user_id is null or p_user_id=v_global or p_evidence_id is null then return false; end if;
-  select size_bytes into v_bytes from public.innova_r2_evidence_registry
-    where evidence_id=p_evidence_id and enabled and size_bytes between 1 and 1000000;
-  if v_bytes is null then return false; end if;
   perform pg_catalog.pg_advisory_xact_lock(789051628::bigint);
+  v_day := (clock_timestamp() at time zone 'UTC')::date;
+  v_month := date_trunc('month',v_day::timestamp)::date;
+  select size_bytes into v_bytes from public.innova_r2_evidence_registry
+    where evidence_id=p_evidence_id and enabled and size_bytes between 1 and 1000000 for share;
+  if v_bytes is null then return false; end if;
   for rec in select * from (values
     ('day'::text,v_day,v_global,100::bigint,100000000::bigint),
     ('month'::text,v_month,v_global,1000::bigint,1000000000::bigint),
