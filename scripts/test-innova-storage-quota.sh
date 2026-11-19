@@ -10,9 +10,10 @@ cleanup() { docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$tmp"; }
 trap cleanup EXIT
 docker run -d --name "$name" --network none --memory 384m --cpus 1 --tmpfs /var/lib/postgresql/data:rw,size=256m -e POSTGRES_HOST_AUTH_METHOD=trust "$image" >/dev/null
 for i in $(seq 1 60); do
-  if docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  if docker exec "$name" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then break; fi
   sleep 1
 done
+docker exec "$name" pg_isready -h 127.0.0.1 -U postgres >/dev/null
 psql_local() { docker exec -i "$name" psql -X -v ON_ERROR_STOP=1 -U postgres "$@"; }
 psql_local -c "create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;"
 psql_local < scripts/innova-storage-read-registry.review.sql
