@@ -44,3 +44,9 @@ El directorio de ejemplo debe estar en un volumen protegido y ser accesible solo
 
 ## Hallazgo
 El bucket es público y las políticas actuales admiten lectura pública y eliminación por cualquier autenticado. La aplicación usa ese bucket para evidencias y adjuntos de mensajería. El inventario del día no contiene objetos con prefijo mensajes/. El corte de acceso requiere revisar autorización por registro; no basta con cambiar el dominio.
+
+## Presupuesto cero y límites de seguridad
+
+R2 Standard: 10 GB-mes, 1 millón de operaciones A y 10 millones B mensuales, compartidos por la cuenta. No es un límite duro de facturación. Bucket privado innova-crealab creado el 19-11-2026. Alerta de presupuesto proyectado USD 0.01 creada y verificada. No activar Infrequent Access, R2 SQL, Data Catalog ni Workers de pago para esta migración.
+
+El script de fase 1 rechaza la copia antes de escribir si el inventario de origen más el destino supera 2.000.000.000 bytes o si el origen supera 1000 objetos. No controla otras aplicaciones o credenciales ni el consumo real de facturación. Ejecutar sin otros escritores concurrentes. Para la fase 2, aplicar un límite global de 8 GB (propuesta: CreaLab 3 GB, EduAI 4 GB y otros 1 GB), 500.000 A y 5.000.000 B por ciclo de facturación, mediante contabilidad central, reserva atómica de capacidad, límites de tamaño y frecuencia, expiración de enlaces, rechazo de escrituras y derivación al Dell. No habilitar carga real en producción hasta probar estas medidas. Monitorear métricas oficiales y mantener margen adicional frente a retraso de medición, concurrencia y accesos externos. No borrar documentos para cumplir una cuota sin respaldo verificado y autorización.
