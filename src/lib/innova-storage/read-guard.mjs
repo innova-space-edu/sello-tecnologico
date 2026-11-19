@@ -1,6 +1,6 @@
 // Only a trusted registry entry may identify an R2 object.
 // Never derive a private object's key solely from mutable evidence URLs.
-export function matchesEvidence(row, entry, userId, role) {
+export function matchesEvidence(row, entry, userId, role, maxBytes = 1000000) {
   if (!row || !entry || entry.enabled !== true || !userId) return false
   // Preview intentionally permits only the original author and a validated admin.
   // Project collaborators and archived references require separate authorization review.
@@ -11,7 +11,7 @@ export function matchesEvidence(row, entry, userId, role) {
     && Number(row.file_size) === Number(entry.size_bytes)
     && row.file_type === entry.mime_type
     && Number.isSafeInteger(Number(entry.size_bytes))
-    && Number(entry.size_bytes) > 0 && Number(entry.size_bytes) <= 1000000
+    && Number(entry.size_bytes) > 0 && Number(entry.size_bytes) <= maxBytes
     && /^[a-f0-9]{64}$/.test(entry.sha256)
 }
 export function safeMediaType(mime) {
