@@ -10,7 +10,7 @@ const row = { id: EVIDENCE, project_id: PROJECT, created_by: USER, file_url: FIL
 const registry = { evidence_id:EVIDENCE, project_id: PROJECT, created_by: USER, legacy_url:FILE_URL, source_key: USER + '/video.mp4', size_bytes:50_000_000, mime_type:'video/mp4', sha256:'a'.repeat(64), enabled:true }
 const environment = {
   INNOVA_STORAGE_DELL_ENABLED: 'true', SUPABASE_URL: 'https://xfleqorozycfdmefdejs.supabase.co',
-  SUPABASE_ANON_KEY:'anon-test', SUPABASE_SERVICE_ROLE_KEY:'service-test',
+  SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test', SUPABASE_SECRET_KEY:'sb_secret_test',
   R2_ACCESS_KEY_ID:'r2-read-test', R2_SECRET_ACCESS_KEY:'r2-private-test',
   R2_ACCOUNT_ID:'84ed45de70a021c365e93b960c406d48',
   ALLOWED_ORIGINS:'https://sello-tecnologico.vercel.app'
@@ -43,8 +43,8 @@ test('full authorization: user JWT RLS, registry, quota then signed link',async(
   assert.equal(result.body.size_bytes,50_000_000)
   assert.equal(result.body.expires_in,60)
   assert.equal(calls.length,5)
-  assert.ok(calls.slice(0,3).every(x=>x.auth==='Bearer my-valid-jwt-token-1234567890' && x.apiKey==='anon-test'))
-  assert.ok(calls.slice(3).every(x=>x.auth==='Bearer service-test' && x.apiKey==='service-test'))
+  assert.ok(calls.slice(0,3).every(x=>x.auth==='Bearer my-valid-jwt-token-1234567890' && x.apiKey==='sb_publishable_test'))
+  assert.ok(calls.slice(3).every(x=>x.auth===undefined && x.apiKey==='sb_secret_test'))
 })
 test('all malformed or short tokens denied before network',async()=>{
   const {calls,fetcher}=fakeDeps()
@@ -81,7 +81,7 @@ test('disabled by default; only explicit allowed origins',async()=>{
   assert.equal(off.enabled,false)
   assert.equal((await authorizeEvidence('my-valid-jwt-token-1234567890',EVIDENCE,off)).status,404)
   assert.throws(()=>loadConfig({...environment,ALLOWED_ORIGINS:'*'}))
-  assert.throws(()=>loadConfig({...environment,SUPABASE_SERVICE_ROLE_KEY:''}))
+  assert.throws(()=>loadConfig({...environment,SUPABASE_SECRET_KEY:''}))
   assert.throws(()=>loadConfig({...environment,SUPABASE_URL:'https://other.supabase.co'}))
   const handler=createHandler(config)
   const req={headers:{origin:'https://untrusted.example'},method:'OPTIONS',url:'/v1/evidences/'+EVIDENCE+'/authorize'}
@@ -117,4 +117,14 @@ test('HTTP handler accepts browser bearer tokens and supplies exact-origin CORS 
   assert.equal(headers['Cache-Control'],'private, no-store')
   assert.equal(body.expires_in,60)
   assert.equal(deps.calls.length,5)
+})
+
+test('reject old Supabase API keys and never send a secret as Bearer',async()=>{
+  assert.throws(()=>loadConfig({...environment,SUPABASE_SECRET_KEY:'eyJ.legacy.jwt'}))
+  assert.throws(()=>loadConfig({...environment,SUPABASE_PUBLISHABLE_KEY:'eyJ.old.jwt'}))
+  const deps=fakeDeps()
+  const r=await authorizeEvidence('my-valid-jwt-token-1234567890',EVIDENCE,config,deps.fetcher,signer)
+  assert.equal(r.status,200)
+  assert.equal(deps.calls[3].auth,undefined)
+  assert.equal(deps.calls[4].auth,undefined)
 })
