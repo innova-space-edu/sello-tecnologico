@@ -1,6 +1,7 @@
 # Example only. Do not run against production until the quota RPC and tunnel are reviewed.
 services:
   innova-storage-authorizer:
+    image: innova-storage-gateway:local-test
     build:
       context: ../..
       dockerfile: services/innova-storage-dell/Dockerfile
