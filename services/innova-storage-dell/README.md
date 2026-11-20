@@ -126,3 +126,19 @@ Crea un contenedor **efímero** con `INNOVA_STORAGE_DELL_ENABLED=true` *solo* co
 **Este smoke test no sustituye la prueba con sesión autenticada real** ni la auditoría de autorización por propietario/roles. El backend sigue sin exponerse por Internet, y el cliente CreaLab permanece apagado. Para comprobar esa ruta completa será necesario definir un flujo de prueba con JWT de sesión gestionado localmente (sin copiarlo a chats ni logs), confirmando que el usuario sin permiso recibe 404 y que solo el usuario autorizado obtiene un enlace temporal.
 
 Documentación oficial de Dockerfile-specific ignore: https://docs.docker.com/build/concepts/context/#filename-and-location.
+
+## Prueba autenticada real del gateway (contendor EFÍMERO, sin publicar puertos)
+Una vez aprobados el preflight de credenciales y la prueba local de denegaciones (ambas PASS):
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/smoke-real-session.sh
+```
+- Solicita **localmente en SSH** correo y contraseña de una cuenta autorizada de CreaLab; el secreto se introduce oculto en el terminal y se envía por stdin al contenedor de prueba; no se copia al chat ni se guarda en archivos. Usar la cuenta administradora o creadora de la evidencia piloto. La aplicación CreaLab utiliza `supabase.auth.signInWithPassword`.
+- El script sigue exigiendo que `storage.env` sea del usuario y tenga permisos 0600, `INNOVA_STORAGE_DELL_ENABLED=false`. La función `loadConfig` se habilita **únicamente en la memoria del proceso efímero**.
+- Inicia un servidor HTTP Node en 127.0.0.1 con puerto efímero **dentro del contenedor**, sin `docker -p`. Solicita una sesión a Supabase Auth, envía el JWT al handler verdadero de la API, comprueba la autorización RLS y registro privado, reserva una sola lectura en el controlador de cuotas y verifica el GET S3 presign de R2 contra tamaño y SHA-256. Sólo el archivo piloto de 65.468 bytes.
+- El script oculta token, contraseña, archivo y URL firmada incluso ante fallo; solo informa el paso y, si hay fallo HTTP, el código. No tocar Cloudflare Tunnel, DNS, Vercel ni la configuración permanente.
+- **Efecto contable previsto:** una solicitud autorizada añade 1 operación y 65.468 bytes de capacidad reservada al día/mes y al contador del usuario. La prueba descarga una copia desde R2, pero no la redistribuye.
+- La prueba requiere inicio de sesión por contraseña. Si el usuario tiene MFA, no recuerda su contraseña o inicia sesión por otro proveedor, no bajar las protecciones; detener y preparar un flujo autenticado desde navegador que no exporte el JWT a un canal externo.
+- En caso de denegación de RLS/propiedad (404/403), revisar políticas, perfil y registro para la cuenta de prueba; **no** habilitar archivos nuevos ni eliminar RLS para corregir el test.
+- Esta prueba positiva con una cuenta autorizada no sustituye la prueba negativa de un usuario sin permisos ni la futura revisión de portafolios históricos. No activar la API pública sin ambos.
