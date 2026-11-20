@@ -40,7 +40,7 @@ La última prueba crea un PostgreSQL temporal de Docker sin red ni puertos, con 
 ## Preinstalación segura (NO ejecutar aún)
 1. Auditar el PR y la función SQL; confirmar que la prueba de concurrencia supera.
 2. Decidir el hostname de autorización, por ejemplo `storage-api.innova-space-edu.cl`, y examinar el Cloudflare Tunnel existente. Configurar reglas de acceso y WAF/rate limiting sin publicar el origen directamente. **El contenedor actual de cloudflared NO puede alcanzar directamente el 127.0.0.1 del anfitrión**: para conectarlo al servicio hay que aprobar una red Docker compartida privada (origen como `http://innova-storage-authorizer:8080`) o un gateway explícito en el anfitrión. La publicación local `127.0.0.1:8788` sirve solo para pruebas desde el Dell. No modificar redes del túnel existente sin revisar impacto en intranet.
-3. Crear archivo secreto exclusivo en Dell, fuera del repositorio, permisos 0600, con las claves de solo lectura R2 y Supabase. Nunca copiar secretos a GitHub, mensajes o `NEXT_PUBLIC_*`. `SUPABASE_SERVICE_ROLE_KEY` tiene privilegios elevados; limitar acceso al contenedor y valorar más adelante sustituirlo por un rol dedicado.
+3. Crear archivo secreto exclusivo en Dell, fuera del repositorio, permisos 0600, con las claves de solo lectura R2 y Supabase. Nunca copiar secretos a GitHub, mensajes o `NEXT_PUBLIC_*`. `SUPABASE_SECRET_KEY` tiene privilegios elevados; limitar acceso al contenedor y valorar más adelante sustituirlo por un rol dedicado.
 4. Definir `INNOVA_STORAGE_ENV_FILE` como ruta absoluta de ese archivo. Adaptar ALLOWED_ORIGINS a los dominios reales de CreaLab.
 5. Revisar y fijar el digest de la imagen Node 22 oficial antes de desplegar. `compose.example.yml` solo es una propuesta: puerto 127.0.0.1:8788, read_only, no-new-privileges, usuario no root, límites de memoria y CPU.
 6. Crear la ruta Cloudflare Tunnel al servicio local y probar `GET /healthz`; validar con cuenta admin, propietario y usuario ajeno. Mantener la variable Dell en false hasta completar SQL, prueba real y auditoría.
@@ -74,3 +74,16 @@ La última prueba crea un PostgreSQL temporal de Docker sin red ni puertos, con 
 - Comando de parada reversible: `INNOVA_STORAGE_ENV_FILE="$HOME/.config/innova-storage-dell/storage.env" docker compose --project-name innova-storage-gateway -f services/innova-storage-dell/compose.example.yml down`. No usar `--volumes`, `docker system prune` ni tocar otros proyectos.
 - El conector administrativo Dell no permitió preparar instalación de este nuevo servicio; estas acciones requieren SSH local y ejecución explícita por el propietario. No se ha hecho despliegue ni cambios en Cloudflare DNS/Tunnel o Vercel.
 - Registro verificado: 123 evidencias, solo 1 habilitada, 364.150.616 bytes registrados. El resto está deshabilitado, no autorizar masivamente hasta terminar auditoría y flujo.
+
+## Credenciales actuales de Supabase (claves nuevas)
+- La API usa `SUPABASE_PUBLISHABLE_KEY=sb_publishable_...` en `apikey` junto con el JWT de sesión en `Authorization` para efectuar las comprobaciones bajo RLS.
+- La API usa `SUPABASE_SECRET_KEY=sb_secret_...` **solo** en el encabezado `apikey` al consultar el registro y reservar cuota. No intenta usar claves opacas `sb_secret_` como `Bearer` JWT. Supabase documenta esta diferencia y recomienda reemplazar las claves antiguas antes del final de 2026.
+- Crear una secret key con nombre propio, por ejemplo `dell-storage`, desde el Dashboard de Supabase del proyecto CreaLab. Tratarla como privilegio elevado y almacenarla únicamente en el Dell. No reutilizarla en clientes.
+- Usar un par **R2 Object Read Only** específico para Dell y bucket `innova-crealab`; no copiar tokens en mensajes ni repositorios.
+- Para cargar valores localmente sin mostrarlos y sin habilitar el servicio, ejecutar por SSH:
+```bash
+cd ~/innova-storage/crealab
+bash services/innova-storage-dell/configure-local-credentials.sh
+```
+  El script pide cuatro claves ocultas y orígenes HTTPS permitidos; escribe exclusivamente `~/.config/innova-storage-dell/storage.env` con modo 0600, `INNOVA_STORAGE_DELL_ENABLED=false`, sin reiniciar ningún contenedor, sin tocar DNS ni Tunnel.
+- Después de configurar, **no cambiar aún `enabled=false`**, ni activar la URL pública; primero probar el servicio local autenticado, permisos y firma privada con una sola evidencia.
