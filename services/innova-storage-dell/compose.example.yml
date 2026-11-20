@@ -1,0 +1,28 @@
+# Example only. Do not run against production until the quota RPC and tunnel are reviewed.
+services:
+  innova-storage-authorizer:
+    image: innova-storage-gateway:local-test
+    build:
+      context: ../..
+      dockerfile: services/innova-storage-dell/Dockerfile
+    env_file:
+      - ${INNOVA_STORAGE_ENV_FILE:?Specify absolute path of protected Dell .env}
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8788:8080"
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD","node","-e","fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

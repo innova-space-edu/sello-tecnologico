@@ -1,0 +1,12 @@
+# Only the exact gateway code enters Docker build context.
+# Precedence is scoped to this Dockerfile; other project Docker builds unaffected.
+*
+!services/
+!services/innova-storage-dell/
+!services/innova-storage-dell/server.mjs
+!services/innova-storage-dell/Dockerfile
+!src/
+!src/lib/
+!src/lib/innova-storage/
+!src/lib/innova-storage/r2-sign.mjs
+!src/lib/innova-storage/read-guard.mjs
