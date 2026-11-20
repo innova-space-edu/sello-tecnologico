@@ -31,10 +31,10 @@
 En el Dell, desde la raíz del clon:
 ```bash
 git pull --ff-only origin feat/innova-storage-r2-migration
-node --test services/innova-storage-dell/server.test.mjs
-node scripts/test-innova-r2-sign.mjs
 INNOVA_TEST_PG_IMAGE=postgres:17-alpine bash scripts/test-innova-storage-dell-quota.sh
+bash services/innova-storage-dell/setup-local-disabled.sh
 ```
+El instalador usa **Node.js dentro de la imagen Docker**, sin instalar Node en Debian. Compila la imagen local, ejecuta las pruebas del gateway y la firma con `docker run --network none` y solo entonces inicia el contenedor con `enabled:false`. Puede descargar `node:22-alpine` si la imagen base no está almacenada localmente. No escribe credenciales reales.
 La última prueba crea un PostgreSQL temporal de Docker sin red ni puertos, con datos ficticios; no toca intranet ni Supabase. Esperar 40 solicitudes aceptadas y 20 rechazadas bajo concurrencia.
 
 ## Preinstalación segura (NO ejecutar aún)
