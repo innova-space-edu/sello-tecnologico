@@ -91,3 +91,30 @@ test('disabled by default; only explicit allowed origins',async()=>{
   assert.equal(code,403)
 })
 console.log('PASS: Dell gateway auth, fail-closed, RLS/role, 50MB grants, quotas, origin restrictions')
+
+test('HTTP handler accepts browser bearer tokens and supplies exact-origin CORS headers',async()=>{
+  const deps=fakeDeps()
+  const handler=createHandler(config,deps.fetcher,signer)
+  const headers={}
+  let status=0
+  let body
+  const req={
+    method:'POST',
+    url:'/v1/evidences/'+EVIDENCE+'/authorize',
+    headers:{
+      origin:'https://sello-tecnologico.vercel.app',
+      authorization:'Bearer my-valid-jwt-token-1234567890'
+    }
+  }
+  const res={
+    setHeader(k,v){headers[k]=v},
+    writeHead(code){status=code},
+    end(data){body=JSON.parse(data)}
+  }
+  await handler(req,res)
+  assert.equal(status,200)
+  assert.equal(headers['Access-Control-Allow-Origin'],'https://sello-tecnologico.vercel.app')
+  assert.equal(headers['Cache-Control'],'private, no-store')
+  assert.equal(body.expires_in,60)
+  assert.equal(deps.calls.length,5)
+})
