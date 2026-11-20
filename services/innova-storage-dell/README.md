@@ -155,3 +155,16 @@ bash services/innova-storage-dell/smoke-negative-registry.sh
 ```
 - Requiere login administrador por contraseña en terminal SSH; compara los contadores antes/después y exige HTTP 404 para un registro deshabilitado y un UUID inexistente. El contenedor es efímero y mantiene el servicio permanente `enabled=false`. El script pasó validación de sintaxis, no se ha ejecutado aún con sesión real.
 - Importante: esta prueba no demuestra que un usuario autenticado **ajeno al proyecto** esté bloqueado. Esa comprobación independiente aún requiere una cuenta de pruebas sin permisos para el archivo piloto. No usar las contraseñas de estudiantes para los ensayos.
+
+## Estado: negativas de archivo confirmadas, prueba de usuario ajeno pendiente
+- 19/11/2026 noche de Chile: operador ejecutó `smoke-negative-registry.sh`. PASS: administradora autenticada, registro deshabilitado 404, evidencia inexistente 404, sin links firmados ni cuota. La reserva en Supabase permanece en 1 operación y 65.468 bytes para 20/11 UTC, 3 operaciones y 196.404 bytes en el mes.
+- Registro: 123 comprobadas, 1 habilitada, 122 deshabilitadas. La comprobación anterior **no prueba todavía** que otra persona autenticada carezca de acceso a la evidencia habilitada.
+- Nuevo test con cuenta **docente no administradora, no autora** del archivo piloto:
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/smoke-nonowner-session.sh
+```
+- Solicita correo y contraseña localmente por SSH, ocultando contraseña y sin guardar el JWT. Exige que el perfil corresponda a `docente`, no esté bloqueado, y no sea propietario; caso contrario aborta, **sin** intentar usar claves de estudiantes. Inicia el handler real de Dell en un puerto efímero solo dentro del contenedor, exige HTTP 404 y comprueba que las cuotas no cambiaron.
+- Si no existe una cuenta docente de pruebas cuyo titular autorice su uso, **no tomar prestadas contraseñas ajenas ni de estudiantes**. Crear una cuenta dedicada de pruebas mediante el flujo normal de CreaLab y asignar el rol docente por la vía administrativa habitual. Esta acción no se automatiza en este PR.
+- Hasta completar este test y la revisión de rutas de lectura para colaboradores, **no modificar Cloudflare DNS/Tunnel ni habilitar la API de manera permanente**. Los originales públicos heredados en Supabase siguen presentes.
