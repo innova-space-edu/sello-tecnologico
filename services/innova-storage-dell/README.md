@@ -168,3 +168,19 @@ bash services/innova-storage-dell/smoke-nonowner-session.sh
 - Solicita correo y contraseña localmente por SSH, ocultando contraseña y sin guardar el JWT. Exige que el perfil corresponda a `docente`, no esté bloqueado, y no sea propietario; caso contrario aborta, **sin** intentar usar claves de estudiantes. Inicia el handler real de Dell en un puerto efímero solo dentro del contenedor, exige HTTP 404 y comprueba que las cuotas no cambiaron.
 - Si no existe una cuenta docente de pruebas cuyo titular autorice su uso, **no tomar prestadas contraseñas ajenas ni de estudiantes**. Crear una cuenta dedicada de pruebas mediante el flujo normal de CreaLab y asignar el rol docente por la vía administrativa habitual. Esta acción no se automatiza en este PR.
 - Hasta completar este test y la revisión de rutas de lectura para colaboradores, **no modificar Cloudflare DNS/Tunnel ni habilitar la API de manera permanente**. Los originales públicos heredados en Supabase siguen presentes.
+
+## Cuenta DOCENTE temporal automatizada (autorización del propietario, 19/11/2026)
+El operador autorizó expresamente crear una cuenta de prueba temporal para cerrar la validación de permisos. No usar las contraseñas de otros docentes, del administrador ni de estudiantes. El conector de administración del Dell no permite ejecutar procesos nuevos en el anfitrión; la ejecución debe hacerse por SSH en el Dell, que ya tiene las claves privadas.
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/smoke-ephemeral-docente.sh
+```
+El script utiliza exclusivamente la API oficial de administración de Supabase Auth en el proyecto CreaLab (clave `sb_secret_`, nunca publicada):
+1. Genera `innova-storage-qa-<aleatorio>@colprovidencia.cl` con contraseña criptográfica solo en memoria. Usando `email_confirm=true` no requiere buzón ni envía invitación; un trigger de CreaLab asigna automáticamente el rol `docente` según el dominio.
+2. Abre sesión por contraseña desde el contenedor efímero, exige perfil `docente`, `blocked=false` y que no sea autor de la evidencia piloto.
+3. Ejecuta `createHandler` real en loopback dentro del contenedor sin publicar puertos; exige `HTTP 404` ante acceso al piloto habilitado y que no devuelva enlace R2.
+4. Comprueba cuotas globales y de usuario antes/después; deben ser idénticas.
+5. En `finally` solicita `DELETE /auth/v1/admin/users/{id}` y verifica que el perfil asociado desapareció por cascada. Si la eliminación falla, muestra solo el identificador/correo **sintético** para borrado manual desde Supabase Authentication → Users, **sin mostrar contraseña ni tokens**. Una terminación forzada tipo SIGKILL/corte eléctrico puede impedir el `finally`; comprobar al cierre que no queden cuentas con prefijo `innova-storage-qa-`.
+
+El script conserva `INNOVA_STORAGE_DELL_ENABLED=false` en el archivo privado. No habilita el servicio, no toca Vercel, DNS, Cloudflare Tunnel, usuarios reales, pruebas, ni evidencia almacenada. El único efecto permitido de esta prueba es crear y eliminar la cuenta sintética y sus filas de perfil/edad vinculadas.
