@@ -87,3 +87,21 @@ bash services/innova-storage-dell/configure-local-credentials.sh
 ```
   El script pide cuatro claves ocultas y orígenes HTTPS permitidos; escribe exclusivamente `~/.config/innova-storage-dell/storage.env` con modo 0600, `INNOVA_STORAGE_DELL_ENABLED=false`, sin reiniciar ningún contenedor, sin tocar DNS ni Tunnel.
 - Después de configurar, **no cambiar aún `enabled=false`**, ni activar la URL pública; primero probar el servicio local autenticado, permisos y firma privada con una sola evidencia.
+
+## Comprobación real, solo lectura (credenciales ya guardadas)
+Después de ejecutar `configure-local-credentials.sh`, **no habilitar el servicio**. Desde SSH del Dell:
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/check-local-connections.sh
+```
+Esta herramienta usa la imagen Docker ya instalada y `~/.config/innova-storage-dell/storage.env` sin copiar ni imprimir claves. Es un contenedor temporal sin puertos publicados; no reinicia `innova-storage-gateway`. Comprueba:
+- REST Supabase usando `sb_publishable_` con `limit=0` (no extrae evidencias).
+- Acceso privado al registro de R2 con `sb_secret_` y rechazo a la misma consulta con credenciales públicas.
+- RPC de cuotas con argumentos nulos, que devuelve `false` sin reservar ni gastar cuota.
+- GET privado R2 del único piloto de 65.468 bytes mediante URL SigV4 de 60 segundos; compara SHA256 y tamaño sin mostrar el documento ni la URL.
+- El archivo de configuración debe ser 0600, del usuario actual, sin symlink, y el servicio debe continuar `enabled=false`.
+
+La prueba hace peticiones de lectura reales a Supabase y a R2, pero **no** cambia configuraciones, no solicita secretos en el chat, no toca DNS/túnel, no habilita registros adicionales ni despliega el servicio. Las claves cargadas como variables del contenedor efímero son visibles a administradores con permisos Docker; mantener permisos de acceso al Docker host controlados. El acceso directo a R2 genera una operación GET; no constituye garantía de costo cero.
+
+Cuando la prueba pase, continuar con autorización real desde una sesión de usuario y una ruta protegida, sin pasar datos estudiantiles por el túnel.
