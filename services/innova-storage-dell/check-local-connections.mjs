@@ -37,12 +37,28 @@ async function run() {
   report('configuración privada reconocida; gateway sigue desactivado')
 
   stage = 'Supabase publishable'
-  // No user token: tests the project's publishable key, without fetching student rows.
-  const anon = await request(SUPABASE_URL + '/rest/v1/evidences?select=id&limit=0', {
-    headers: headersFor(e.SUPABASE_PUBLISHABLE_KEY)
+  // Without a user JWT, RLS/grants in this project reject SELECT on evidences.
+  // HTTP 401/403 from PostgREST with PostgreSQL 42501 confirms the API key
+  // reached PostgREST; it does NOT mean the publishable key was invalid.
+  // Never change evidence policies or grant public SELECT for this preflight.
+  const anon = await fetch(SUPABASE_URL + '/rest/v1/evidences?select=id&limit=0', {
+    headers: headersFor(e.SUPABASE_PUBLISHABLE_KEY),
+    cache: 'no-store',
+    redirect: 'error',
+    signal: AbortSignal.timeout(12000)
   })
-  if (!Array.isArray(await anon.json())) fail('Formato REST inesperado')
-  report('Supabase publishable key y REST API')
+  if (anon.status === 200) {
+    if (!Array.isArray(await anon.json())) fail('Formato REST inesperado')
+    report('Supabase publishable key aceptada por PostgREST')
+  } else if (anon.status === 401 || anon.status === 403) {
+    const problem = await anon.json().catch(() => null)
+    if (problem?.code !== '42501') {
+      fail('Error de API pública distinto a denegación de permisos (HTTP ' + anon.status + ')')
+    }
+    report('Supabase publishable key reconocida; lectura anónima de evidencias denegada (42501)')
+  } else {
+    fail('Estado REST inesperado (HTTP ' + anon.status + ')')
+  }
 
   stage = 'Supabase secret'
   const registryUrl = new URL(SUPABASE_URL + '/rest/v1/innova_r2_evidence_registry')
@@ -67,9 +83,11 @@ async function run() {
     cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(12000)
   })
   if (unauthorized.status !== 401 && unauthorized.status !== 403) {
-    fail('Registro privado accesible por anon (HTTP ' + unauthorized.status + ')')
+    fail('Registro privado accesible o respuesta inesperada (HTTP ' + unauthorized.status + ')')
   }
-  report('acceso anónimo al registro privado denegado')
+  const denial = await unauthorized.json().catch(() => null)
+  if (denial?.code !== '42501') fail('Registro privado: rechazo distinto de permisos PostgreSQL')
+  report('acceso anónimo al registro privado denegado por PostgreSQL (42501)')
 
   stage = 'Supabase quota no-op'
   // Null arguments exit BEFORE advisory locks or writing counters, as verified in PG tests.
