@@ -7,10 +7,19 @@ cd "$ROOT"
 command -v docker >/dev/null || { echo "Docker no disponible"; exit 1; }
 docker compose version >/dev/null || { echo "Docker Compose no disponible"; exit 1; }
 command -v curl >/dev/null || { echo "curl no disponible"; exit 1; }
-command -v node >/dev/null || { echo "Node.js no disponible: ejecutar antes pruebas con Node desde Dell"; exit 1; }
-
-node --test services/innova-storage-dell/server.test.mjs
-node scripts/test-innova-r2-sign.mjs
+# Node.js runs ONLY in the Docker image. No host Node.js installation is required.
+# This image may be downloaded once. Run tests with no network or host secrets.
+image="innova-storage-gateway:local-test"
+echo "Construyendo imagen Docker de prueba (sin iniciar el servicio)..."
+docker build --tag "$image" --file services/innova-storage-dell/Dockerfile "$ROOT"
+test_node() {
+  docker run --rm --network none --read-only --cap-drop ALL \
+    --security-opt no-new-privileges --pids-limit 64 --memory 256m \
+    --mount "type=bind,src=$ROOT,dst=/workspace,readonly" \
+    --workdir /workspace --entrypoint node "$image" "$@"
+}
+test_node --test services/innova-storage-dell/server.test.mjs
+test_node scripts/test-innova-r2-sign.mjs
 
 dir="${HOME}/.config/innova-storage-dell"
 file="$dir/storage.env"
@@ -44,8 +53,13 @@ if docker ps --format '{{.Names}} {{.Ports}}' | grep -E '127\.0\.0\.1:8788->' | 
 fi
 echo "Se construirá únicamente el servicio de prueba, deshabilitado, enlazado a 127.0.0.1:8788."
 INNOVA_STORAGE_ENV_FILE="$file" docker compose --project-name innova-storage-gateway \
-  -f services/innova-storage-dell/compose.example.yml up -d --build --no-deps
-result="$(curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8788/healthz)"
+  -f services/innova-storage-dell/compose.example.yml up -d --no-build --no-deps
+result=""
+for attempt in $(seq 1 15); do
+  result="$(curl --fail --silent --max-time 3 http://127.0.0.1:8788/healthz || true)"
+  [[ -n "$result" ]] && break
+  sleep 1
+done
 printf 'Health: %s\n' "$result"
 if [[ "$result" != *'"enabled":false'* ]]; then
   echo "Se esperaba un servicio DESHABILITADO. Comprobar manualmente."
