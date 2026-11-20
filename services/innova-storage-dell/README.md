@@ -105,3 +105,9 @@ Esta herramienta usa la imagen Docker ya instalada y `~/.config/innova-storage-d
 La prueba hace peticiones de lectura reales a Supabase y a R2, pero **no** cambia configuraciones, no solicita secretos en el chat, no toca DNS/túnel, no habilita registros adicionales ni despliega el servicio. Las claves cargadas como variables del contenedor efímero son visibles a administradores con permisos Docker; mantener permisos de acceso al Docker host controlados. El acceso directo a R2 genera una operación GET; no constituye garantía de costo cero.
 
 Cuando la prueba pase, continuar con autorización real desde una sesión de usuario y una ruta protegida, sin pasar datos estudiantiles por el túnel.
+
+## Corrección del preflight para evidencias protegidas
+- En la primera ejecución en Dell: `PASS: configuración privada reconocida` seguido por `FAIL: Supabase publishable — HTTP 401 (esperado 200)`.
+- Investigación en Supabase `edge_logs`: la solicitud llegó a PostgREST, que devolvió `42501` (privilegios insuficientes) al intentar consultar `evidences` sin JWT de usuario. La clave publicable moderna `default` figura habilitada en el proyecto.
+- Se corrigió `check-local-connections.mjs`: si la lectura anónima devuelve `401/403` con `code:42501`, se reconoce como bloqueo de autorización y el preflight continúa; errores distintos siguen siendo fallo. La comprobación del registro privado exige igualmente `42501`; nunca se relajan permisos ni se fuerza un login administrativo.
+- Esta corrección no confirma todavía las credenciales secretas, R2 ni la conexión real desde el Dell: repetir `bash services/innova-storage-dell/check-local-connections.sh` tras actualizar el repositorio. La API permanece `enabled=false`.
