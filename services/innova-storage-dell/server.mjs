@@ -19,17 +19,18 @@ export function loadConfig(env = process.env) {
     }
   }
   const enabled = env.INNOVA_STORAGE_DELL_ENABLED === 'true'
-  if (enabled && (!env.SUPABASE_ANON_KEY || !env.SUPABASE_SERVICE_ROLE_KEY || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || origins.length === 0)) {
+  if (enabled && (!env.SUPABASE_PUBLISHABLE_KEY || !env.SUPABASE_SECRET_KEY || !env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || origins.length === 0)) {
     throw new Error('Dell Storage requires credentials and explicit allowed origins')
   }
+  if (enabled && (!env.SUPABASE_PUBLISHABLE_KEY.startsWith('sb_publishable_') || !env.SUPABASE_SECRET_KEY.startsWith('sb_secret_'))) throw new Error('Use new Supabase API keys')
   if (enabled && env.SUPABASE_URL !== PROJECT_URL) throw new Error('Unexpected Supabase project')
   if (enabled && env.R2_ACCOUNT_ID !== ACCOUNT_ID) throw new Error('Unexpected R2 account')
   return {
     enabled,
     origins: new Set(origins),
     supabaseUrl: PROJECT_URL,
-    anonKey: env.SUPABASE_ANON_KEY || '',
-    serviceKey: env.SUPABASE_SERVICE_ROLE_KEY || '',
+    publicKey: env.SUPABASE_PUBLISHABLE_KEY || '',
+    secretKey: env.SUPABASE_SECRET_KEY || '',
     accessKeyId: env.R2_ACCESS_KEY_ID || '',
     secretAccessKey: env.R2_SECRET_ACCESS_KEY || '',
     accountId: ACCOUNT_ID,
@@ -60,12 +61,12 @@ export async function authorizeEvidence(token, evidenceId, config, fetcher = fet
   }
   try {
     const userResponse = await jsonFetch(fetcher, config.supabaseUrl + '/auth/v1/user', {
-      headers: restHeaders(config.anonKey, token),
+      headers: restHeaders(config.publicKey, token),
     })
     const userId = userResponse.data?.id
     if (!userResponse.ok || !UUID.test(String(userId || ''))) return { status: 401, body: { error: 'No autorizado' } }
 
-    const userHeaders = restHeaders(config.anonKey, token)
+    const userHeaders = restHeaders(config.publicKey, token)
     const profileUrl = new URL(config.supabaseUrl + '/rest/v1/profiles')
     profileUrl.searchParams.set('id', 'eq.' + userId)
     profileUrl.searchParams.set('select', 'role,blocked')
@@ -84,7 +85,8 @@ export async function authorizeEvidence(token, evidenceId, config, fetcher = fet
     if (!Array.isArray(evidence.data) || !evidence.data.length) return { status: 404, body: { error: 'Archivo no disponible' } }
 
     // Service key can read the registry, but MUST NOT authorize the user's evidence row.
-    const adminHeaders = restHeaders(config.serviceKey, config.serviceKey)
+    // New sb_secret keys must be sent only as apikey, never as Bearer JWT.
+    const adminHeaders = { apikey: config.secretKey, Accept: 'application/json' }
     const registryUrl = new URL(config.supabaseUrl + '/rest/v1/innova_r2_evidence_registry')
     registryUrl.searchParams.set('evidence_id', 'eq.' + evidenceId)
     registryUrl.searchParams.set('select', '*')
