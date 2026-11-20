@@ -78,4 +78,6 @@ expect_status 204 "preflight CORS de CreaLab permitido" \
 expect_status 413 "cuerpos inesperados rechazados" \
   --request POST --data '{}' "$url/v1/evidences/$id/authorize"
 echo "PASS: sin JWT válido no se emiten enlaces, ni se reserva cuota"
-echo "PASS: contenedor efímero eliminado automáticamente al terminar"
+cleanup
+trap - EXIT
+echo "PASS: contenedor efímero eliminado; servicio permanente sin cambios"
