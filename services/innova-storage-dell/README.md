@@ -142,3 +142,16 @@ bash services/innova-storage-dell/smoke-real-session.sh
 - La prueba requiere inicio de sesión por contraseña. Si el usuario tiene MFA, no recuerda su contraseña o inicia sesión por otro proveedor, no bajar las protecciones; detener y preparar un flujo autenticado desde navegador que no exporte el JWT a un canal externo.
 - En caso de denegación de RLS/propiedad (404/403), revisar políticas, perfil y registro para la cuenta de prueba; **no** habilitar archivos nuevos ni eliminar RLS para corregir el test.
 - Esta prueba positiva con una cuenta autorizada no sustituye la prueba negativa de un usuario sin permisos ni la futura revisión de portafolios históricos. No activar la API pública sin ambos.
+
+## Resultado de autenticación real y siguiente prueba negativa
+- Operador ejecutó `smoke-real-session.sh` con cuenta administradora real: login Supabase PASS; autorización del gateway Dell con JWT/RLS/registro/cuota PASS; GET privado desde R2 con 65.468 B y SHA-256 coincidente PASS. Proceso efímero eliminado, sin puertos publicados. No se guardaron contraseñas en repositorio.
+- Confirmado vía Supabase: la reserva del gateway del 20-11-2026 UTC fue exactamente una operación y 65.468 bytes; total del mes 3 operaciones y 196.404 bytes incluyendo dos solicitudes previas de Preview. Son **bytes reservados**, no telemetría exacta de R2.
+- Registro privado: 123 evidencias, 1 habilitada y 122 deshabilitadas. Preparado un test de denegación para esos registros deshabilitados e identificadores inexistentes usando cuenta administradora real, sin emitir enlaces ni reservar cuota.
+- Para ejecutar la prueba negativa sin publicar puertos ni revelar credenciales:
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/smoke-negative-registry.sh
+```
+- Requiere login administrador por contraseña en terminal SSH; compara los contadores antes/después y exige HTTP 404 para un registro deshabilitado y un UUID inexistente. El contenedor es efímero y mantiene el servicio permanente `enabled=false`. El script pasó validación de sintaxis, no se ha ejecutado aún con sesión real.
+- Importante: esta prueba no demuestra que un usuario autenticado **ajeno al proyecto** esté bloqueado. Esa comprobación independiente aún requiere una cuenta de pruebas sin permisos para el archivo piloto. No usar las contraseñas de estudiantes para los ensayos.
