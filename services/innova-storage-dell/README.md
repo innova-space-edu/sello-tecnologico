@@ -111,3 +111,18 @@ Cuando la prueba pase, continuar con autorización real desde una sesión de usu
 - Investigación en Supabase `edge_logs`: la solicitud llegó a PostgREST, que devolvió `42501` (privilegios insuficientes) al intentar consultar `evidences` sin JWT de usuario. La clave publicable moderna `default` figura habilitada en el proyecto.
 - Se corrigió `check-local-connections.mjs`: si la lectura anónima devuelve `401/403` con `code:42501`, se reconoce como bloqueo de autorización y el preflight continúa; errores distintos siguen siendo fallo. La comprobación del registro privado exige igualmente `42501`; nunca se relajan permisos ni se fuerza un login administrativo.
 - Esta corrección no confirma todavía las credenciales secretas, R2 ni la conexión real desde el Dell: repetir `bash services/innova-storage-dell/check-local-connections.sh` tras actualizar el repositorio. La API permanece `enabled=false`.
+
+## Prueba local de la API habilitada solo temporalmente (sin túnel ni DNS)
+Después del PASS completo de `check-local-connections.sh`, ejecutar:
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/smoke-local-enabled.sh
+```
+La prueba exige que la configuración permanente continúe con `INNOVA_STORAGE_DELL_ENABLED=false`, que las claves no sean accesibles a otros usuarios (0600) y que el puerto loopback 8790 esté libre. Construye **otra imagen** `innova-storage-gateway:local-auth-smoke` con un `Dockerfile.dockerignore` específico que incluye únicamente tres archivos de código de la API. La imagen existente `innova-storage-gateway:local-test` y el contenedor permanente deshabilitado se mantienen.
+
+Crea un contenedor **efímero** con `INNOVA_STORAGE_DELL_ENABLED=true` *solo* como variable de entorno del contenedor; publica exclusivamente `127.0.0.1:8790`. Comprueba HTTP healthz, 401 sin JWT, 401 con JWT ficticio, 403 con Origin externo, CORS 204 para el origen conocido y rechazo 413 de cuerpos no esperados. No crea enlaces firmados, porque no usa un JWT válido; no modifica cuotas, no accede a evidencias privadas y elimina automáticamente el contenedor al terminar o ante error. No modifica el archivo privado, DNS, túnel, Vercel ni los otros contenedores.
+
+**Este smoke test no sustituye la prueba con sesión autenticada real** ni la auditoría de autorización por propietario/roles. El backend sigue sin exponerse por Internet, y el cliente CreaLab permanece apagado. Para comprobar esa ruta completa será necesario definir un flujo de prueba con JWT de sesión gestionado localmente (sin copiarlo a chats ni logs), confirmando que el usuario sin permiso recibe 404 y que solo el usuario autorizado obtiene un enlace temporal.
+
+Documentación oficial de Dockerfile-specific ignore: https://docs.docker.com/build/concepts/context/#filename-and-location.
