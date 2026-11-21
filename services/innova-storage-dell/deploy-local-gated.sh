@@ -54,7 +54,10 @@ if [[ "${#networks[@]}" -ne 1 ]]; then
 fi
 export INNOVA_SHARED_TUNNEL_NETWORK="${networks[0]}"
 export INNOVA_STORAGE_ENV_FILE="$config"
-echo "PASS: red Docker existente de Cloudflare Tunnel identificada (sin modificar otros servicios)."
+# Validate interpolation/YAML without disclosing the rendered secrets.
+docker compose --project-name "$project" -f "$compose" config --quiet ||
+  { echo "FAIL: docker compose config inválida; sin cambios"; exit 1; }
+echo "PASS: red Docker y Compose validadas (sin modificar otros servicios)."
 
 # The Dockerfile-specific .dockerignore includes ONLY three source files.
 echo "Construyendo imagen independiente del gateway; el piloto desactivado :8788 no se modifica..."
