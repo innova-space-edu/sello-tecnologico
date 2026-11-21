@@ -184,3 +184,25 @@ El script utiliza exclusivamente la API oficial de administración de Supabase A
 5. En `finally` solicita `DELETE /auth/v1/admin/users/{id}` y verifica que el perfil asociado desapareció por cascada. Si la eliminación falla, muestra solo el identificador/correo **sintético** para borrado manual desde Supabase Authentication → Users, **sin mostrar contraseña ni tokens**. Una terminación forzada tipo SIGKILL/corte eléctrico puede impedir el `finally`; comprobar al cierre que no queden cuentas con prefijo `innova-storage-qa-`.
 
 El script conserva `INNOVA_STORAGE_DELL_ENABLED=false` en el archivo privado. No habilita el servicio, no toca Vercel, DNS, Cloudflare Tunnel, usuarios reales, pruebas, ni evidencia almacenada. El único efecto permitido de esta prueba es crear y eliminar la cuenta sintética y sus filas de perfil/edad vinculadas.
+
+## Preparado 21-11-2026: docente real PASS, despliegue local aislado y conciliación de vídeos
+- Una cuenta docente REAL (sin usar admin ni estudiantes), **no autora**, ejecutó `smoke-nonowner-session.sh`: PASS rol docente; HTTP 404 al solicitar archivo piloto habilitado; 0 enlaces privados; cuotas intactas; contenedor efímero eliminado. Esta prueba autoriza continuar con la configuración técnica, pero no elimina la necesidad de auditoría completa de otros tipos de usuarios.
+- Auditoría SQL: 144 evidencias, 133 con URL, 123 registradas en R2, 10 sin registro: seis `video/quicktime` y cuatro `video/mp4` (393.781.996 bytes de 21.983.538 a 51.317.925 cada una); todas tienen proyecto, autor, MIME y URL del bucket correcto. Además, 129 de 1.681 entradas de `portfolio_archive_items` contienen referencias al bucket original.
+- `reconcile-unregistered.sh` lee las 10 copias ya presentes en R2 y compara SHA-256 y tamaño en streaming, sin escribir en Supabase Storage. `--verify-only` no escribe; `--register-disabled` verifica las diez ANTES de crear nuevos registros `enabled=false`. En caso de interrupción durante el registro, puede haber filas parciales; detener y conciliar manualmente antes de repetir. Requiere 394 MB de lecturas R2.
+```bash
+cd ~/innova-storage/crealab
+git pull --ff-only origin feat/innova-storage-r2-migration
+bash services/innova-storage-dell/reconcile-unregistered.sh --register-disabled
+```
+- `compose.production.yml` define un segundo contenedor Docker `innova-storage-dell-prod` distinto del piloto `:8788`. Solo publica `127.0.0.1:8789` al anfitrión, y utiliza una red Docker externa **ya existente** compartida con `intranet-tunnel`. El archivo privado conserva `INNOVA_STORAGE_DELL_ENABLED=false` y sólo la variable del contenedor nuevo es `true`. El servicio `innova-storage-prod:8080` será el destino del túnel una vez verificado.
+- `deploy-local-gated.sh` identifica la red del túnel comprobando que resuelve `portal:3000`; se niega a elegir cuando hay 0 o varias coincidencias. Construye imagen nueva con contexto Docker mínimo, inicia el contenedor de producción candidato, prueba `/healthz`, HTTP 401 sin JWT, CORS 204 y resolución de `innova-storage-prod` en la red Docker. Si falla, elimina la nueva instancia. No toca la anterior ni Cloudflare.
+```bash
+bash services/innova-storage-dell/deploy-local-gated.sh
+```
+- Reversión local sin modificar el piloto, claves ni archivos:
+```bash
+bash services/innova-storage-dell/rollback-local-gateway.sh
+```
+- Cloudflare: túnel remoto `intranet-dell` id `bc0eb84c-4249-4928-82cf-0266339273e2` saludable. Nuevo hostname propuesto `storage-api.innova-space-edu.cl`, **aún sin DNS ni regla ingress**. Una vez comprobado el contenedor, insertar regla `{hostname:storage-api.innova-space-edu.cl,service:http://innova-storage-prod:8080}` **antes** de `http_status:404`, conservando todas las reglas previas y `warp-routing`; crear CNAME proxy al túnel. Por diseño, esta API usa JWT Supabase de usuario como Bearer; exigir autenticación Cloudflare Access al mismo endpoint interferiría con el flujo si no se integra explícitamente. Mantener fail-closed y considerar mitigación DDoS/rate limiting.
+- UI: la vista de detalle `src/app/evidencias/[id]/page.tsx` tiene flujo privado *sólo* para el piloto cuando se activen `NEXT_PUBLIC_INNOVA_STORAGE_DELL_ENABLED=true`, `NEXT_PUBLIC_INNOVA_STORAGE_DELL_URL=https://storage-api.innova-space-edu.cl` y `NEXT_PUBLIC_INNOVA_STORAGE_DELL_PILOT_EVIDENCE_ID=cb497fe7-f927-401c-81e2-bf09d4256cc6`. En ausencia de esas variables, el sitio funciona como antes. No habilitar las variables sin aprobar preview y route externa.
+- **No mover el bucket original ni eliminar URLs históricas en esta fase**. Nueva subida, mensajes, portfolios y medios compartidos siguen usando Supabase Storage; requieren un camino de escritura directa R2 con firma de PUT, finalización verificada, política de autorización, CORS R2 y migración por módulos antes del corte global.
