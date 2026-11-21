@@ -1,0 +1,39 @@
+# Dedicated production-candidate gateway; separate from the disabled :8788 pilot.
+# Deployed ONLY after authenticated owner/nonowner checks pass.
+# Tunnel and DNS are configured separately after verifying Docker connectivity.
+services:
+  innova-storage-authorizer:
+    image: innova-storage-gateway:prod-candidate
+    container_name: innova-storage-dell-prod
+    env_file:
+      - ${INNOVA_STORAGE_ENV_FILE:?Set protected absolute Dell env file}
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8080"
+      # Do not modify the 0600 file: this override applies ONLY to this container.
+      INNOVA_STORAGE_DELL_ENABLED: "true"
+    ports:
+      - "127.0.0.1:8789:8080"
+    networks:
+      tunnel-shared:
+        aliases:
+          - innova-storage-prod
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>r.json()).then(x=>process.exit(x.ok===true&&x.enabled===true?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+networks:
+  tunnel-shared:
+    external: true
+    name: ${INNOVA_SHARED_TUNNEL_NETWORK:?Set shared Docker network reachable from intranet-tunnel}
