@@ -1,5 +1,6 @@
 'use client'
 import { createClient } from '@/lib/supabase'
+import { authorizeDellEvidenceDownload } from '@/lib/innova-storage/dell-client'
 import Sidebar from '@/components/Sidebar'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -48,6 +49,47 @@ export default function EvidenciaDetallePage() {
   const [rol, setRol] = useState('')
   const [imgError, setImgError] = useState(false)
   const [videoError, setVideoError] = useState(false)
+  const [privateFileUrl, setPrivateFileUrl] = useState<string | null>(null)
+  const [privateFileError, setPrivateFileError] = useState('')
+  const [privateFileBusy, setPrivateFileBusy] = useState(false)
+  const privatePilotEnabled = Boolean(ev?.id &&
+    process.env.NEXT_PUBLIC_INNOVA_STORAGE_DELL_ENABLED === 'true' &&
+    process.env.NEXT_PUBLIC_INNOVA_STORAGE_DELL_PILOT_EVIDENCE_ID === ev.id)
+  const displayFileUrl = privatePilotEnabled ? privateFileUrl : ev?.file_url
+
+  const requestPrivateFile = async (): Promise<string | null> => {
+    if (!ev?.id) return null
+    setPrivateFileError('')
+    setPrivateFileBusy(true)
+    try {
+      const data = await authorizeDellEvidenceDownload(ev.id)
+      if (!data?.url) throw new Error('No se pudo autorizar el archivo')
+      setPrivateFileUrl(data.url)
+      return data.url
+    } catch {
+      setPrivateFileUrl(null)
+      setPrivateFileError('No fue posible autorizar este archivo privado.')
+      return null
+    } finally {
+      setPrivateFileBusy(false)
+    }
+  }
+
+  const handleOpen = async () => {
+    if (!ev?.file_url) return
+    if (privatePilotEnabled) {
+      const signed = await requestPrivateFile()
+      if (signed) {
+        const link = document.createElement('a')
+        link.href = signed
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        link.click()
+      }
+      return
+    }
+    window.open(ev.file_url, '_blank', 'noopener,noreferrer')
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -83,6 +125,10 @@ export default function EvidenciaDetallePage() {
 
   const handleDownload = async () => {
     if (!ev?.file_url) return
+    if (privatePilotEnabled) {
+      await handleOpen()
+      return
+    }
     try {
       const response = await fetch(ev.file_url)
       const blob = await response.blob()
@@ -206,22 +252,31 @@ export default function EvidenciaDetallePage() {
                       className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
                       ⬇️ Descargar
                     </button>
-                    <a
-                      href={ev.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    <button
+                      onClick={handleOpen}
+                      disabled={privateFileBusy}
+                      className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50">
                       🔗 Abrir
-                    </a>
+                    </button>
                   </div>
                 </div>
 
                 <div className="p-4">
+                  {privatePilotEnabled && !privateFileUrl && (
+                    <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-4 text-center">
+                      <p className="mb-3 text-sm text-blue-900">Archivo privado: es necesario autorizar la vista previa.</p>
+                      <button type="button" disabled={privateFileBusy} onClick={() => void requestPrivateFile()}
+                        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                        {privateFileBusy ? 'Autorizando...' : 'Ver archivo privado'}
+                      </button>
+                    </div>
+                  )}
+                  {privatePilotEnabled && privateFileError && <p role="alert" className="mb-3 text-sm text-red-600">{privateFileError}</p>}
                   {/* Imagen */}
-                  {isImage && !imgError && (
+                  {isImage && !imgError && displayFileUrl && (
                     <div className="flex items-center justify-center bg-gray-50 rounded-xl p-4 min-h-48">
                       <img
-                        src={ev.file_url}
+                        src={displayFileUrl ?? undefined}
                         alt={ev.title}
                         className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
                         onError={() => setImgError(true)}
@@ -232,15 +287,15 @@ export default function EvidenciaDetallePage() {
                     <div className="bg-red-50 rounded-xl p-6 text-center">
                       <div className="text-4xl mb-2">🖼️</div>
                       <p className="text-sm text-red-500 font-medium">No se pudo cargar la imagen</p>
-                      <a href={ev.file_url} target="_blank" rel="noopener noreferrer"
+                      <a href={displayFileUrl ?? undefined} target="_blank" rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline mt-1 inline-block">Abrir en nueva pestaña</a>
                     </div>
                   )}
 
                   {/* Video */}
-                  {isVideo && !videoError && (
+                  {isVideo && !videoError && displayFileUrl && (
                     <video
-                      src={ev.file_url}
+                      src={displayFileUrl ?? undefined}
                       controls
                       className="w-full max-h-[60vh] rounded-xl bg-black"
                       onError={() => setVideoError(true)}
@@ -250,16 +305,16 @@ export default function EvidenciaDetallePage() {
                     <div className="bg-gray-50 rounded-xl p-6 text-center">
                       <div className="text-4xl mb-2">🎥</div>
                       <p className="text-sm text-gray-500 font-medium">No se pudo reproducir el video</p>
-                      <a href={ev.file_url} target="_blank" rel="noopener noreferrer"
+                      <a href={displayFileUrl ?? undefined} target="_blank" rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline mt-1 inline-block">Abrir en nueva pestaña</a>
                     </div>
                   )}
 
                   {/* PDF embed */}
-                  {isPDF && (
+                  {isPDF && displayFileUrl && (
                     <div className="rounded-xl overflow-hidden border border-gray-200">
                       <iframe
-                        src={ev.file_url}
+                        src={displayFileUrl ?? undefined}
                         className="w-full h-[70vh]"
                         title={ev.title}
                       />
