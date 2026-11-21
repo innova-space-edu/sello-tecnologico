@@ -14,13 +14,22 @@ const report = text => console.log('PASS: ' + text)
 const fail = () => { throw new Error('Test failed') }
 
 async function getJson(url, options, wanted = 200) {
-  const r = await fetch(url, { cache:'no-store', redirect:'error', signal:AbortSignal.timeout(15000), ...options })
+  let r
+  try {
+    r = await fetch(url, { cache:'no-store', redirect:'error', signal:AbortSignal.timeout(15000), ...options })
+  } catch (err) {
+    // Never log the URL, request body, credentials, or upstream error stack.
+    const safe = new Error('Network request failed')
+    safe.kind = err?.name === 'TimeoutError' ? 'timeout' : 'red/TLS/DNS'
+    throw safe
+  }
   if (r.status !== wanted) {
     const err = new Error('Bad HTTP status')
     err.httpCode = r.status
     throw err
   }
-  return await r.json()
+  try { return await r.json() }
+  catch { const err = new Error('Response not JSON'); err.kind = 'respuesta_no_json'; throw err }
 }
 function exactUserHeaders(config, token) {
   return { apikey:config.publicKey, Authorization:'Bearer '+token, Accept:'application/json' }
@@ -32,7 +41,7 @@ async function receiveCredentials() {
   let buffer=''
   for await (const part of process.stdin) {
     buffer += String(part)
-    if (buffer.length > 4096) fail()
+    if (buffer.length > 4096) { const err = new Error('Long input'); err.kind = 'formato_credenciales'; throw err }
   }
   const [email,password] = buffer.replace(/\r/g,'').split('\n')
   buffer=''
@@ -137,6 +146,7 @@ async function run() {
   report('prueba terminada sin publicar puertos ni modificar servicio permanente')
 }
 run().catch(err=>{
-  console.error('FAIL: '+phase+(Number.isInteger(err.httpCode)?' — HTTP '+err.httpCode:''))
+  const detail = Number.isInteger(err.httpCode) ? ' — HTTP '+err.httpCode : err.kind ? ' — '+err.kind : ''
+  console.error('FAIL: '+phase+detail)
   process.exitCode=1
 })
