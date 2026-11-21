@@ -70,7 +70,8 @@ async function main(){
  ])
  const has=new Set(existing.map(x=>x.evidence_id))
  const missing=items.filter(x=>x.file_url && !has.has(x.id))
- if(missing.length!==EXPECTED_MISSING) fail('recuento distinto del inventario aprobado: '+missing.length)
+ if(missing.length===0 && existing.length===133){ report('registro ya conciliado; no hay evidencias sin registrar'); return }
+ if(missing.length!==EXPECTED_MISSING || existing.length!==123) fail('recuento distinto del inventario aprobado: '+missing.length+' faltantes, '+existing.length+' registradas')
  let bytes=0
  const verified=[]
  for(let i=0;i<missing.length;i++){
@@ -85,20 +86,17 @@ async function main(){
  report('verificados '+verified.length+' archivos, '+bytes+' bytes, con SHA-256 de R2')
  if(!isWrite){report('modo solo lectura; registro Supabase sin cambios');return}
  stage='registro deshabilitado'
- // One insert per record; never upsert or mark enabled. If interruption occurs,
- // the script fails the count gate next time: reconcile partial rows explicitly.
- for(let i=0;i<verified.length;i++){
-   const record=verified[i]
-   await api(SUPABASE+'/rest/v1/innova_r2_evidence_registry',{
-     method:'POST',
-     headers:{...headers,'Content-Type':'application/json',Prefer:'return=minimal'},
-     body:JSON.stringify(record)
-   },201)
-   report('registro deshabilitado '+(i+1)+'/'+verified.length)
- }
+ // Single PostgREST bulk INSERT runs in one database transaction.
+ // Never UPSERT and never enable records; any conflict aborts the full batch.
+ await api(SUPABASE+'/rest/v1/innova_r2_evidence_registry',{
+   method:'POST',
+   headers:{...headers,'Content-Type':'application/json',Prefer:'return=minimal'},
+   body:JSON.stringify(verified)
+ },201)
+ report('10 registros deshabilitados insertados en una sola transacción')
  const final=await list('innova_r2_evidence_registry','evidence_id,enabled')
  if(final.length!==existing.length+verified.length)fail('conteo final incorrecto')
- if(final.filter(x=>x.enabled===true).length!==1)fail('se alteró cantidad de evidencias habilitadas')
+ if(final.filter(x=>x.enabled===true).length!==1 || final.filter(x=>x.enabled===false).length!==132)fail('el registro final no es el esperado')
  report('Supabase conciliado; 133 registros, solo 1 habilitado')
 }
 main().catch(err=>{
